@@ -1,0 +1,28 @@
+dependencies: {}
+description: HW timer-based driver for incremental rotary encoders
+discussion: https://github.com/esp-idf-lib/core/discussions
+documentation: https://esp-idf-lib.github.io/encoder/
+files:
+  exclude:
+  - docs/**/*
+issues: https://github.com/esp-idf-lib/encoder/issues
+license: BSD-3
+maintainers:
+- Ruslan V. Uss (@UncleRus) <unclerus@gmail.com>
+repository: git://github.com/esp-idf-lib/encoder.git
+repository_info:
+  commit_sha: 608ac261ea1d4fdb93ff8ffc3701ae87a2f380ae
+  path: .
+targets:
+- esp32
+- esp32c2
+- esp32c3
+- esp32c5
+- esp32c6
+- esp32c61
+- esp32h2
+- esp32p4
+- esp32s2
+- esp32s3
+url: https://github.com/esp-idf-lib/core
+version: 1.0.7
