@@ -98,8 +98,8 @@ void drawCube(U8G2 &display, float angleX, float angleY) {
 }
 
 static float angleX = 0, angleY = 0;
-static float height = 28;
-static bool state = 0;
+// static float height = 28;
+// static bool state = 0;
 
 // --- USER DEFINED APP: A Cube Demo ---
 class CubeDemo : public IApplication {

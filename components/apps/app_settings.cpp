@@ -57,13 +57,13 @@ ListItem sub_Alarm[3] = {
 // };
 
 ListItem itemList[10] = {
-    ListItem(">>> Settings <<<"),
-    ListItem("- Language", sub_Language, 3),
-    ListItem("- Tube config", nullptr, 0, [](){  }),
-    ListItem("- Click Sound", nullptr, 0, nullptr, ListItemExtra{&en_sound_click, nullptr}),
-    ListItem("- Alarm", sub_Alarm, 3),
-    ListItem("- Brightness", nullptr, 0, [](){ ui.showPopupProgress(brightness, 0, 100, "Brightness", 100, 40, 5000, 1); }, ListItemExtra{nullptr, &brightness}),
-    ListItem("- Volume", nullptr, 0, [](){ ui.showPopupProgress(sound_volume, 0, 100, "Volume", 100, 40, 5000, 1); }, ListItemExtra{nullptr, &sound_volume}),
+    ListItem(">>>>> 设置 <<<<<"),
+    ListItem("- 语言", sub_Language, 3),
+    ListItem("- 盖革管", nullptr, 0, [](){  }),
+    ListItem("- 辐射精示", nullptr, 0, nullptr, ListItemExtra{&en_sound_click, nullptr}),
+    ListItem("- 辐射警报", sub_Alarm, 3),
+    ListItem("- 亮度", nullptr, 0, [](){ ui.showPopupProgress(brightness, 0, 100, "Brightness", 100, 40, 5000, 1); }, ListItemExtra{nullptr, &brightness}),
+    ListItem("- 音量", nullptr, 0, [](){ ui.showPopupProgress(sound_volume, 0, 100, "Volume", 100, 40, 5000, 1); }, ListItemExtra{nullptr, &sound_volume}),
     ListItem("- Anytone", nullptr, 0, [](){  }),
     ListItem("- Potato", nullptr, 0, [](){  }),
     ListItem("- Tomato", nullptr, 0, [](){  })

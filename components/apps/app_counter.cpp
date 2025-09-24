@@ -191,6 +191,15 @@ public:
         icon_alert.draw();
         icon_battery.draw();
         brace.draw();
+
+        if (histogram.isExpanded()) {
+            u8g2.clearBuffer();
+            u8g2.drawStr(3, 10, "<STATS>");
+            u8g2.drawStr(3, 20, "Max:");
+            u8g2.drawStr(3, 30, "1.45uSv/h");
+            u8g2.drawStr(3, 40, "Min:");
+            u8g2.drawStr(3, 50, "0.25uSv/h");
+        }
         histogram.draw();
         m_focusMan.draw();
     }
@@ -224,7 +233,6 @@ public:
         m_ui.markFading();
     }
 };
-
 AppItem counter_app{
     .title = "COUNTER",
     .bitmap = image_info_bits,
