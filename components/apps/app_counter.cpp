@@ -24,15 +24,20 @@
 #include "widgets/brace/brace.h"
 #include "widgets/iconButton/iconButton.h"
 #include "focus/focus.h"
+#include "voltage_pid.hpp"
+#include "counter_task.h"
+#include "pin_definitions.h"
+#include "system_varibles.h"
+#include "blinker/Blinker.h"
+#include <fastmath.h>
+
+extern VoltagePID voltage_controller;
+
 static const unsigned char image_info_bits[] = {
-    0xf0,0xff,0x0f,0xfc,0xff,0x3f,0xfe,0xff,0x7f,0xfe,0xff,0x7f,0xff,0x81,0xff,0xff,0x00,0xff,0x7f,0x3e,0xff,0x7f,0x3f,0xff,0xff,0x3f,0xff,0xff,0x1f,0xff,0xff,0x8f,0xff,0xff,0xc7,0xff,0xff,0xe3,0xff,0xff,0xe3,0xff,0xff,0xe3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xe3,0xff,0xff,0xe3,0xff,0xff,0xff,0xff,0xfe,0xff,0x7f,0xfe,0xff,0x7f,0xfc,0xff,0x3f,0xf0,0xff,0x0f
+    0xf0,0xff,0x0f,0xfc,0xff,0x3f,0xde,0xff,0x7b,0x8e,0xff,0x71,0x87,0xff,0xe1,0x03,0xff,0xc0,0x03,0x7e,0xc0,0x01,0x7e,0x80,0x01,0x3c,0x80,0x01,0x3c,0x80,0x01,0x66,0x80,0x01,0xc3,0x80,0xff,0xc3,0xff,0xff,0xe7,0xff,0xff,0xff,0xff,0xff,0xfb,0xff,0xff,0x71,0xff,0xff,0x31,0xff,0xff,0x10,0xfe,0xff,0x10,0xfe,0x7e,0x10,0x74,0xfe,0x10,0x60,0xfc,0xe3,0x3f,0xf0,0xff,0x0f
 };
 static const unsigned char image_Background_bits[] = {0xfe,0x01,0x00,0x00,0x00,0x00,0x00,0xe0,0xff,0xff,0xff,0x0f,0x00,0x00,0x00,0x00,0x01,0x03,0x00,0x00,0x00,0x00,0x00,0x30,0x00,0x00,0x00,0x18,0x00,0x00,0x00,0x00,0x7d,0x06,0x00,0x00,0x00,0x00,0x00,0x18,0xff,0xb7,0x55,0x31,0x00,0x00,0x00,0x00,0x81,0xfc,0xff,0xff,0xff,0xff,0xff,0x8f,0x00,0x00,0x00,0xe2,0xff,0xff,0xff,0x7f,0x3d,0x01,0x00,0x00,0x00,0x00,0x00,0x40,0xb6,0xea,0xff,0x04,0x00,0x00,0x00,0x80,0x41,0xfe,0xff,0xff,0xaa,0xfe,0xff,0x3f,0x01,0x00,0x00,0xf9,0xff,0xff,0xff,0xab,0x9f,0x00,0x00,0x00,0x00,0x00,0x00,0x80,0xf8,0xff,0x7f,0x02,0x00,0x00,0x00,0x80,0x20,0xff,0xff,0xff,0xff,0x55,0xfd,0x7f,0xfc,0xff,0xff,0x6c,0xff,0xff,0xff,0xb5,0x40,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x06,0x00,0x80,0x01,0x00,0x00,0x00,0x80,0x80,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x03,0x00,0x00,0xff,0xff,0xff,0xff,0xff};
-static float s_static_data_buffer[25] = {
-    0.1f, 0.2f, 0.4f, 0.6f, 0.8f, 1.0f, 0.9f, 0.7f, 0.5f, 0.3f,
-    0.2f, 0.1f, 0.3f, 0.5f, 0.7f, 0.9f, 1.0f, 0.8f, 0.6f, 0.4f,
-    0.2f, 0.1f, 0.2f, 0.3f, 0.4f
-};
+
 // 7 * 7
 static const unsigned char image_SOUND_ON_bits[] = {0x24,0x46,0x57,0x57,0x57,0x46,0x24};
 static const unsigned char image_SOUND_OFF_bits[] = {0x04,0x06,0x57,0x27,0x57,0x06,0x04};
@@ -46,6 +51,70 @@ static const unsigned char image_BAT_75_bits[] = {0xff,0x01,0x3f,0x03,0x3f,0x03,
 static const unsigned char image_BAT_50_bits[] = {0xff,0x01,0x1f,0x03,0x1f,0x03,0x1f,0x03,0x1f,0x03,0xff,0x01};
 static const unsigned char image_BAT_25_bits[] = {0xff,0x01,0x07,0x03,0x07,0x03,0x07,0x03,0x07,0x03,0xff,0x01};
 static const unsigned char image_BAT_empty_bits[] = {0xff,0x01,0x01,0x03,0x01,0x03,0x01,0x03,0x01,0x03,0xff,0x01};
+
+// Levels of safety
+float safe_until = 300;
+float warn_until = 600;
+float danger_until = 1000;
+float hazardrous_until = 2000;
+
+#include <stdio.h>
+#include <math.h>
+#include <string.h>
+#include <stdbool.h> // C 中使用 bool 需要这个头文件
+
+// 宏定义单位字符串，方便维护
+#define UNIT_STRING       "uSv/h"    // 例子: 单位字符串
+#define UNIT_PLACEHOLDER  "-.---uSv/h" // 例子: 占位符（带单位）
+#define EMPTY_PLACEHOLDER "-.---"  // 例子: 占位符（无单位）
+
+/**
+ * @brief 以万用表风格（固定四位有效数字）将浮点数写入缓冲区。
+ * * @param buffer 指向目标字符串缓冲区的指针。
+ * @param buffer_size 缓冲区的最大容量。
+ * @param value 要格式化的浮点数值（请注意，fabs() 要求 float/double 保持一致）。
+ * @param withUnit 是否包含单位字符串（uSv/h）。
+ * @return 写入的字符数（不包括终止符 \0），失败时返回负值。
+ */
+
+int format_meter_style(char *buffer, size_t buffer_size, float value, bool withUnit) {
+    const char* unit_suffix = withUnit ? UNIT_STRING : "";
+
+    if (buffer_size == 0) return 0;
+
+    // 1) Zero placeholder
+    if (fabsf(value) < 1e-7f) {
+        const char* placeholder = withUnit ? UNIT_PLACEHOLDER : EMPTY_PLACEHOLDER;
+        snprintf(buffer, buffer_size, "%s", placeholder);
+        return (int)strlen(buffer);
+    }
+
+    double d = (double)value;
+    double absd = fabs(d);
+
+    char tmp[64];
+
+    // 2) Normal range: fixed-point with up to 3 decimals
+    if (absd >= 0.001 && absd < 10000.0) {
+        snprintf(tmp, sizeof(tmp), "%.3f", d);
+
+        // Strip trailing zeros and possible trailing dot
+        char *pdot = strchr(tmp, '.');
+        if (pdot) {
+            char *end = tmp + strlen(tmp) - 1;
+            while (end > pdot && *end == '0') { *end = '\0'; --end; }
+            if (end == pdot) *end = '\0';
+        }
+    }
+    else {
+        // 3) Scientific notation for very small / large
+        snprintf(tmp, sizeof(tmp), "%.3g", d);
+    }
+
+    snprintf(buffer, buffer_size, "%s%s", tmp, unit_suffix);
+    return (int)strlen(buffer);
+}
+
 // --- USER DEFINED APP: A Geiger counter UI demo ---
 class APP_COUNTER: public IApplication {
 private:
@@ -54,7 +123,6 @@ private:
     Brace brace;
     FocusManager m_focusMan;
     IconButton icon_battery;
-    IconButton icon_alert;
     IconButton icon_sounding;
     IconButton icon_alarm;
     // State machine for loading animation sequence
@@ -71,6 +139,14 @@ private:
     int32_t anim_mark_m = 0;
     int32_t anim_bg = 0;
     int32_t anim_status_x = -27;
+    int32_t anim_clock_y = 0;
+    char print_buffer[24];
+    uint32_t timestamp_prev;
+    uint32_t timestamp_now;
+    Blinker blinker;
+
+    float current_cpm = 0;
+
 public:
     APP_COUNTER(PixelUI& ui) : 
     m_ui(ui), 
@@ -78,9 +154,9 @@ public:
     brace(ui), 
     m_focusMan(ui), 
     icon_battery(ui),
-    icon_alert(ui),
     icon_sounding(ui),
-    icon_alarm(ui)
+    icon_alarm(ui),
+    blinker(ui, 100)
     {}
     void onEnter(ExitCallback cb) override {
         IApplication::onEnter(cb);
@@ -98,39 +174,106 @@ public:
         // icon battery
         icon_battery.setSource(image_BAT_75_bits);
         icon_battery.setMargin(10, 6);
-        icon_battery.setCoordinate(14, 2);
+        icon_battery.setCoordinate(12, 2);
         // icon sounding
         icon_sounding.setSource(image_SOUND_OFF_bits);
         icon_sounding.setMargin(7, 7);
-        icon_sounding.setCoordinate(40, 1);
-        // icon alert
-        icon_alert.setSource(image_Alert_bits);
-        icon_alert.setMargin(9, 7);
-        icon_alert.setCoordinate(28, 1);
+        icon_sounding.setCoordinate(26, 1);
+        
         // icon alarm
         icon_alarm.setSource(image_BELL_bits);
         icon_alarm.setMargin(6, 7);
-        icon_alarm.setCoordinate(51, 1);
+        icon_alarm.setCoordinate(36, 1);
+
         // Adding widgets to focus manager, enabling cursor navigation
         m_focusMan.addWidget(&brace);
         m_focusMan.addWidget(&histogram);  
+
+        timestamp_prev = timestamp_now = m_ui.getCurrentTime();
+
         loadState = LoadState::INIT;
         first_time = false;
+
+        voltage_controller.startTask();
+        counter_task_config_t tube_conf = {
+            .gpio_num = PIN_PULSE_IN
+        };
+        start_counter_task(&tube_conf);
     }
+
     void braceContent() {
         U8G2& u8g2 = m_ui.getU8G2();
         u8g2.setFont(u8g2_font_5x7_tr);
-        u8g2.drawStr(30, 54, "10.00");
+        format_meter_style(print_buffer, sizeof(print_buffer), histogram.getMaxValue(), false);
+        u8g2.drawStr(30, 54, print_buffer);
         u8g2.drawStr(31, 61, "uSv/h");
         u8g2.drawRBox(8, 50, 20, 10, 2);
         u8g2.setDrawColor(0);
         u8g2.drawStr(11, 58, "Max");
         u8g2.setDrawColor(1);
     }
+
+    void drawLabel( bool iscalib ) {
+        U8G2& u8g2 = m_ui.getU8G2();
+        if (!iscalib) {
+            u8g2.setFont(u8g2_font_5x7_tr);
+            
+            if (current_cpm < safe_until) {
+                u8g2.drawStr(5, 42, "SAFE");
+                u8g2.setClipWindow(29,36,128,42);
+                u8g2.drawStr(anim_status_x, 42, "Low Radiation");
+                u8g2.setMaxClipWindow();
+                blinker.stopOnVisible();
+            }
+            else if (current_cpm < warn_until) {
+                u8g2.drawStr(5, 42, "WARN");
+                u8g2.setClipWindow(29,36,128,42);
+                u8g2.drawStr(anim_status_x, 42, "RISING LEVEL");
+                u8g2.setMaxClipWindow();
+                blinker.set_interval(500);
+                blinker.start();
+            }
+            else if (current_cpm < danger_until) {
+                u8g2.drawStr(5, 42, "DNGR");
+                u8g2.setClipWindow(29,36,128,42);
+                u8g2.drawStr(anim_status_x, 42, "UNSAFE DOSE");
+                u8g2.setMaxClipWindow();
+                blinker.set_interval(300);
+                blinker.start();
+            }
+            else if (current_cpm < hazardrous_until) {
+                u8g2.drawStr(5, 42, "HZDR");
+                u8g2.setClipWindow(29,36,128,42);
+                u8g2.drawStr(anim_status_x, 42, "SEVERE THREAT");
+                u8g2.setMaxClipWindow();
+                blinker.set_interval(100);
+                blinker.start();
+            }
+
+            u8g2.setDrawColor(2);
+            u8g2.drawBox(3, 35, anim_mark_m, 8);
+            u8g2.setDrawColor(1);
+            
+
+        } else {
+            u8g2.setFont(u8g2_font_5x7_tr);
+            u8g2.drawStr(5, 42, "CALI");
+            u8g2.setClipWindow(29,36,128,42);
+            u8g2.drawStr(anim_status_x, 42, "PLEASE WAIT");
+            u8g2.setMaxClipWindow();
+            u8g2.setDrawColor(2);
+            u8g2.drawBox(3, 35, anim_mark_m, 8);
+            u8g2.setDrawColor(1);
+            u8g2.setFont(u8g2_font_profont17_tr);
+        }
+    }
+
     void draw() override {
+        timestamp_now = m_ui.getCurrentTime();
         if (!first_time) {
             m_ui.animate(anim_mark_m, 23, 300, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
             m_ui.animate(anim_bg, 128, 500, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
+            m_ui.animate(anim_clock_y, 8, 200, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
             
             // the state machine start from its initial state
             loadState = LoadState::BRACE_LOADING;
@@ -142,7 +285,6 @@ public:
             case LoadState::BRACE_LOADING:
                 brace.onLoad();
                 icon_battery.onLoad();
-                icon_alert.onLoad();
                 loadState = LoadState::WAIT_HISTO;
                 state_timestamp = m_ui.getCurrentTime(); // record when was the state entered
                 break;
@@ -170,25 +312,47 @@ public:
         u8g2.drawXBM(0, 7, 128, 10, image_Background_bits);
         u8g2.setMaxClipWindow();
         
-        u8g2.setFont(u8g2_font_5x7_tr);
-        u8g2.drawStr(5, 42, "MEAS");
-        u8g2.setClipWindow(29,36,83,42);
-        u8g2.drawStr(anim_status_x, 42, "PLEASE WAIT");
-        u8g2.setMaxClipWindow();
-        u8g2.setDrawColor(2);
-        u8g2.drawBox(3, 35, anim_mark_m, 8);
-        u8g2.setDrawColor(1);
         u8g2.setFont(u8g2_font_profont17_tr);
-        u8g2.drawStr(3, 31, "-.-- mR/h");
-        u8g2.setFont(u8g2_font_4x6_tr);
-        u8g2.drawStr(100, 32, "CNT");
-        u8g2.drawStr(100, 39, "1234");
-        histogram.setData(s_static_data_buffer, 25, 0);
+        current_cpm = get_current_cpm();
+        // snprintf(print_buffer, sizeof(print_buffer), "%.4guSv/h", current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient());
+        format_meter_style(print_buffer, sizeof(print_buffer), current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient(), true);
+        u8g2.drawStr(3, 31, print_buffer);
+
+        blinker.update();
+        if (timestamp_now - timestamp_prev >= 1000){
+            if (!is_startup_mode()){
+                timestamp_prev = timestamp_now;
+                histogram.addData(current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient());
+                blinker.stopOnVisible();
+            } else {
+                blinker.start();
+            }
+        }
+
+        if (blinker.is_visible()) {
+            if (is_startup_mode()) {drawLabel( true );}
+            else                 {drawLabel( false);}
+        }
+
+        u8g2.setFont(u8g2_font_5x7_tr);
+        uint16_t volt = voltage_controller.getVoltage();
         
+        snprintf(print_buffer, sizeof(print_buffer), "%dV", volt);
+        u8g2.drawStr(105, 42, print_buffer);
+
+        if (abs(volt - voltage_controller.getTargetVolt()) < 10) {
+            u8g2.setDrawColor(2);
+            u8g2.drawBox(104, 35, 21, 8);
+        }
+
+        u8g2.setDrawColor(1);
+        
+        u8g2.setFont(u8g2_font_5x7_tr);
+        u8g2.drawStr(97, anim_clock_y, "07:23P");
+
         // draw widgets
         icon_sounding.draw();
         icon_alarm.draw();
-        icon_alert.draw();
         icon_battery.draw();
         brace.draw();
 
@@ -196,9 +360,11 @@ public:
             u8g2.clearBuffer();
             u8g2.drawStr(3, 10, "<STATS>");
             u8g2.drawStr(3, 20, "Max:");
-            u8g2.drawStr(3, 30, "1.45uSv/h");
-            u8g2.drawStr(3, 40, "Min:");
-            u8g2.drawStr(3, 50, "0.25uSv/h");
+            snprintf(print_buffer, sizeof(print_buffer), "%.3gusv/h", histogram.getMaxValue());
+            u8g2.drawStr(3, 30, print_buffer);
+            u8g2.drawStr(3, 40, "Avg:");
+            snprintf(print_buffer, sizeof(print_buffer), "%.3gusv/h", histogram.getAverageValue());
+            u8g2.drawStr(3, 50, print_buffer);
         }
         histogram.draw();
         m_focusMan.draw();
@@ -228,6 +394,8 @@ public:
     }
 
     void onExit() {
+        voltage_controller.stop();
+        stop_counter_task();
         m_ui.clearAllAnimations();
         m_ui.setContinousDraw(false);
         m_ui.markFading();

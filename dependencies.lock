@@ -17,13 +17,151 @@ dependencies:
     - esp32s2
     - esp32s3
     version: 1.0.7
+  esp-idf-lib/esp_idf_lib_helpers:
+    component_hash: a8049b1e609679fb54b2d57b0399dd29c4d1fda09a797edac9926f7810aa5703
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    targets:
+    - esp32
+    - esp32c2
+    - esp32c3
+    - esp32c5
+    - esp32c6
+    - esp32c61
+    - esp32h2
+    - esp32p4
+    - esp32s2
+    - esp32s3
+    version: 1.3.10
+  esp-idf-lib/i2cdev:
+    component_hash: 11c08f9e1a7d346b5dd763196dc2567cf2209ae49042402c2c2d296624601c14
+    dependencies:
+    - name: esp-idf-lib/esp_idf_lib_helpers
+      registry_url: https://components.espressif.com
+      require: private
+      version: '*'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    targets:
+    - esp32
+    - esp32c2
+    - esp32c3
+    - esp32c5
+    - esp32c6
+    - esp32c61
+    - esp32h2
+    - esp32p4
+    - esp32s2
+    - esp32s3
+    version: 2.0.8
+  esp-idf-lib/pcf8563:
+    component_hash: 14af1ac95d9f1ba3113692b6acaa89af20a319c7b00248d648cd58b0d9d48092
+    dependencies:
+    - name: esp-idf-lib/esp_idf_lib_helpers
+      registry_url: https://components.espressif.com
+      require: private
+      version: '*'
+    - name: esp-idf-lib/i2cdev
+      registry_url: https://components.espressif.com
+      require: private
+      version: '*'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    targets:
+    - esp32
+    - esp32c2
+    - esp32c3
+    - esp32c5
+    - esp32c6
+    - esp32c61
+    - esp32h2
+    - esp32p4
+    - esp32s2
+    - esp32s3
+    version: 1.0.7
+  espp/adc:
+    component_hash: db11241ef76a7fc6cdaa34d7f7255b43c3fbc6edf810903a7685201e439218d0
+    dependencies:
+    - name: espp/base_component
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0'
+    - name: espp/task
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0'
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.0.24
+  espp/base_component:
+    component_hash: 559c6fc89b19f19349e97631a89e2ef6892e51fb80fbbf485d2c29a9fad87560
+    dependencies:
+    - name: espp/logger
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0'
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.0.25
+  espp/format:
+    component_hash: 23f579d4b06ea45c37cd05232fd800005378072d4c77054e5ddbaaca87b934ea
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.0.25
+  espp/logger:
+    component_hash: c273d20a0a0b5bc421831b1055348cdce405282819f9b566d9fcf59b42f54b90
+    dependencies:
+    - name: espp/format
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0'
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.0.25
+  espp/task:
+    component_hash: e8a3af6e38d5e977436b7015644f3d521a48f5234b7bbf012416e0108e45895f
+    dependencies:
+    - name: espp/base_component
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0'
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.0.25
   idf:
     source:
       type: idf
     version: 5.5.1
 direct_dependencies:
 - esp-idf-lib/encoder
+- esp-idf-lib/pcf8563
+- espp/adc
 - idf
-manifest_hash: f1d446b16ba00d62ec37d6bfbd2344722e2a318eb67c1f421ea3dcf8da09ffa7
+manifest_hash: 96cbc86dfc51adb64abf915f9f90fbb81916fca4431418aedaa8a6af7048fc93
 target: esp32c6
 version: 2.0.0

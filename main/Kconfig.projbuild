@@ -1,0 +1,53 @@
+menu "Geiger Counter Configuration"
+
+    config GEIGER_PIN
+        int "GPIO pin for geiger counter input"
+        range 0 39
+        default 0
+        help
+            GPIO pin number for geiger counter pulse input.
+            Should be connected to M4011 output.
+
+    config GEIGER_CONVERSION_FACTOR
+        string "Conversion factor from CPM to μSv/h"
+        default "0.0057"
+        help
+            Conversion factor for M4011 tube.
+            Default value 0.0057 is typical for M4011.
+            Adjust based on calibration.
+
+    config GEIGER_ENABLE_TESTS
+        bool "Enable test mode and diagnostics"
+        default y
+        help
+            Enable test mode functionality for validation
+            and performance testing.
+
+    config GEIGER_TASK_STACK_SIZE
+        int "Geiger counter task stack size"
+        range 2048 8192
+        default 4096
+        help
+            Stack size for the geiger counter task in bytes.
+
+    config GEIGER_TASK_PRIORITY
+        int "Geiger counter task priority"
+        range 1 25
+        default 5
+        help
+            Priority of the geiger counter task.
+
+    config GEIGER_UPDATE_INTERVAL_MS
+        int "Update interval in milliseconds"
+        range 50 1000
+        default 100
+        help
+            How often the algorithm updates in milliseconds.
+
+    config GEIGER_ENABLE_DEBUG
+        bool "Enable debug output"
+        default n
+        help
+            Enable detailed debug logging.
+
+endmenu

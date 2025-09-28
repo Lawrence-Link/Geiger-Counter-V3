@@ -1,0 +1,17 @@
+--align-reference=name
+--attach-classes
+--attach-classes
+--attach-namespaces
+--convert-tabs
+--exclude=build
+--exclude=common
+--exclude=managed_components
+--ignore-exclude-errors
+--indent-switches
+--indent=spaces=4
+--keep-one-line-statements
+--max-continuation-indent=120
+--pad-header
+--pad-oper
+--style=allman
+--unpad-paren

@@ -1,6 +1,6 @@
 idf_component_register(SRCS "app_counter.cpp" "app_settings.cpp" "app_penis.cpp" "app_registry.cpp" "app_charging_animation.cpp" "app_cube.cpp"
                     INCLUDE_DIRS "."
-                    REQUIRES "PixelUI")
+                    REQUIRES "PixelUI" "voltage_pid" "main")
 
 # 防止静态注册被优化
 target_compile_options(${COMPONENT_LIB} PRIVATE 

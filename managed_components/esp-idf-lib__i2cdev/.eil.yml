@@ -1,0 +1,28 @@
+name: i2cdev
+description: ESP-IDF I2C master thread-safe utilities
+version: 2.0.8
+groups:
+  - common
+code_owners:
+  - UncleRus
+depends:
+  - driver
+  - freertos
+  - esp_idf_lib_helpers
+thread_safe: yes
+targets:
+  - esp32
+  - esp8266
+  - esp32s2
+  - esp32c3
+  - esp32s3
+  - esp32c2
+  - esp32c6
+  - esp32h2
+  - esp32p4
+  - esp32c5
+  - esp32c61
+license: MIT
+copyrights:
+  - name: UncleRus
+    year: 2018

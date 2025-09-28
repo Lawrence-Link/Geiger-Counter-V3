@@ -97,7 +97,8 @@
     "typeinfo": "cpp",
     "variant": "cpp",
     "text_encoding": "cpp",
-    "future": "cpp"
+    "future": "cpp",
+    "cw2015.h": "c"
   },
   "git.ignoreLimitWarning": true,
 }
