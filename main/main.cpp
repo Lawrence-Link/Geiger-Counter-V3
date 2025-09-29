@@ -20,11 +20,17 @@
 #include "ui_heartbeat_task.h"
 #include "GPIO.h"
 #include "battery.h"
-
+#include "common.h"
 // Global variables
 U8G2 u8g2;
 PixelUI ui(u8g2);
+
+extern AppItem charge_app;
+extern AppItem sillycat_app;
+
 static const char *TAG = "main";
+
+QueueHandle_t ui_event_queue;
 
 VoltagePID voltage_controller(
         /** ADC controller config **/
@@ -63,6 +69,7 @@ extern "C" void app_main(void)
     // Register applications
     registerApps();
 
+    ui.getViewManagerPtr()->push(sillycat_app.createApp(ui));
     auto appView = AppLauncher::createAppLauncherView(ui, *ui.getViewManagerPtr());
     ui.getViewManagerPtr()->push(appView);
 
@@ -76,11 +83,31 @@ extern "C" void app_main(void)
     voltage_controller.setTarget(380.0f);
     voltage_controller.setPID(1.5f, 7.0f, 0.00f);  
     
+    static uint32_t tickPrevChargingAnim = ui.getCurrentTime();
+    static uint32_t tickNowChargingAnim = ui.getCurrentTime();
+    bool countdown_enable_charging_anim = false;
+
+    ui_event_queue = xQueueCreate(10, sizeof(UI_EVENT));
+
     // === Main rendering loop ===
-    InputEvent ev;
+    InputEvent in_ev;
+    UI_EVENT ui_ev;
     for (;;) {
-        while (xQueueReceive(input_event_queue, &ev, 0) == pdTRUE) {
-            ui.handleInput(ev);
+        tickNowChargingAnim = ui.getCurrentTime();
+        while (xQueueReceive(input_event_queue, &in_ev, 0) == pdTRUE) {
+            ui.handleInput(in_ev);
+        }
+        if(xQueueReceive(ui_event_queue, &ui_ev, 0) == pdTRUE) {
+            countdown_enable_charging_anim = true;
+            tickPrevChargingAnim = ui.getCurrentTime();
+            tickNowChargingAnim = ui.getCurrentTime();
+        }
+
+        if (countdown_enable_charging_anim) {
+            if (tickNowChargingAnim - tickPrevChargingAnim > 1000 && gpio_get_level(PIN_USB_STATUS)) {
+                countdown_enable_charging_anim = false;
+                ui.getViewManagerPtr()->push(charge_app.createApp(ui));
+            }
         }
         ui.renderer();
         vTaskDelay(pdMS_TO_TICKS(10));

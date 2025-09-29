@@ -21,6 +21,8 @@
 #include "core/app/app_system.h"
 #include <memory>
 
+extern bool showing_charging_anim;
+extern int battery_percentage;
 // Icon bitmap
 static const unsigned char image_sans2_bits[] = {
     0xf0,0xff,0x0f,0xfc,0xff,0x3f,0xfe,0xff,0x7f,0xfe,0xff,0x7f,
@@ -39,7 +41,7 @@ enum class ChargeState {
     DONE
 };
 
-class ChargeDemo : public IApplication {
+class Charge : public IApplication {
 private:
     PixelUI& m_ui;
 
@@ -56,7 +58,7 @@ private:
     unsigned long stateEnterTime = 0; // The time when each state is entered
 
 public:
-    ChargeDemo(PixelUI& ui) : m_ui(ui) {}
+    Charge(PixelUI& ui) : m_ui(ui) {}
 
     // ---------------- Drawing function ----------------
     void draw() override {
@@ -89,24 +91,20 @@ public:
         switch(state) {
             case ChargeState::LIGHTNING_AND_RING:
                 // Transition to the next state only after the initial animation is mostly complete.
-                // 仅在初始动画基本完成后，才过渡到下一个状态。
                 if (m_ui.getCurrentTime() - stateEnterTime > 1200) {
                     state = ChargeState::SHRINK_RING;
                     stateEnterTime = m_ui.getCurrentTime();
                     // Animate the ring shrinking to 0
-                    // 动画圆环收缩到0
                     m_ui.animate(ringPercent, 0, 600, EasingType::EASE_OUT_CUBIC);
                 }
                 break;
 
             case ChargeState::SHRINK_RING:
                 // Check if the ring animation is complete (ringPercent is close to 0).
-                // 检查圆环动画是否完成（ringPercent接近0）。
                 if (m_ui.getCurrentTime() - stateEnterTime > 900) {
                     state = ChargeState::MOVE_LIGHTNING;
                     stateEnterTime = m_ui.getCurrentTime();
                     // Animate lightning moving left, percentage text appearing, and background expanding
-                    // 动画闪电左移，百分比文字出现，背景板展开
                     
                     m_ui.animate(lightningOffsetX, -10, 600, EasingType::EASE_OUT_CUBIC);
                     m_ui.animate(batteryPercent_anim, batteryPercent, 600, EasingType::EASE_OUT_CUBIC);
@@ -116,7 +114,6 @@ public:
 
             case ChargeState::MOVE_LIGHTNING:
                 // Transition to DONE after the move animation is complete
-                // 在移动动画完成后，过渡到DONE状态
                 if (m_ui.getCurrentTime() - stateEnterTime > 2200) {
                     state = ChargeState::DONE;
                     stateEnterTime = m_ui.getCurrentTime();
@@ -144,7 +141,8 @@ public:
         m_ui.animate(lightIconSize, 7, 400, EasingType::EASE_IN_CUBIC, PROTECTION::PROTECTED);
 
         // Ring animates from 0 to the battery percentage
-        ringPercent = 0;
+        
+        batteryPercent = battery_percentage;
         m_ui.animate(ringPercent, batteryPercent, 600, EasingType::EASE_OUT_CUBIC);
 
         batteryPercent_anim = 0; // Percentage text is hidden initially
@@ -159,6 +157,7 @@ public:
 
     void onExit() override {
         m_ui.setContinousDraw(false);
+        showing_charging_anim = false;
         m_ui.markFading();
     }
 
@@ -207,7 +206,7 @@ AppItem charge_app{
     .bitmap = image_sans2_bits,
     
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<ChargeDemo>(ui); 
+        return std::make_unique<Charge>(ui); 
     },
     
     .type = MenuItemType::App,

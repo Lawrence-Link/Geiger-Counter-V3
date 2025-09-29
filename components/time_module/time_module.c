@@ -5,13 +5,13 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
+ * this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
  * 3. Neither the name of the copyright holder nor the names of itscontributors
- *    may be used to endorse or promote products derived from this software without
- *    specific prior written permission.
+ * may be used to endorse or promote products derived from this software without
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -26,7 +26,7 @@
  */
 
 /**
- * @file pcf8563.c
+ * @file time_module.c
  *
  * ESP-IDF driver for PCF8563 (BM8563) real-time clock/calendar
  *
@@ -34,9 +34,23 @@
  *
  * BSD Licensed as described in the file LICENSE
  */
-#include "pcf8563.h"
+#include "time_module.h"
+
+// 解决 struct tm 不完整类型错误
+#include <time.h> 
+// 解决 portTICK_PERIOD_MS 错误
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+// 解决 memcpy 相关的头文件
+#include <string.h> 
+// I2C Master API
+#include "driver/i2c_master.h"
+
 
 #define I2C_FREQ_HZ 400000
+#define I2C_TIMEOUT_MS 100
+// 解决 portTICK_PERIOD_MS 错误
+#define I2C_TIMEOUT_TICKS (I2C_TIMEOUT_MS / portTICK_PERIOD_MS)
 
 #define REG_CTRL_STATUS1 0x00
 #define REG_CTRL_STATUS2 0x01
@@ -92,75 +106,60 @@ static uint8_t dec2bcd(uint8_t val)
     return ((val / 10) << 4) + (val % 10);
 }
 
-static inline esp_err_t read_reg_nolock(i2c_dev_t *dev, uint8_t reg, uint8_t *val)
+/**
+ * @brief 使用 i2c_master_transmit_receive 读取单个寄存器
+ */
+static esp_err_t read_reg(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t *val)
 {
-    return i2c_dev_read_reg(dev, reg, val, 1);
+    CHECK_ARG(dev);
+    return i2c_master_transmit_receive(dev, &reg, 1, val, 1, I2C_TIMEOUT_TICKS);
 }
 
-static inline esp_err_t write_reg_nolock(i2c_dev_t *dev, uint8_t reg, uint8_t val)
+/**
+ * @brief 使用 i2c_master_transmit 写入单个寄存器
+ */
+static esp_err_t write_reg(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t val)
 {
-    return i2c_dev_write_reg(dev, reg, &val, 1);
+    CHECK_ARG(dev);
+    uint8_t write_buf[2] = {reg, val};
+    return i2c_master_transmit(dev, write_buf, 2, I2C_TIMEOUT_TICKS);
 }
 
-static esp_err_t update_reg_nolock(i2c_dev_t *dev, uint8_t reg, uint8_t mask, uint8_t val)
+/**
+ * @brief 读取、修改并写入寄存器
+ */
+static esp_err_t update_reg(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t mask, uint8_t val)
 {
     uint8_t v;
-    CHECK(read_reg_nolock(dev, reg, &v));
-    CHECK(write_reg_nolock(dev, reg, (v & ~mask) | val));
+    CHECK(read_reg(dev, reg, &v));
+    CHECK(write_reg(dev, reg, (v & ~mask) | val));
     return ESP_OK;
 }
 
-static esp_err_t read_reg(i2c_dev_t *dev, uint8_t reg, uint8_t *val)
+/**
+ * @brief 使用 i2c_master_transmit_receive 读取寄存器块
+ */
+static esp_err_t read_reg_block(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t *data, size_t len)
 {
-    I2C_DEV_TAKE_MUTEX(dev);
-    I2C_DEV_CHECK(dev, read_reg_nolock(dev, reg, val));
-    I2C_DEV_GIVE_MUTEX(dev);
-
-    return ESP_OK;
+    CHECK_ARG(dev);
+    return i2c_master_transmit_receive(dev, &reg, 1, data, len, I2C_TIMEOUT_TICKS);
 }
 
-static esp_err_t write_reg(i2c_dev_t *dev, uint8_t reg, uint8_t val)
+/**
+ * @brief 使用 i2c_master_transmit 写入寄存器块
+ */
+static esp_err_t write_reg_block(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t *data, size_t len)
 {
-    I2C_DEV_TAKE_MUTEX(dev);
-    I2C_DEV_CHECK(dev, write_reg_nolock(dev, reg, val));
-    I2C_DEV_GIVE_MUTEX(dev);
-
-    return ESP_OK;
-}
-
-static esp_err_t update_reg(i2c_dev_t *dev, uint8_t reg, uint8_t mask, uint8_t val)
-{
-    I2C_DEV_TAKE_MUTEX(dev);
-    I2C_DEV_CHECK(dev, update_reg_nolock(dev, reg, mask, val));
-    I2C_DEV_GIVE_MUTEX(dev);
-
-    return ESP_OK;
+    CHECK_ARG(dev);
+    uint8_t write_buf[1 + len];
+    write_buf[0] = reg;
+    memcpy(write_buf + 1, data, len);
+    return i2c_master_transmit(dev, write_buf, 1 + len, I2C_TIMEOUT_TICKS);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-esp_err_t pcf8563_init_desc(i2c_dev_t *dev, i2c_port_t port, gpio_num_t sda_gpio, gpio_num_t scl_gpio)
-{
-    CHECK_ARG(dev);
-
-    dev->port = port;
-    dev->addr = PCF8563_I2C_ADDR;
-    dev->cfg.sda_io_num = sda_gpio;
-    dev->cfg.scl_io_num = scl_gpio;
-#if HELPER_TARGET_IS_ESP32
-    dev->cfg.master.clk_speed = I2C_FREQ_HZ;
-#endif
-    return i2c_dev_create_mutex(dev);
-}
-
-esp_err_t pcf8563_free_desc(i2c_dev_t *dev)
-{
-    CHECK_ARG(dev);
-
-    return i2c_dev_delete_mutex(dev);
-}
-
-esp_err_t pcf8563_set_time(i2c_dev_t *dev, struct tm *time)
+esp_err_t pcf8563_set_time(i2c_master_dev_handle_t dev, struct tm *time)
 {
     CHECK_ARG(dev && time);
 
@@ -173,26 +172,21 @@ esp_err_t pcf8563_set_time(i2c_dev_t *dev, struct tm *time)
         dec2bcd(time->tm_hour),
         dec2bcd(time->tm_mday),
         dec2bcd(time->tm_wday),
-        dec2bcd(time->tm_mon + 1) | (ovf ? BV(BIT_YEAR_CENTURY) : 0),
+        // 修正 narrowing conversion 错误，使用 C-style cast
+        (uint8_t)(dec2bcd(time->tm_mon + 1) | (ovf ? BV(BIT_YEAR_CENTURY) : 0)),
         dec2bcd(time->tm_year - (ovf ? 200 : 100))
     };
 
-    I2C_DEV_TAKE_MUTEX(dev);
-    I2C_DEV_CHECK(dev, i2c_dev_write_reg(dev, REG_VL_SECONDS, data, 7));
-    I2C_DEV_GIVE_MUTEX(dev);
-
-    return ESP_OK;
+    return write_reg_block(dev, REG_VL_SECONDS, data, 7);
 }
 
-esp_err_t pcf8563_get_time(i2c_dev_t *dev, struct tm *time, bool *valid)
+esp_err_t pcf8563_get_time(i2c_master_dev_handle_t dev, struct tm *time, bool *valid)
 {
     CHECK_ARG(dev && time && valid);
 
     uint8_t data[7];
 
-    I2C_DEV_TAKE_MUTEX(dev);
-    I2C_DEV_CHECK(dev, i2c_dev_read_reg(dev, REG_VL_SECONDS, data, 7));
-    I2C_DEV_GIVE_MUTEX(dev);
+    CHECK(read_reg_block(dev, REG_VL_SECONDS, data, 7));
 
     *valid = data[0] & BV(BIT_VL) ? false : true;
     time->tm_sec  = bcd2dec(data[0] & ~BV(BIT_VL));
@@ -206,7 +200,7 @@ esp_err_t pcf8563_get_time(i2c_dev_t *dev, struct tm *time, bool *valid)
     return ESP_OK;
 }
 
-esp_err_t pcf8563_set_clkout(i2c_dev_t *dev, pcf8563_clkout_freq_t freq)
+esp_err_t pcf8563_set_clkout(i2c_master_dev_handle_t dev, pcf8563_clkout_freq_t freq)
 {
     CHECK_ARG(dev);
 
@@ -217,75 +211,74 @@ esp_err_t pcf8563_set_clkout(i2c_dev_t *dev, pcf8563_clkout_freq_t freq)
                     );
 }
 
-esp_err_t pcf8563_get_clkout(i2c_dev_t *dev, pcf8563_clkout_freq_t *freq)
+esp_err_t pcf8563_get_clkout(i2c_master_dev_handle_t dev, pcf8563_clkout_freq_t *freq)
 {
     CHECK_ARG(dev && freq);
 
     uint8_t v;
     CHECK(read_reg(dev, REG_CLKOUT, &v));
-    *freq = v & BV(BIT_CLKOUT_FE) ? (v & 3) + 1 : PCF8563_DISABLED;
+    
+    *freq = (pcf8563_clkout_freq_t)(v & BV(BIT_CLKOUT_FE) ? (v & 3) + 1 : PCF8563_DISABLED);
 
     return ESP_OK;
 }
 
-esp_err_t pcf8563_set_timer_settings(i2c_dev_t *dev, bool int_enable, pcf8563_timer_clock_t clock)
+esp_err_t pcf8563_set_timer_settings(i2c_master_dev_handle_t dev, bool int_enable, pcf8563_timer_clock_t clock)
 {
     CHECK_ARG(dev);
 
-    I2C_DEV_TAKE_MUTEX(dev);
-    I2C_DEV_CHECK(dev, update_reg_nolock(dev, REG_CTRL_STATUS2,
-                                         BV(BIT_CTRL_STATUS2_TIE), int_enable ? BV(BIT_CTRL_STATUS2_TIE) : 0));
-    I2C_DEV_CHECK(dev, update_reg_nolock(dev, REG_TIMER_CTRL, MASK_TIMER_CTRL_TD, clock));
-    I2C_DEV_GIVE_MUTEX(dev);
+    // Update CTRL_STATUS2 (TIE bit)
+    CHECK(update_reg(dev, REG_CTRL_STATUS2,
+                     BV(BIT_CTRL_STATUS2_TIE), int_enable ? BV(BIT_CTRL_STATUS2_TIE) : 0));
+    // Update TIMER_CTRL (TD bits)
+    CHECK(update_reg(dev, REG_TIMER_CTRL, MASK_TIMER_CTRL_TD, (uint8_t)clock));
 
     return ESP_OK;
 }
 
-esp_err_t pcf8563_get_timer_settings(i2c_dev_t *dev, bool *int_enabled, pcf8563_timer_clock_t *clock)
+esp_err_t pcf8563_get_timer_settings(i2c_master_dev_handle_t dev, bool *int_enabled, pcf8563_timer_clock_t *clock)
 {
     CHECK_ARG(dev && int_enabled && clock);
 
     uint8_t s, t;
-    I2C_DEV_TAKE_MUTEX(dev);
-    I2C_DEV_CHECK(dev, read_reg_nolock(dev, REG_CTRL_STATUS2, &s));
-    I2C_DEV_CHECK(dev, read_reg_nolock(dev, REG_TIMER_CTRL, &t));
-    I2C_DEV_GIVE_MUTEX(dev);
+    CHECK(read_reg(dev, REG_CTRL_STATUS2, &s));
+    CHECK(read_reg(dev, REG_TIMER_CTRL, &t));
 
     *int_enabled = s & BV(BIT_CTRL_STATUS2_TIE) ? true : false;
-    *clock = t & MASK_TIMER_CTRL_TD;
+    *clock = (pcf8563_timer_clock_t)(t & MASK_TIMER_CTRL_TD);
 
     return ESP_OK;
 }
 
-esp_err_t pcf8563_set_timer_value(i2c_dev_t *dev, uint8_t value)
+esp_err_t pcf8563_set_timer_value(i2c_master_dev_handle_t dev, uint8_t value)
 {
     CHECK_ARG(dev);
 
     return write_reg(dev, REG_TIMER, value);
 }
 
-esp_err_t pcf8563_get_timer_value(i2c_dev_t *dev, uint8_t *value)
+esp_err_t pcf8563_get_timer_value(i2c_master_dev_handle_t dev, uint8_t *value)
 {
     CHECK_ARG(dev && value);
 
     return read_reg(dev, REG_TIMER, value);
 }
 
-esp_err_t pcf8563_start_timer(i2c_dev_t *dev)
+esp_err_t pcf8563_start_timer(i2c_master_dev_handle_t dev)
 {
     CHECK_ARG(dev);
 
     return update_reg(dev, REG_TIMER_CTRL, BV(BIT_TIMER_CTRL_TE), BV(BIT_TIMER_CTRL_TE));
 }
 
-esp_err_t pcf8563_stop_timer(i2c_dev_t *dev)
+esp_err_t pcf8563_stop_timer(i2c_master_dev_handle_t dev)
 {
     CHECK_ARG(dev);
 
     return update_reg(dev, REG_TIMER_CTRL, BV(BIT_TIMER_CTRL_TE), 0);
 }
 
-esp_err_t pcf8563_get_timer_flag(i2c_dev_t *dev, bool *timer)
+esp_err_t pcf8563_get_timer_flag(i2c_master_dev_handle_t dev, bool *timer)
 {
     CHECK_ARG(dev && timer);
 
@@ -296,43 +289,44 @@ esp_err_t pcf8563_get_timer_flag(i2c_dev_t *dev, bool *timer)
     return ESP_OK;
 }
 
-esp_err_t pcf8563_clear_timer_flag(i2c_dev_t *dev)
+esp_err_t pcf8563_clear_timer_flag(i2c_master_dev_handle_t dev)
 {
     CHECK_ARG(dev);
 
     return update_reg(dev, REG_CTRL_STATUS2, BV(BIT_CTRL_STATUS2_TF), 0);
 }
 
-esp_err_t pcf8563_set_alarm(i2c_dev_t *dev, bool int_enable, uint32_t flags, struct tm *time)
+esp_err_t pcf8563_set_alarm(i2c_master_dev_handle_t dev, bool int_enable, uint32_t flags, struct tm *time)
 {
     CHECK_ARG(dev && time);
 
-    I2C_DEV_TAKE_MUTEX(dev);
-    I2C_DEV_CHECK(dev, update_reg_nolock(dev, REG_CTRL_STATUS2,
-                                         BV(BIT_CTRL_STATUS2_AIE), int_enable ? BV(BIT_CTRL_STATUS2_AIE) : 0));
+    // Update CTRL_STATUS2 (AIE bit)
+    CHECK(update_reg(dev, REG_CTRL_STATUS2,
+                     BV(BIT_CTRL_STATUS2_AIE), int_enable ? BV(BIT_CTRL_STATUS2_AIE) : 0));
+
     uint8_t data[4] =
     {
-        dec2bcd(time->tm_min) | (flags & PCF8563_ALARM_MATCH_MIN ? 0 : BV(BIT_AE)),
-        dec2bcd(time->tm_hour) | (flags & PCF8563_ALARM_MATCH_HOUR ? 0 : BV(BIT_AE)),
-        dec2bcd(time->tm_mday) | (flags & PCF8563_ALARM_MATCH_DAY ? 0 : BV(BIT_AE)),
-        dec2bcd(time->tm_wday) | (flags & PCF8563_ALARM_MATCH_WEEKDAY ? 0 : BV(BIT_AE)),
+        // 修正 narrowing conversion 错误，使用 C-style cast
+        (uint8_t)(dec2bcd(time->tm_min) | (flags & PCF8563_ALARM_MATCH_MIN ? 0 : BV(BIT_AE))),
+        // 修正 narrowing conversion 错误，使用 C-style cast
+        (uint8_t)(dec2bcd(time->tm_hour) | (flags & PCF8563_ALARM_MATCH_HOUR ? 0 : BV(BIT_AE))),
+        // 修正 narrowing conversion 错误，使用 C-style cast
+        (uint8_t)(dec2bcd(time->tm_mday) | (flags & PCF8563_ALARM_MATCH_DAY ? 0 : BV(BIT_AE))),
+        // 修正 narrowing conversion 错误，使用 C-style cast
+        (uint8_t)(dec2bcd(time->tm_wday) | (flags & PCF8563_ALARM_MATCH_WEEKDAY ? 0 : BV(BIT_AE))),
     };
-    I2C_DEV_CHECK(dev, i2c_dev_write_reg(dev, REG_ALARM_MIN, data, 4));
-    I2C_DEV_GIVE_MUTEX(dev);
 
-    return ESP_OK;
+    return write_reg_block(dev, REG_ALARM_MIN, data, 4);
 }
 
-esp_err_t pcf8563_get_alarm(i2c_dev_t *dev, bool *int_enabled, uint32_t *flags, struct tm *time)
+esp_err_t pcf8563_get_alarm(i2c_master_dev_handle_t dev, bool *int_enabled, uint32_t *flags, struct tm *time)
 {
     CHECK_ARG(dev && int_enabled && flags && time);
 
     uint8_t data[4], s;
 
-    I2C_DEV_TAKE_MUTEX(dev);
-    I2C_DEV_CHECK(dev, read_reg_nolock(dev, REG_CTRL_STATUS2, &s));
-    I2C_DEV_CHECK(dev, i2c_dev_read_reg(dev, REG_ALARM_MIN, data, 4));
-    I2C_DEV_GIVE_MUTEX(dev);
+    CHECK(read_reg(dev, REG_CTRL_STATUS2, &s));
+    CHECK(read_reg_block(dev, REG_ALARM_MIN, data, 4));
 
     *int_enabled = s & BV(BIT_CTRL_STATUS2_AIE) ? true : false;
     *flags = 0;
@@ -353,7 +347,7 @@ esp_err_t pcf8563_get_alarm(i2c_dev_t *dev, bool *int_enabled, uint32_t *flags, 
     return ESP_OK;
 }
 
-esp_err_t pcf8563_get_alarm_flag(i2c_dev_t *dev, bool *alarm)
+esp_err_t pcf8563_get_alarm_flag(i2c_master_dev_handle_t dev, bool *alarm)
 {
     CHECK_ARG(dev && alarm);
 
@@ -364,7 +358,7 @@ esp_err_t pcf8563_get_alarm_flag(i2c_dev_t *dev, bool *alarm)
     return ESP_OK;
 }
 
-esp_err_t pcf8563_clear_alarm_flag(i2c_dev_t *dev)
+esp_err_t pcf8563_clear_alarm_flag(i2c_master_dev_handle_t dev)
 {
     CHECK_ARG(dev);
 

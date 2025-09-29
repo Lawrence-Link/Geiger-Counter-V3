@@ -1,9 +1,0 @@
-dependencies:
-  esp-idf-lib/esp_idf_lib_helpers:
-    version: '*'
-  esp-idf-lib/i2cdev:
-    version: '*'
-  esp-idf-lib/pcf8563:
-    version: '*'
-description: default
-version: 1.0.0

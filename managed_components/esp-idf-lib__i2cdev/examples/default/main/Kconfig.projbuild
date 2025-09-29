@@ -1,7 +1,0 @@
-menu "I2C scanner configuration"
-    config EXAMPLE_I2C_CLOCK_HZ
-        int "I2C clock frequency, Hz"
-        default 100000
-
-    rsource "../../../Kconfig.i2c"
-endmenu

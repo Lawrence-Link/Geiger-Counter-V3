@@ -1,7 +1,0 @@
-examples/**/sdkconfig
-examples/**/sdkconfig.old
-examples/**/build/
-examples/**/dependencies.lock
-docs/_*/
-docs/doxygen.log
-*.swp

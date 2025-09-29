@@ -1,3 +1,0 @@
-[submodule "common"]
-	path = common
-	url = https://github.com/esp-idf-lib/common.git
