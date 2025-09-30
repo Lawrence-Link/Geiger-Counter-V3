@@ -160,9 +160,9 @@ private:
     {
         CORO_BEGIN(ctx);
             brace.onLoad();
-            icon_battery.onLoad();
         CORO_DELAY(ctx, m_ui, 80, 100);
             histogram.onLoad();
+            icon_battery.onLoad();
             icon_sounding.onLoad();
             icon_alarm.onLoad();
             m_ui.animate(anim_status_x, 29, 450, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
@@ -474,7 +474,4 @@ AppItem counter_app{
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
         return std::make_unique<APP_COUNTER>(ui); 
     },
-    
-    .type = MenuItemType::App,
-    .order = 0
 };

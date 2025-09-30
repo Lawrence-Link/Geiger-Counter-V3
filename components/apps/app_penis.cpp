@@ -85,7 +85,4 @@ AppItem app_penis{
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
         return std::make_unique<Penis>(ui); 
     },
-    
-    .type = MenuItemType::App,
-    .order = 0
 };

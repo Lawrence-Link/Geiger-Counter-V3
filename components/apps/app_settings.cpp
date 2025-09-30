@@ -87,7 +87,4 @@ AppItem settings_app{
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
         return std::make_unique<APP_SETTINGS>(ui, itemList, 10); 
     },
-    
-    .type = MenuItemType::App,
-    .order = 0
 };

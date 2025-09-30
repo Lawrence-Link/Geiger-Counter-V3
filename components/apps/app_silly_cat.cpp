@@ -77,7 +77,4 @@ AppItem sillycat_app{
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
         return std::make_unique<SillyCat>(ui); 
     },
-    
-    .type = MenuItemType::App,
-    .order = 0
 };

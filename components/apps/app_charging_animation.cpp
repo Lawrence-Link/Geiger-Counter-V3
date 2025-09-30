@@ -10,20 +10,10 @@
 extern bool showing_charging_anim;
 extern int battery_percentage;
 
-// Icon bitmap
-static const unsigned char image_sans2_bits[] = {
-    0xf0,0xff,0x0f,0xfc,0xff,0x3f,0xfe,0xff,0x7f,0xfe,0xff,0x7f,
-    0xff,0xff,0xff,0x3f,0x00,0xff,0x3f,0x7f,0xfe,0xbf,0x7e,0xfd,
-    0xbf,0x00,0xfc,0xbf,0x7e,0xfd,0xbf,0x72,0xfd,0xbf,0x6a,0xfd,
-    0xbf,0x72,0xfd,0xbf,0x6a,0xfd,0x3f,0x00,0xfd,0x7f,0xfe,0xec,
-    0xf3,0x00,0xc4,0xe7,0xff,0xef,0xcf,0xff,0xe3,0x1f,0xff,0xf8,
-    0x7e,0x3c,0x7e,0xfe,0x81,0x7f,0xfc,0xff,0x3f,0xf0,0xff,0x0f
-};
-
 class Charge : public IApplication {
 private:
     PixelUI& m_ui;
-    // 动画变量
+    // animation varibles
     int32_t lightIconSize = 0;
     int32_t batteryPercent_anim = 0;
     int32_t ringPercent = 0;
@@ -79,19 +69,19 @@ public:
     void onEnter(ExitCallback cb) override {
         IApplication::onEnter(cb);
 
-        // 重置所有动画状态
         lightIconSize = 0;
         batteryPercent_anim = 0;
         ringPercent = 0;
         lightningOffsetX = 0;
         batteryPercent = battery_percentage;
         
-        animationCoroutine_ = std::make_shared<Coroutine>(
+        animationCoroutine_ = std::make_shared<Coroutine>( // add coroutine for the *Amazing* setup animation
             std::bind(&Charge::animation_coroutine_body, this, std::placeholders::_1, std::placeholders::_2),
             m_ui
         );
-
+        // register coroutine
         m_ui.addCoroutine(animationCoroutine_);
+
         m_ui.setContinousDraw(true);
         m_ui.markDirty();
     }
@@ -101,6 +91,7 @@ public:
         showing_charging_anim = false;
         m_ui.markFading();
         
+        // remove the coroutine instance when exit
         if (animationCoroutine_) {
             m_ui.removeCoroutine(animationCoroutine_);
             animationCoroutine_.reset();
@@ -147,13 +138,10 @@ private:
 
 // ---------------- Application registration ----------------
 AppItem charge_app{
-    .title = "CHARGING",
-    .bitmap = image_sans2_bits,
+    .title = nullptr,
+    .bitmap = nullptr,
     
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
         return std::make_unique<Charge>(ui); 
     },
-    
-    .type = MenuItemType::App,
-    .order = 0
 };
