@@ -97,7 +97,7 @@ int format_meter_style(char *buffer, size_t buffer_size, float value, bool withU
     double absd = fabs(d);
 
     char tmp[64];
-
+    
     // 2) Normal range: fixed-point with up to 3 decimal places
     if (absd >= 0.001 && absd < 10000.0) {
         snprintf(tmp, sizeof(tmp), "%.3f", d);
