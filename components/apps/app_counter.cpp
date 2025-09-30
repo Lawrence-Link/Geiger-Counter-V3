@@ -36,6 +36,7 @@
 #include <fastmath.h>
 
 #include "i2c.h" // for the handles
+#include "core/coroutine/Coroutine.h"
 
 extern VoltagePID voltage_controller;
 extern int battery_percentage;
@@ -151,9 +152,22 @@ private:
     Blinker blinker_description_bar;
     Blinker blinker_calibration_icon;
     float current_cpm = 0;
-    
     struct tm timeinfo;
     bool tm_valid;
+    std::shared_ptr<Coroutine> animationCoroutine_;
+
+    void animation_coroutine_body(CoroutineContext& ctx, PixelUI& ui) 
+    {
+        CORO_BEGIN(ctx);
+            brace.onLoad();
+            icon_battery.onLoad();
+        CORO_DELAY(ctx, m_ui, 80, 100);
+            histogram.onLoad();
+            icon_sounding.onLoad();
+            icon_alarm.onLoad();
+            m_ui.animate(anim_status_x, 29, 450, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
+        CORO_END(ctx);
+    }
 
 public:
     APP_COUNTER(PixelUI& ui) : 
@@ -208,7 +222,12 @@ public:
 
         timestamp_prev = timestamp_now = m_ui.getCurrentTime();
 
-        loadState = LoadState::INIT;
+        animationCoroutine_ = std::make_shared<Coroutine>(
+            std::bind(&APP_COUNTER::animation_coroutine_body, this, std::placeholders::_1, std::placeholders::_2),
+            m_ui
+        );
+        m_ui.addCoroutine(animationCoroutine_);
+
         first_time = false;
 
         // Start hardware-related tasks
@@ -304,39 +323,9 @@ public:
             blinker_description_bar.stopOnVisible();
 
             // Start the loading animation state machine
-            loadState = LoadState::BRACE_LOADING;
             state_timestamp = m_ui.getCurrentTime();
             first_time = true;
         }
-
-        // Loading animation state machine update
-        switch (loadState) {
-            case LoadState::BRACE_LOADING:
-                brace.onLoad();
-                icon_battery.onLoad();
-                loadState = LoadState::WAIT_HISTO;
-                state_timestamp = m_ui.getCurrentTime();
-                break;
-            case LoadState::WAIT_HISTO:
-                if (m_ui.getCurrentTime() - state_timestamp >= 80) {
-                    loadState = LoadState::HISTO_LOADING;
-                }
-                break;
-            case LoadState::HISTO_LOADING:
-                histogram.onLoad();
-                icon_sounding.onLoad();
-                icon_alarm.onLoad();
-                loadState = LoadState::DONE;
-                // Start status text animation after main widgets load
-                m_ui.animate(anim_status_x, 29, 450, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
-                break;
-            case LoadState::DONE:
-                // Normal operation
-                break;
-            default:
-                break;
-        }
-
         // --- UI Drawing ---
         U8G2& u8g2 = m_ui.getU8G2();
 
@@ -464,6 +453,12 @@ public:
     void onExit() {
         voltage_controller.stop();
         stop_counter_task();
+
+        if (animationCoroutine_) {
+            m_ui.removeCoroutine(animationCoroutine_);
+            animationCoroutine_.reset();
+        }
+
         m_ui.clearAllAnimations();
         m_ui.setContinousDraw(false);
         m_ui.markFading();
