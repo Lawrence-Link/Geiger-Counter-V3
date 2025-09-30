@@ -98,7 +98,16 @@
     "variant": "cpp",
     "text_encoding": "cpp",
     "future": "cpp",
-    "cw2015.h": "c"
+    "cw2015.h": "c",
+    "any": "cpp",
+    "strstream": "cpp",
+    "bitset": "cpp",
+    "cfenv": "cpp",
+    "codecvt": "cpp",
+    "expected": "cpp",
+    "stdfloat": "cpp",
+    "valarray": "cpp",
+    "ranges": "cpp"
   },
   "git.ignoreLimitWarning": true,
 }

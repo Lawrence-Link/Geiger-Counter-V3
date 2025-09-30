@@ -1,28 +1,15 @@
 /*
  * Copyright (C) 2025 Lawrence Link
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
-// --- USER DEFINED APP: charging animation
 
 #include "core/app/IApplication.h"
 #include "core/app/app_system.h"
+#include "core/coroutine/Coroutine.h"
 #include <memory>
 
 extern bool showing_charging_anim;
 extern int battery_percentage;
+
 // Icon bitmap
 static const unsigned char image_sans2_bits[] = {
     0xf0,0xff,0x0f,0xfc,0xff,0x3f,0xfe,0xff,0x7f,0xfe,0xff,0x7f,
@@ -33,124 +20,78 @@ static const unsigned char image_sans2_bits[] = {
     0x7e,0x3c,0x7e,0xfe,0x81,0x7f,0xfc,0xff,0x3f,0xf0,0xff,0x0f
 };
 
-// State machine
-enum class ChargeState {
-    LIGHTNING_AND_RING,  // Lightning appears + ring fills from 0 to percent
-    SHRINK_RING,         // Ring shrinks to 0
-    MOVE_LIGHTNING,      // Lightning moves left + number appears
-    DONE
-};
-
 class Charge : public IApplication {
 private:
     PixelUI& m_ui;
-
-    // Animation variables
+    // 动画变量
     int32_t lightIconSize = 0;
     int32_t batteryPercent_anim = 0;
-    int32_t ringPercent = 0;         // Ring animation variable
-    int32_t lightningOffsetX = 0;    // Lightning offset
-    int32_t rectWidth = 10;           // Background rectangle width
-    int batteryPercent = 50;       // Assumed battery level is 50%
+    int32_t ringPercent = 0;
+    int32_t lightningOffsetX = 0;
+    int batteryPercent = 50;
 
-    // State machine
-    ChargeState state = ChargeState::LIGHTNING_AND_RING;
-    unsigned long stateEnterTime = 0; // The time when each state is entered
+    std::shared_ptr<Coroutine> animationCoroutine_;
+
+    void animation_coroutine_body(CoroutineContext& ctx, PixelUI& ui) {
+        CORO_BEGIN(ctx);
+        
+        ui.animate(lightIconSize, 7, 400, EasingType::EASE_IN_CUBIC, PROTECTION::PROTECTED);
+        ui.animate(ringPercent, batteryPercent, 600, EasingType::EASE_OUT_CUBIC);
+        CORO_DELAY(ctx, ui, 1200, 100);
+
+        ui.animate(ringPercent, 0, 600, EasingType::EASE_OUT_CUBIC);
+        CORO_DELAY(ctx, ui, 900, 200);   
+
+        ui.animate(lightningOffsetX, -10, 600, EasingType::EASE_OUT_CUBIC);
+        ui.animate(batteryPercent_anim, batteryPercent, 600, EasingType::EASE_OUT_CUBIC);
+        CORO_DELAY(ctx, ui, 2200, 300); 
+        
+        requestExit();
+        
+        CORO_END(ctx);
+    }
 
 public:
     Charge(PixelUI& ui) : m_ui(ui) {}
 
-    // ---------------- Drawing function ----------------
     void draw() override {
         m_ui.markDirty();
         U8G2& display = m_ui.getU8G2();
-
         int centerX = 64 + lightningOffsetX;
         int centerY = 32;
 
-        // Draw lightning
         drawChargingLightning(lightIconSize, centerX, centerY);
-
-        // Draw the ring (animated)
         drawBatteryRing(display, 64, 32, 15, 2, ringPercent);
 
-        // Draw the percentage number
-        if (state == ChargeState::MOVE_LIGHTNING || state == ChargeState::DONE) {
-            char buf[8];
+        if (batteryPercent_anim > 0) {
+            char buf[12];
             sprintf(buf, "%d%%", (int)batteryPercent_anim);
             display.setFont(u8g2_font_6x10_tf);
             display.drawStr(65, 36, buf);
         }
-
-        // State machine scheduler
-        updateState();
     }
 
-    // ---------------- State machine scheduler ----------------
-    void updateState() {
-        switch(state) {
-            case ChargeState::LIGHTNING_AND_RING:
-                // Transition to the next state only after the initial animation is mostly complete.
-                if (m_ui.getCurrentTime() - stateEnterTime > 1200) {
-                    state = ChargeState::SHRINK_RING;
-                    stateEnterTime = m_ui.getCurrentTime();
-                    // Animate the ring shrinking to 0
-                    m_ui.animate(ringPercent, 0, 600, EasingType::EASE_OUT_CUBIC);
-                }
-                break;
-
-            case ChargeState::SHRINK_RING:
-                // Check if the ring animation is complete (ringPercent is close to 0).
-                if (m_ui.getCurrentTime() - stateEnterTime > 900) {
-                    state = ChargeState::MOVE_LIGHTNING;
-                    stateEnterTime = m_ui.getCurrentTime();
-                    // Animate lightning moving left, percentage text appearing, and background expanding
-                    
-                    m_ui.animate(lightningOffsetX, -10, 600, EasingType::EASE_OUT_CUBIC);
-                    m_ui.animate(batteryPercent_anim, batteryPercent, 600, EasingType::EASE_OUT_CUBIC);
-                    m_ui.animate(rectWidth, 90, 670, EasingType::EASE_OUT_CUBIC);
-                }
-                break;
-
-            case ChargeState::MOVE_LIGHTNING:
-                // Transition to DONE after the move animation is complete
-                if (m_ui.getCurrentTime() - stateEnterTime > 2200) {
-                    state = ChargeState::DONE;
-                    stateEnterTime = m_ui.getCurrentTime();
-                }
-                break;
-
-            case ChargeState::DONE:
-                // Remain in the final state
-                requestExit();
-                break;
-        }
-    }
-
-    // ---------------- Input handling ----------------
     bool handleInput(InputEvent event) override {
-        requestExit(); // Any input exits the application
+        requestExit();
         return true;
     }
 
-    // ---------------- Lifecycle ----------------
     void onEnter(ExitCallback cb) override {
         IApplication::onEnter(cb);
 
-        // Lightning size animation
-        m_ui.animate(lightIconSize, 7, 400, EasingType::EASE_IN_CUBIC, PROTECTION::PROTECTED);
-
-        // Ring animates from 0 to the battery percentage
-        
+        // 重置所有动画状态
+        lightIconSize = 0;
+        batteryPercent_anim = 0;
+        ringPercent = 0;
+        lightningOffsetX = 0;
         batteryPercent = battery_percentage;
-        m_ui.animate(ringPercent, batteryPercent, 600, EasingType::EASE_OUT_CUBIC);
+        
+        animationCoroutine_ = std::make_shared<Coroutine>(
+            std::bind(&Charge::animation_coroutine_body, this, std::placeholders::_1, std::placeholders::_2),
+            m_ui
+        );
 
-        batteryPercent_anim = 0; // Percentage text is hidden initially
-        lightningOffsetX = 0;    // Initial lightning position
-
-        state = ChargeState::LIGHTNING_AND_RING;
-        stateEnterTime = m_ui.getCurrentTime();
-
+        m_ui.addCoroutine(animationCoroutine_);
         m_ui.setContinousDraw(true);
         m_ui.markDirty();
     }
@@ -159,6 +100,11 @@ public:
         m_ui.setContinousDraw(false);
         showing_charging_anim = false;
         m_ui.markFading();
+        
+        if (animationCoroutine_) {
+            m_ui.removeCoroutine(animationCoroutine_);
+            animationCoroutine_.reset();
+        }
     }
 
 private:
@@ -200,7 +146,6 @@ private:
 };
 
 // ---------------- Application registration ----------------
-
 AppItem charge_app{
     .title = "CHARGING",
     .bitmap = image_sans2_bits,
