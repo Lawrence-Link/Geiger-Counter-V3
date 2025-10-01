@@ -1,0 +1,56 @@
+# C++ build artifacts
+*.o
+*.obj
+*.so
+*.dll
+*.exe
+*.out
+*.a
+*.lib
+
+# CMake build directories
+/build/
+[Cc]MakeFiles/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Qt generated files
+*.moc
+*.qrc
+*.rcc
+*.ui
+*.autosave
+
+# Qt Creator
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.creator.user
+*.creator.user.*
+*.creator.*
+*.user
+*.user.*
+
+# Visual Studio Code
+.vscode/
+
+# CLion
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Other
+*.swp
+*.swo
+*.bak
+*.tmp
+
+third_party/u8g2/build/
