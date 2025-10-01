@@ -76,8 +76,8 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
      // 创建一个简单的旋律 (小星星)
     Tune::Melody startup = {
         {Notes::C5, 100},
-        {Notes::E5, 100},
-        {Notes::G5, 100}
+        {Notes::G5, 100},
+        {Notes::E5, 100}
     };
 
     Tune::Melody bluejay = {

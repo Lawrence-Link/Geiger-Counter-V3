@@ -8,7 +8,7 @@
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
 #include "tune.h"
-
+#include "led.h"
 #include <cmath>
 
 // --- Constants ---
@@ -196,6 +196,20 @@ static void counter_task(void *pvParameters) {
                 cpm_accumulator += calculated_cpm;
                 cpm_average_count++;
             }
+
+            if (calculated_cpm < 300) {
+                LedBlinker::getInstance().enqueueBlink(LedColor::GREEN);
+            }
+            else if (calculated_cpm < 600) {
+                LedBlinker::getInstance().enqueueBlink(LedColor::YELLOW);
+            }
+            else if (calculated_cpm < 1000) {
+                LedBlinker::getInstance().enqueueBlink(LedColor::RED);
+            }
+            else if (calculated_cpm < 2000) {
+                LedBlinker::getInstance().enqueueBlink(LedColor::RED);
+            }
+
         } else {
             vTaskDelay(pdMS_TO_TICKS(10)); // Sleep briefly if queue is empty
         }

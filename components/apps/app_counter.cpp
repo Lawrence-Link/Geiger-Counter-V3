@@ -37,6 +37,7 @@
 
 #include "i2c.h" // for the handles
 #include "core/coroutine/Coroutine.h"
+#include "led.h"
 
 extern VoltagePID voltage_controller;
 extern int battery_percentage;
