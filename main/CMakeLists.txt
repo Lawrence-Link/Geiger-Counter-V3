@@ -1,3 +1,22 @@
-idf_component_register(SRCS "main.cpp" "GPIO.cpp" "i2c.cpp" "battery.cpp" "encoder_task.cpp" "ui_heartbeat_task.cpp" "counter_task.cpp"
+idf_component_register(
+                    SRCS 
+                    "main.cpp" 
+               
                     INCLUDE_DIRS "."
-                    REQUIRES "u8g2" "PixelUI" "voltage_pid" "cw2015chbd" "driver" "esp_timer" "freertos" "apps" "time_module")
+                    
+                    REQUIRES 
+                    "u8g2" 
+                    "PixelUI" 
+                    "voltage_pid" 
+                    "driver" 
+                    "esp_timer" 
+                    "freertos" 
+                    "apps" 
+                    "time_module"
+                    "battery_task"
+                    "encoder_task"
+                    "ui_heartbeat_task"
+                    "gpio_stuff"
+                    "i2c_stuff"
+                    "system_nvs_varibles"
+                    )

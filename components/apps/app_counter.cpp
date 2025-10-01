@@ -31,7 +31,7 @@
 #include "time_module.h"
 
 #include "pin_definitions.h"
-#include "system_varibles.h"
+#include "system_nvs_varibles.h"
 #include "blinker/Blinker.h"
 #include <fastmath.h>
 

@@ -21,6 +21,7 @@
 #include "GPIO.h"
 #include "battery.h"
 #include "common.h"
+
 // Global variables
 U8G2 u8g2;
 PixelUI ui(u8g2);
@@ -47,7 +48,7 @@ void delay_ms(uint32_t ms) {
     vTaskDelay(pdMS_TO_TICKS(ms));
 }
 
-extern "C" void app_main(void)
+extern "C" void app_main(void) // mainly reserved for ui rendering
 {   
     // Initialize display
     esp_err_t ret = u8g2_init_sh1106(u8g2.getU8g2());

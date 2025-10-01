@@ -20,7 +20,7 @@
 #include "PixelUI.h"
 #include "core/app/app_system.h"
 #include "ui/ListView/ListView.h"
-#include "system_varibles.h"
+#include "system_nvs_varibles.h"
 
 bool en_sound_click = false;
 bool en_sos = false;
