@@ -19,4 +19,5 @@ idf_component_register(
                     "gpio_stuff"
                     "i2c_stuff"
                     "system_nvs_varibles"
+                    "nvs"
                     )

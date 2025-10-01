@@ -18,3 +18,4 @@ dependencies:
   espp/adc: ^1.0.24
   esp-idf-lib/esp_idf_lib_helpers: ^1.3.10
   espp/nvs: ^1.0.25
+  supcik/buzzer: ^3.0.1

@@ -22,8 +22,11 @@
 #include "ui/ListView/ListView.h"
 #include "system_nvs_varibles.h"
 
+#include "esp_log.h"
+
 bool en_sound_click = false;
 bool en_sos = false;
+bool en_led = true;
 
 int32_t brightness = 0;
 int32_t sound_volume = 0;
@@ -32,16 +35,10 @@ static const unsigned char image_LISTVIEW_bits[] = {0xf0,0xff,0x0f,0xfc,0xff,0x3
 
 extern PixelUI ui;
 
-ListItem sub_Language[3] = {
-    ListItem(">>> Language <<<"),
-    ListItem("- ENGLISH", nullptr, 0, [](){  }),
-    ListItem("- 简体中文", nullptr, 0, [](){  })
-};
-
 ListItem sub_Alarm[3] = {
-    ListItem(">>> Alarm <<<"),
-    ListItem("- Enable", nullptr, 0, nullptr, ListItemExtra{&en_sos, nullptr}),
-    ListItem("- Warn at", nullptr, 0, [](){  })
+    ListItem(">>> 辐射警告 <<<"),
+    ListItem("- 启用", nullptr, 0, nullptr, ListItemExtra{&en_sos, nullptr}),
+    ListItem("- 触发阈值", nullptr, 0, [](){  })
 };
 
 // ListItem itemList[10] = {
@@ -75,8 +72,29 @@ public:
     APP_SETTINGS(PixelUI& ui, ListItem *itemList, size_t length) : ListView(ui, itemList, length) {
         brightness = SystemConf::getInstance().read_conf_brightness();
     }
+    
+    void onLoad() override {
+        auto& syscfg = SystemConf::getInstance();
+
+        syscfg.load_conf_from_nvs();
+
+        brightness = syscfg.read_conf_brightness();
+        sound_volume = syscfg.read_conf_loudness();
+        en_sound_click = syscfg.read_conf_enable_sound();
+        en_sos = syscfg.read_conf_enable_alert();
+    }
+
     void onSave() override {
+        auto& syscfg = SystemConf::getInstance();
         
+        syscfg.set_conf_brightness(brightness);
+        syscfg.set_conf_enable_alert(en_sos);
+        syscfg.set_conf_enable_blink(en_led);
+        syscfg.set_conf_enable_sound(en_sound_click);
+        syscfg.set_conf_loudness(sound_volume);
+
+        syscfg.save_conf_to_nvs();
+        // syscfg.set_conf_tube_convertion_coefficient();
     }
 };
 

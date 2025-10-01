@@ -74,6 +74,7 @@ public:
     void onPause() override;
     void onExit() override;
 
+    virtual void onLoad() = 0;
     virtual void onSave() = 0;
 
     // --- Public Utility Methods ---

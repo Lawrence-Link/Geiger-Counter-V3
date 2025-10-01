@@ -21,6 +21,9 @@
 #include "GPIO.h"
 #include "battery.h"
 #include "common.h"
+#include "system_nvs_varibles.h"
+#include "nvs.hpp"
+#include "nvs_handle_espp.hpp"
 
 // Global variables
 U8G2 u8g2;
@@ -59,6 +62,15 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
 
     I2C_Devices_Init();
     GPIO_init();
+
+    // initialize nvs driver
+    std::error_code ec;
+    espp::Nvs nvs_driver;
+    nvs_driver.init(ec);
+    // load setup from nvs
+    auto& syscfg = SystemConf::getInstance();
+    syscfg.load_conf_from_nvs();
+    u8g2.setContrast(syscfg.read_conf_brightness() * 51);
 
     startBatteryTask();
     u8g2.setFont(u8g2_font_helvB08_tr);

@@ -1,0 +1,12 @@
+dependencies:
+  idf: '>=5.3'
+description: Buzzer component for ESP-IDF
+license: MIT
+maintainers:
+- Jacques Supcik <jacques@supcik.net>
+repository: git://github.com/supcik/idf-buzzer.git
+repository_info:
+  commit_sha: a7d678124207c8ceddb76fb3516263486d5c4ff0
+  path: buzzer
+url: https://github.com/supcik/idf-buzzer/tree/main/buzzer
+version: 3.0.1

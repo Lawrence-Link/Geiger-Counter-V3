@@ -123,12 +123,23 @@ dependencies:
     source:
       type: idf
     version: 5.5.1
+  supcik/buzzer:
+    component_hash: 8fc191ab2efe6526905b597c30aa3bf21e2de54152044197fd00b2dcbf54e4a4
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.3'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 3.0.1
 direct_dependencies:
 - esp-idf-lib/encoder
 - esp-idf-lib/esp_idf_lib_helpers
 - espp/adc
 - espp/nvs
 - idf
-manifest_hash: 94632af479e1ec071e0a6f9358081085057c3ebef898f8586d5514d45ed3c7a1
+- supcik/buzzer
+manifest_hash: 95b164adcbef3e05da16c389d04e2841efa1fb8e7b272560f6d77444f3ad0c7e
 target: esp32c6
 version: 2.0.0

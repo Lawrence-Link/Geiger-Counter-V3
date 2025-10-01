@@ -38,6 +38,8 @@ void ListView::onEnter(ExitCallback exitCallback){
     // animation: scrollbar
     m_ui.animate(animation_pixel_dots, 32, 400, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
     
+    onLoad();
+
     startLoadAnimation();
     scrollToTarget(0);
 }
@@ -253,6 +255,7 @@ void ListView::onResume() {
 void ListView::onPause() {}
 
 void ListView::onExit() {
+    onSave();
     m_ui.markFading();
     m_ui.setContinousDraw(false);
     m_ui.getAnimationManPtr()->clearAllProtectionMarks();
