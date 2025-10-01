@@ -24,6 +24,7 @@ void Blinker::start() {
 
 void Blinker::stop() {
     m_running = false;
+    m_visible = false;
     m_stop_on_visible = false;
 }
 

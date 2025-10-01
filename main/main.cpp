@@ -24,7 +24,7 @@
 #include "system_nvs_varibles.h"
 #include "nvs.hpp"
 #include "nvs_handle_espp.hpp"
-
+#include "tune.h"
 // Global variables
 U8G2 u8g2;
 PixelUI ui(u8g2);
@@ -71,6 +71,49 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     auto& syscfg = SystemConf::getInstance();
     syscfg.load_conf_from_nvs();
     u8g2.setContrast(syscfg.read_conf_brightness() * 51);
+
+    Tune& tune = Tune::getInstance();
+     // 创建一个简单的旋律 (小星星)
+    Tune::Melody startup = {
+        {Notes::C5, 100},
+        {Notes::E5, 100},
+        {Notes::G5, 100}
+    };
+
+    Tune::Melody bluejay = {
+        {Notes::B4, 105},      // 4b
+        {Notes::REST, 26},     // p
+        {Notes::E5, 105},      // 4e5
+        {Notes::REST, 26},     // p
+        {Notes::B4, 105},      // 4b
+        {Notes::REST, 26},     // p
+        {740, 105},            // 4f#5 (F#5)
+        {Notes::REST, 210},    // 2p
+        {Notes::E5, 105},      // 4e5
+        {Notes::B5, 210},      // 2b5
+        {Notes::B5, 52}        // 8b5
+    };
+    
+    // 警报旋律
+    Tune::Melody alarm = {
+        {Notes::A5, Duration::EIGHTH},
+        {Notes::REST, Duration::EIGHTH},
+        {Notes::A5, Duration::EIGHTH},
+        {Notes::REST, Duration::EIGHTH},
+        {Notes::A5, Duration::EIGHTH},
+        {Notes::REST, Duration::QUARTER}
+    };
+    
+    // 也可以使用 C 接口
+    // tune_note_t beep_pattern[] = {
+    //     {1000, 100},  // 1kHz, 100ms
+    //     {0, 50},      // 休止符, 50ms
+    //     {1000, 100},  // 1kHz, 100ms
+    //     {0, 50},      // 休止符, 50ms
+    //     {1000, 100}   // 1kHz, 100ms
+    // };
+
+    tune.playMelody(startup);
 
     startBatteryTask();
     u8g2.setFont(u8g2_font_helvB08_tr);

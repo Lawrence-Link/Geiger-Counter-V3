@@ -6,6 +6,8 @@
 #include "GPIO.h"
 #include "pin_definitions.h"
 #include "common.h"
+#include "tune.h"
+#include "esp_log.h"
 
 extern QueueHandle_t ui_event_queue;
 
@@ -46,4 +48,9 @@ void GPIO_init() {
     gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
     gpio_isr_handler_add(PIN_USB_STATUS, usb_status_isr_handler, (void*) PIN_USB_STATUS);
 
+    Tune& tune = Tune::getInstance();
+    if (!tune.initialize(PIN_BUZZER)) {
+        ESP_LOGE("kTag", "Failed to initialize tune library");
+        return;
+    }
 }

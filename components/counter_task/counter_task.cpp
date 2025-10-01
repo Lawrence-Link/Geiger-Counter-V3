@@ -7,6 +7,7 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
+#include "tune.h"
 
 #include <cmath>
 
@@ -67,11 +68,16 @@ static void counter_task(void *pvParameters) {
 
     ESP_LOGI(TAG, "Counter task started. Local array size: %zu bytes.", sizeof(timestamp_history));
 
+    auto& tune = Tune::getInstance();
+
     while (true) {
         int64_t new_timestamp;
         
         // 1. Non-blocking pulse reception
         if (xQueueReceive(s_timestamp_queue, &new_timestamp, 0) == pdPASS) {
+
+            tune.geigerClick();
+
             float calculated_cpm = -1.0f; // Temporary CPM value
 
             if (!first_pulse_received) {

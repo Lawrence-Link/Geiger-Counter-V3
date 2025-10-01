@@ -287,7 +287,7 @@ public:
                 blinker_description_bar.set_interval(300);
                 blinker_description_bar.start();
             }
-            else if (current_cpm < hazardrous_until) {
+            else {
                 u8g2.drawStr(5, 42, "HZDR");
                 u8g2.setClipWindow(29,36,128,42);
                 u8g2.drawStr(anim_status_x, 42, "SEVERE THREAT");

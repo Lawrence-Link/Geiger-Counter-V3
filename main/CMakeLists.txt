@@ -20,4 +20,5 @@ idf_component_register(
                     "i2c_stuff"
                     "system_nvs_varibles"
                     "nvs"
+                    "tune"
                     )
