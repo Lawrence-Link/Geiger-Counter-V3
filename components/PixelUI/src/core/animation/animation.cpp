@@ -118,23 +118,21 @@ void Animation::stop() {
 @param currentTime Current time (milliseconds).
 @return True if the animation is still running, otherwise false.
 */
-bool Animation::update(uint32_t currentTime){
-    if (!_isActive) {
-        return false;
-    }
-
+bool Animation::update(uint32_t currentTime) {
+    if (!_isActive) return false;
+    
     uint32_t elapsed = currentTime - _startTime;
     
-    // If the animation is complete, force the progress to the fixed-point representation of 1.0
-    bool completed = (elapsed >= _duration);
+    // a small gap to prevent from jitter at the end
+    bool completed = (elapsed >= _duration) || (elapsed >= _duration - 1);
     
-    // Calculate the normalized time 't', using 64-bit integer to avoid overflow
-    int32_t t = completed ? FIXED_POINT_ONE : ((int64_t)elapsed * FIXED_POINT_ONE) / _duration;
-
-    // Calculate the final progress using the easing function
+    int32_t t = completed ? FIXED_POINT_ONE : 
+                ((int64_t)elapsed * FIXED_POINT_ONE) / _duration;
+    
     _progress = EasingCalculator::calculate(_easing, t);
-
+    
     if (completed) {
+        _progress = FIXED_POINT_ONE;
         _isActive = false;
         return false;
     }

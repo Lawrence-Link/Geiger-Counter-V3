@@ -91,6 +91,20 @@ dependencies:
       registry_url: https://components.espressif.com
       type: service
     version: 1.0.25
+  espp/nvs:
+    component_hash: cc54239c3ede8ba6ea01942991343948a835ef308468e80d3046f1b5d7c0c19f
+    dependencies:
+    - name: espp/base_component
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0'
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.0.25
   espp/task:
     component_hash: e8a3af6e38d5e977436b7015644f3d521a48f5234b7bbf012416e0108e45895f
     dependencies:
@@ -113,7 +127,8 @@ direct_dependencies:
 - esp-idf-lib/encoder
 - esp-idf-lib/esp_idf_lib_helpers
 - espp/adc
+- espp/nvs
 - idf
-manifest_hash: 26b6bc34730376ba1bbfd95a8d3ddce6fca5199f2864b3f48a434dacd7236bcf
+manifest_hash: 94632af479e1ec071e0a6f9358081085057c3ebef898f8586d5514d45ed3c7a1
 target: esp32c6
 version: 2.0.0

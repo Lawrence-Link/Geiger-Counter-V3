@@ -104,7 +104,7 @@ void dump_cw2015_regs(i2c_master_dev_handle_t dev)
     }
 
     // 如果 VCELL raw 非全 0，则分别用两种常见解析方法解释
-    uint16_t raw = ((uint16_t)buf[0] << 8) | buf[1]; // 注意：这里最后读到的是 MODE buf，如果前面读取 VCELL 要用对应 buf
+    uint16_t raw = ((uint16_t)buf[0] << 8) | buf[1]; 
     // 为了可靠，重新读 VCELL 并解释：
     uint8_t vcell_bytes[2];
     if (i2c_read_reg_simple(dev, 0x02, vcell_bytes, 2) == ESP_OK) {

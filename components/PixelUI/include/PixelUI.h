@@ -161,7 +161,15 @@ public:
      * @param duration Display duration.
      * @param priority Popup priority.
      */
-    void showPopupProgress(int32_t& value, int32_t minValue, int32_t maxValue, const char* title = "", uint16_t width = 100, uint16_t height = 40, uint16_t duration = 3000, uint8_t priority = 0);
+    void showPopupProgress(int32_t& value, 
+        int32_t minValue, 
+        int32_t maxValue, 
+        const char* title, 
+        uint16_t width = 100, 
+        uint16_t height = 40, 
+        uint16_t duration = 3000, 
+        uint8_t priority = 0, 
+        std::function<void(int32_t val)> update_cb = nullptr);
 
     /**
      * @brief Marks the display buffer as dirty, forcing a redraw.

@@ -20,7 +20,10 @@
 #include <functional>
 #include "core/app/app_system.h"
 #include "core/animation/animation.h"
-#include "ui/Popup/Popup.h"
+
+#include "ui/Popup/PopupProgress.h"
+#include "ui/Popup/PopupInfo.h"
+
 #include "core/coroutine/Coroutine.h"
 #include <cinttypes>
 /**
@@ -193,7 +196,7 @@ void PixelUI::renderer() {
  */
 void PixelUI::showPopupProgress(int32_t& value, int32_t minValue, int32_t maxValue, 
                                const char* title, uint16_t width, uint16_t height, 
-                               uint16_t duration, uint8_t priority) {
+                               uint16_t duration, uint8_t priority, std::function<void(int32_t val)> update_cb) {
     if (minValue >= maxValue) {
         #ifdef USE_DEBUG_OUPUT
         if (m_func_debug_print) {
@@ -213,7 +216,7 @@ void PixelUI::showPopupProgress(int32_t& value, int32_t minValue, int32_t maxVal
     if (duration > 30000) duration = 30000; // Max 30 seconds
     if (duration < 1000) duration = 1000;   // Min 1 second
     
-    auto popup = std::make_shared<PopupProgress>(*this, width, height, value, minValue, maxValue, title, duration, priority);
+    auto popup = std::make_shared<PopupProgress>(*this, width, height, value, minValue, maxValue, title, duration, priority, update_cb);
     m_popupManagerPtr->addPopup(popup);
     markDirty();
 }

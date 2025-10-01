@@ -3,7 +3,6 @@
 #include "esp_log.h"
 #include "pin_definitions.h"
 
-static const char *TAG = "encoder_task";
 static QueueHandle_t encoder_event_queue;
 static rotary_encoder_t re;
 

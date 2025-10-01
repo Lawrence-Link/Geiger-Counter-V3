@@ -1,0 +1,19 @@
+dependencies:
+  espp/base_component: '>=1.0'
+  idf:
+    version: '>=5.0'
+description: NVS (non-volatile storage) component for ESP-IDF
+documentation: https://esp-cpp.github.io/espp/nvs.html
+license: MIT
+maintainers:
+- William Emfinger <waemfinger@gmail.com>
+repository: git://github.com/esp-cpp/espp.git
+repository_info:
+  commit_sha: 143f589637e643ace684e60308039f06bdeb90a7
+  path: components/nvs
+tags:
+- cpp
+- Component
+- NVS
+url: https://github.com/esp-cpp/espp/tree/main/components/nvs
+version: 1.0.25

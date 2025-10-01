@@ -22,7 +22,7 @@
 #include <memory>
 #include <mutex>
 #include <atomic>
-#include "ui/Popup/Popup.h"
+#include "ui/Popup/PopupManager.h"
 
 class ViewManager {
 public:

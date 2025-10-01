@@ -59,8 +59,8 @@ ListItem sub_Alarm[3] = {
 
 ListItem itemList[10] = {
     ListItem(">>>> 设置 <<<<"),
-    ListItem("- 屏幕亮度", nullptr, 0, [](){ ui.showPopupProgress(brightness, 0, 100, "Brightness", 100, 40, 5000, 1); }, ListItemExtra{nullptr, &brightness}),
-    ListItem("- 音量", nullptr, 0, [](){ ui.showPopupProgress(sound_volume, 0, 100, "Volume", 100, 40, 5000, 1); }, ListItemExtra{nullptr, &sound_volume}),
+    ListItem("- 屏幕亮度", nullptr, 0, [](){ ui.showPopupProgress(brightness, 0, 5, "亮度", 100, 40, 5000, 1, [](int32_t val){ui.getU8G2().setContrast(val * 51);}); }, ListItemExtra{nullptr, &brightness}),
+    ListItem("- 音量", nullptr, 0, [](){ ui.showPopupProgress(sound_volume, 0, 100, "音量", 100, 40, 5000, 1); }, ListItemExtra{nullptr, &sound_volume}),
     ListItem("- LED", nullptr, 0, [](){  }),
     ListItem("- 盖革管", nullptr, 0, [](){  }),
     ListItem("- 辐射警示", nullptr, 0, nullptr, ListItemExtra{&en_sound_click, nullptr}),
