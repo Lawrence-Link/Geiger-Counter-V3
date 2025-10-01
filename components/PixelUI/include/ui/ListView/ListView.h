@@ -24,6 +24,7 @@
 #include "etl/delegate.h"
 #include "core/animation/animation.h"
 #include "core/app/IApplication.h"
+#include "etl/map.h"
 
 // Struct to hold extra data for a list item, like values for switches or sliders.
 struct ListItemExtra{
@@ -86,6 +87,12 @@ private:
     ListItem* m_itemList;
     size_t m_itemLength;
     
+    struct SwitchAnimState {
+    int32_t boxX = 0;
+    bool isAnimating = false;
+};
+    etl::map<int, SwitchAnimState, MAX_LISTVIEW_SLOT_NUM> switchAnimStates_;
+
     // --- Layout and Spacing Variables ---
     uint8_t spacing_ = 7;
     uint8_t topMargin_ = 3;
@@ -122,8 +129,6 @@ private:
     ListItem* oldItemList_ = nullptr;
     size_t oldItemLength_ = 0;
     int oldTopVisibleIndex_ = 0;
-    int32_t switchBoxX = 0;
-
     // --- Progress Bar Variables ---
     int32_t progress_bar_top = 0;
     int32_t progress_bar_bottom = 0;

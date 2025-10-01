@@ -22,7 +22,6 @@ void ListView::onEnter(ExitCallback exitCallback){
     IApplication::onEnter(exitCallback);
     m_ui.setContinousDraw(true);
     U8G2& u8g2 = m_ui.getU8G2();
-
     u8g2.setFont(u8g2_font_wqy12_t_gb2312b);
     FontHeight = u8g2.getFontAscent() - u8g2.getFontDescent();
     
@@ -34,12 +33,17 @@ void ListView::onEnter(ExitCallback exitCallback){
     for (int i = 0; i < visibleItemCount_ + 1; i++) {
         itemLoadAnimations_[i] = 0;
     }
-
+    for (int i = 0; i <= m_itemLength; i++) {
+        if (m_itemList[i].extra.switchValue) {
+            switchAnimStates_[i].boxX = *m_itemList[i].extra.switchValue ? 7 : 0;
+            switchAnimStates_[i].isAnimating = false;
+        }
+    }
+    
     // animation: scrollbar
     m_ui.animate(animation_pixel_dots, 32, 400, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
     
     onLoad();
-
     startLoadAnimation();
     scrollToTarget(0);
 }
@@ -161,21 +165,30 @@ void ListView::selectCurrent(){
     }
     // one without nextlist, but with function
     if (!m_itemList[currentCursor].nextList && m_itemList[currentCursor].pFunc ){ m_itemList[currentCursor].pFunc(); } // Enter pFunc
-    
     else if (m_itemList[currentCursor].extra.switchValue) {
         bool* switchValPtr = m_itemList[currentCursor].extra.switchValue;
-
-        // current state of the switch
         bool currentState = *switchValPtr;
-
-        // calculate the start and end positions for the switch box
-        // int32_t startX = currentState ? 7 : 0;
         int32_t endX = currentState ? 0 : 7;
         
-        // animate switchBoxX ( the dense box inside the switch frame act as the switch button )
-        m_ui.animate(switchBoxX, endX, 200, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
-
-        // switch the value after the animation duration
+        // 保存当前索引
+        size_t targetIndex = currentCursor;
+        switchAnimStates_[targetIndex].isAnimating = true;
+        
+        auto callback = [this, targetIndex](int32_t value) {
+            this->switchAnimStates_[targetIndex].boxX = value;
+        };
+        
+        auto animation = std::make_shared<CallbackAnimation>(
+            switchAnimStates_[targetIndex].boxX, 
+            endX, 
+            200, 
+            EasingType::EASE_IN_OUT_CUBIC, 
+            callback
+        );
+        
+        m_ui.getAnimationManPtr()->markProtected(animation);
+        m_ui.addAnimation(animation);
+        
         *switchValPtr = !currentState;
         return;
     }
@@ -264,7 +277,6 @@ void ListView::onExit() {
 void ListView::draw(){
     U8G2& u8g2 = m_ui.getU8G2();
     u8g2.setFont(u8g2_font_wqy12_t_gb2312b); 
-
     int startIndex = std::max(0, topVisibleIndex_ - 2);
     int endIndex = std::min((int)m_itemLength, topVisibleIndex_ + visibleItemCount_ + 2);
     
@@ -285,13 +297,23 @@ void ListView::draw(){
             
             if (m_itemList[itemIndex].extra.switchValue) {
                 u8g2.drawRFrame(u8g2.getDisplayWidth() - 42, itemY - 9, 14, 8, 1);
-                u8g2.drawRBox(u8g2.getDisplayWidth() - 42 + switchBoxX, itemY - 9, 7, 8, 2);
+                
+                // 使用正确的动画状态
+                int32_t currentSwitchBoxX = 0;
+                if (switchAnimStates_.find(itemIndex) != switchAnimStates_.end()) {
+                    currentSwitchBoxX = switchAnimStates_[itemIndex].boxX;
+                } else {
+                    // 如果没有动画状态，根据switch值设置初始位置
+                    currentSwitchBoxX = *m_itemList[itemIndex].extra.switchValue ? 7 : 0;
+                }
+                
+                u8g2.drawRBox(u8g2.getDisplayWidth() - 42 + currentSwitchBoxX, itemY - 9, 7, 8, 2);
+                
                 if (*m_itemList[itemIndex].extra.switchValue)
                     u8g2.drawUTF8(u8g2.getDisplayWidth() - 25, itemY - 1 , "ON");
                 else 
                     u8g2.drawUTF8(u8g2.getDisplayWidth() - 25, itemY - 1, "OFF");
             }
-
             if (m_itemList[itemIndex].extra.intValue) {
                 char buf[5] = {0};
                 snprintf(buf, 5, "%ld", *m_itemList[itemIndex].extra.intValue);
@@ -299,7 +321,6 @@ void ListView::draw(){
             }
         }
     }
-
     u8g2.drawVLine(126, progress_bar_top, progress_bar_bottom);
     drawCursor();
 }

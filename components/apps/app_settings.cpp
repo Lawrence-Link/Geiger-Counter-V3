@@ -27,6 +27,8 @@
 bool en_sound_click = false;
 bool en_sos = false;
 bool en_led = true;
+bool i_am_a_furry = false;
+bool en_sound_navigate = false;
 
 int32_t brightness = 0;
 int32_t sound_volume = 0;
@@ -39,6 +41,12 @@ ListItem sub_Alarm[3] = {
     ListItem(">>> 辐射警告 <<<"),
     ListItem("- 启用", nullptr, 0, nullptr, ListItemExtra{&en_sos, nullptr}),
     ListItem("- 触发阈值", nullptr, 0, [](){  })
+};
+
+ListItem sub_Tube_cfg[3] = {
+    ListItem(">>> 盖革管 <<<"),
+    ListItem("- 工作电压", nullptr, 0, [](){  }),
+    ListItem("- 恒压调试")
 };
 
 // ListItem itemList[10] = {
@@ -54,24 +62,20 @@ ListItem sub_Alarm[3] = {
 //     ListItem("- Tomato", nullptr, 0, [](){  })
 // };
 
-ListItem itemList[10] = {
+ListItem itemList[8] = {
     ListItem(">>>> 设置 <<<<"),
     ListItem("- 屏幕亮度", nullptr, 0, [](){ ui.showPopupProgress(brightness, 0, 5, "亮度", 100, 40, 5000, 1, [](int32_t val){ui.getU8G2().setContrast(val * 51);}); }, ListItemExtra{nullptr, &brightness}),
-    ListItem("- 音量", nullptr, 0, [](){ ui.showPopupProgress(sound_volume, 0, 100, "音量", 100, 40, 5000, 1); }, ListItemExtra{nullptr, &sound_volume}),
-    ListItem("- LED", nullptr, 0, [](){  }),
-    ListItem("- 盖革管", nullptr, 0, [](){  }),
-    ListItem("- 辐射警示", nullptr, 0, nullptr, ListItemExtra{&en_sound_click, nullptr}),
-    ListItem("- 辐射警报", sub_Alarm, 3),
-    ListItem("- Anytone", nullptr, 0, [](){  }),
-    ListItem("- Potato", nullptr, 0, [](){  }),
-    ListItem("- Tomato", nullptr, 0, [](){  }), 
+    ListItem("- 警报", sub_Alarm, 3),
+    ListItem("- 盖革管", sub_Tube_cfg, 3),
+    ListItem("- 脉冲音", nullptr, 0, nullptr, ListItemExtra{&en_sound_click, nullptr}),
+    ListItem("- 导航音", nullptr, 0, nullptr, ListItemExtra{&en_sound_navigate, nullptr}),
+    ListItem("- LED灯光", nullptr, 0, nullptr, ListItemExtra{&en_led, nullptr}),
+    ListItem("- 我是福瑞", nullptr, 0, nullptr, ListItemExtra{&i_am_a_furry, nullptr}),
 };
 
 class APP_SETTINGS : public ListView {
 public:
-    APP_SETTINGS(PixelUI& ui, ListItem *itemList, size_t length) : ListView(ui, itemList, length) {
-        brightness = SystemConf::getInstance().read_conf_brightness();
-    }
+    APP_SETTINGS(PixelUI& ui, ListItem *itemList, size_t length) : ListView(ui, itemList, length) {}
     
     void onLoad() override {
         auto& syscfg = SystemConf::getInstance();
@@ -103,6 +107,6 @@ AppItem settings_app{
     .bitmap = image_LISTVIEW_bits,
     
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<APP_SETTINGS>(ui, itemList, 10); 
+        return std::make_unique<APP_SETTINGS>(ui, itemList, 8); 
     },
 };
