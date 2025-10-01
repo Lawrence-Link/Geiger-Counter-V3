@@ -24,8 +24,6 @@ public:
     uint8_t read_conf_enable_blink() const { return alert_status; }
     float read_conf_tube_convertion_coefficient() const { return tube_convertion_coefficient; }
 
-    
-
 private:
     bool alert_status;
     bool sound_status;
