@@ -163,14 +163,13 @@ void ListView::selectCurrent(){
         returnToPreviousContext();
         return ;
     }
-    // one without nextlist, but with function
-    if (!m_itemList[currentCursor].nextList && m_itemList[currentCursor].pFunc ){ m_itemList[currentCursor].pFunc(); } // Enter pFunc
-    else if (m_itemList[currentCursor].extra.switchValue) {
+
+    if (m_itemList[currentCursor].pFunc ){ m_itemList[currentCursor].pFunc(); } // Enter pFunc
+    if (m_itemList[currentCursor].extra.switchValue) {
         bool* switchValPtr = m_itemList[currentCursor].extra.switchValue;
         bool currentState = *switchValPtr;
         int32_t endX = currentState ? 0 : 7;
         
-        // 保存当前索引
         size_t targetIndex = currentCursor;
         switchAnimStates_[targetIndex].isAnimating = true;
         
@@ -192,7 +191,7 @@ void ListView::selectCurrent(){
         *switchValPtr = !currentState;
         return;
     }
-    else { 
+    if (m_itemList[currentCursor].nextList){  // next list
         m_ui.getAnimationManPtr()->clear();
         m_history_stack.push_back(etl::make_pair(etl::make_pair(m_itemList, m_itemLength), currentCursor));
         m_itemLength = m_itemList[currentCursor].nextListLength - 1;

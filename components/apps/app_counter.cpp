@@ -64,10 +64,9 @@ static const unsigned char image_BAT_25_bits[] = {0xff,0x01,0x07,0x03,0x07,0x03,
 static const unsigned char image_BAT_empty_bits[] = {0xff,0x01,0x01,0x03,0x01,0x03,0x01,0x03,0x01,0x03,0xff,0x01};
 
 // Radiation level thresholds (cpm or converted units, depending on usage)
-float safe_until = 300;
-float warn_until = 600;
-float danger_until = 1000;
-float hazardrous_until = 2000;
+static int32_t cpm_warn_threshold = 300;
+static int32_t cpm_dngr_threshold = 600;
+static int32_t cpm_hzdr_threshold = 1000;
 
 // Macro definitions for unit strings
 #define UNIT_STRING       "uSv/h"
@@ -186,6 +185,12 @@ public:
     // Called when the application is started
     void onEnter(ExitCallback cb) override {
         IApplication::onEnter(cb);
+
+        auto& syscfg = SystemConf::getInstance();
+        cpm_warn_threshold = syscfg.read_conf_warn_threshold();
+        cpm_dngr_threshold = syscfg.read_conf_dngr_threshold();
+        cpm_hzdr_threshold = syscfg.read_conf_hzdr_threshold();
+
         m_ui.setContinousDraw(true);
         pcf8563_get_time(pcf8563_dev, &timeinfo, &tm_valid);
         // Initialize and configure widgets
@@ -265,14 +270,14 @@ public:
         
         if (current_cpm > 0) {
             // Determine status text based on radiation thresholds
-            if (current_cpm < safe_until) {
+            if (current_cpm < cpm_warn_threshold) {
                 u8g2.drawStr(5, 42, "SAFE");
                 u8g2.setClipWindow(29,36,128,42);
                 u8g2.drawStr(anim_status_x, 42, "Low Radiation");
                 u8g2.setMaxClipWindow();
                 blinker_description_bar.stopOnVisible();
             }
-            else if (current_cpm < warn_until) {
+            else if (current_cpm < cpm_dngr_threshold) {
                 u8g2.drawStr(5, 42, "WARN");
                 u8g2.setClipWindow(29,36,128,42);
                 u8g2.drawStr(anim_status_x, 42, "RISING LEVEL");
@@ -280,7 +285,7 @@ public:
                 blinker_description_bar.set_interval(500);
                 blinker_description_bar.start();
             }
-            else if (current_cpm < danger_until) {
+            else if (current_cpm < cpm_hzdr_threshold) {
                 u8g2.drawStr(5, 42, "DNGR");
                 u8g2.setClipWindow(29,36,128,42);
                 u8g2.drawStr(anim_status_x, 42, "UNSAFE DOSE");

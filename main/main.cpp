@@ -25,6 +25,7 @@
 #include "nvs.hpp"
 #include "nvs_handle_espp.hpp"
 #include "tune.h"
+
 // Global variables
 U8G2 u8g2;
 PixelUI ui(u8g2);
@@ -73,7 +74,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     u8g2.setContrast(syscfg.read_conf_brightness() * 51);
 
     Tune& tune = Tune::getInstance();
-     // 创建一个简单的旋律 (小星星)
+
     Tune::Melody startup = {
         {Notes::C5, 100},
         {Notes::G5, 100},
@@ -103,21 +104,12 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
         {Notes::A5, Duration::EIGHTH},
         {Notes::REST, Duration::QUARTER}
     };
-    
-    // 也可以使用 C 接口
-    // tune_note_t beep_pattern[] = {
-    //     {1000, 100},  // 1kHz, 100ms
-    //     {0, 50},      // 休止符, 50ms
-    //     {1000, 100},  // 1kHz, 100ms
-    //     {0, 50},      // 休止符, 50ms
-    //     {1000, 100}   // 1kHz, 100ms
-    // };
 
     tune.playMelody(startup);
 
     startBatteryTask();
     u8g2.setFont(u8g2_font_helvB08_tr);
-    u8g2.drawStr(-1, 61, " By PixelUI");
+    u8g2.drawStr(1, 61, "By PixelUI");
     u8g2.sendBuffer();
 
     vTaskDelay(pdMS_TO_TICKS(1000));

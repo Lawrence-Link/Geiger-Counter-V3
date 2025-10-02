@@ -10,6 +10,7 @@
 #include "tune.h"
 #include "led.h"
 #include <cmath>
+#include "system_nvs_varibles.h"
 
 // --- Constants ---
 static const char *TAG = "GEIGER_COUNTER";
@@ -22,6 +23,12 @@ static const char *TAG = "GEIGER_COUNTER";
 static TaskHandle_t s_counter_task_handle = NULL;
 static QueueHandle_t s_timestamp_queue = NULL; 
 static SemaphoreHandle_t s_cpm_mutex = NULL; 
+
+static int32_t cpm_warn_threshold;
+static int32_t cpm_dngr_threshold;
+static int32_t cpm_hzdr_threshold;
+
+bool en_click;
 
 static float current_cpm = 0.0f; 
 
@@ -43,6 +50,13 @@ static void IRAM_ATTR isr_geiger_pulse(void *arg) {
 
 static void counter_task(void *pvParameters) {
     // --- Core data structures ---
+    auto& syscfg = SystemConf::getInstance();
+
+    cpm_warn_threshold = syscfg.read_conf_warn_threshold();
+    cpm_dngr_threshold = syscfg.read_conf_dngr_threshold();
+    cpm_hzdr_threshold = syscfg.read_conf_hzdr_threshold();
+    en_click = syscfg.read_conf_enable_geiger_click();
+    
     int64_t timestamp_history[RING_BUFFER_SIZE];
     size_t write_index = 0;
     bool buffer_full = false;
@@ -75,8 +89,7 @@ static void counter_task(void *pvParameters) {
         
         // 1. Non-blocking pulse reception
         if (xQueueReceive(s_timestamp_queue, &new_timestamp, 0) == pdPASS) {
-
-            tune.geigerClick();
+            if (en_click) tune.geigerClick();
 
             float calculated_cpm = -1.0f; // Temporary CPM value
 
@@ -197,16 +210,13 @@ static void counter_task(void *pvParameters) {
                 cpm_average_count++;
             }
 
-            if (calculated_cpm < 300) {
+            if (calculated_cpm < cpm_warn_threshold) {
                 LedBlinker::getInstance().enqueueBlink(LedColor::GREEN);
             }
-            else if (calculated_cpm < 600) {
+            else if (calculated_cpm < cpm_dngr_threshold) {
                 LedBlinker::getInstance().enqueueBlink(LedColor::YELLOW);
             }
-            else if (calculated_cpm < 1000) {
-                LedBlinker::getInstance().enqueueBlink(LedColor::RED);
-            }
-            else if (calculated_cpm < 2000) {
+            else{
                 LedBlinker::getInstance().enqueueBlink(LedColor::RED);
             }
 
