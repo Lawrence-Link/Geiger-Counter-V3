@@ -24,8 +24,8 @@
 
 #include "esp_log.h"
 
-bool en_sound_click = false; // geiger click
-bool en_sound_navigate = false; // sound navigate
+bool en_sound_click; // geiger click
+bool en_sound_navigate; // sound navigate
 bool en_sos = false;    // alert
 bool en_led = true;     // led
 float convertion_coefficient = 0.0f;

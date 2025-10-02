@@ -35,10 +35,10 @@ struct ListItemExtra{
 // Represents a single item in a list view.
 struct ListItem{
     mutable char Title[MAX_LISTITEM_NAME_NUM]; // The display title of the item. 'mutable' allows it to be changed even if the struct is 'const'.
-    ListItem * nextList;                       // Pointer to a sub-menu (another list).
-    size_t nextListLength;                     // The number of items in the sub-menu.
-    std::function<void()> pFunc;               // A function to execute when the item is selected.
-    ListItemExtra extra;                       // Extra data for dynamic UI elements.
+    ListItem * nextList = nullptr;                       // Pointer to a sub-menu (another list).
+    size_t nextListLength = 0;                     // The number of items in the sub-menu.
+    std::function<void()> pFunc = nullptr;               // A function to execute when the item is selected.
+    ListItemExtra extra = {nullptr,nullptr};                       // Extra data for dynamic UI elements.
 private:
     // Animation values for visual effects on individual items.
     int32_t anim_val1 = 0;

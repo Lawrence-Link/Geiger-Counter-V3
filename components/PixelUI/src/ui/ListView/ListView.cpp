@@ -164,13 +164,25 @@ void ListView::selectCurrent(){
         return ;
     }
 
-    if (m_itemList[currentCursor].pFunc ){ m_itemList[currentCursor].pFunc(); } // Enter pFunc
-    if (m_itemList[currentCursor].extra.switchValue) {
-        bool* switchValPtr = m_itemList[currentCursor].extra.switchValue;
-        bool currentState = *switchValPtr;
-        int32_t endX = currentState ? 0 : 7;
+    if (m_itemList[currentCursor].nextList){  // next list
+        m_ui.getAnimationManPtr()->clear();
+        m_history_stack.push_back(etl::make_pair(etl::make_pair(m_itemList, m_itemLength), currentCursor));
+        m_itemLength = m_itemList[currentCursor].nextListLength - 1;
+        m_itemList = m_itemList[currentCursor].nextList;
+        currentCursor = 0;
+        m_ui.markFading();
+        startLoadAnimation();
         
-        size_t targetIndex = currentCursor;
+        scrollToTarget(0);
+        return;
+    }
+
+    if (m_itemList[currentCursor].extra.switchValue) {
+        bool* switchValPtr = m_itemList[currentCursor].extra.switchValue; // get switchValue pointer
+        bool currentState = *switchValPtr;  // retrieve currentState
+        int32_t endX = currentState ? 0 : 7; // calculate the end for the button box animation
+        
+        size_t targetIndex = currentCursor; // setting target index
         switchAnimStates_[targetIndex].isAnimating = true;
         
         auto callback = [this, targetIndex](int32_t value) {
@@ -189,20 +201,8 @@ void ListView::selectCurrent(){
         m_ui.addAnimation(animation);
         
         *switchValPtr = !currentState;
-        return;
     }
-    if (m_itemList[currentCursor].nextList){  // next list
-        m_ui.getAnimationManPtr()->clear();
-        m_history_stack.push_back(etl::make_pair(etl::make_pair(m_itemList, m_itemLength), currentCursor));
-        m_itemLength = m_itemList[currentCursor].nextListLength - 1;
-        m_itemList = m_itemList[currentCursor].nextList;
-        currentCursor = 0;
-        m_ui.markFading();
-        startLoadAnimation();
-        
-        scrollToTarget(0);
-        return;
-    }
+    if (m_itemList[currentCursor].pFunc ){ m_itemList[currentCursor].pFunc(); } // Enter pFunc
 }
 
 /*
