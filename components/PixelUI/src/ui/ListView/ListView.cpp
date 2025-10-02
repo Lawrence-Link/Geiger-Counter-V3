@@ -30,6 +30,8 @@ void ListView::onEnter(ExitCallback exitCallback){
     currentCursor = 0;
     isInitialLoad_ = true;
     
+    onLoad(); // onLoad to initialize varible readings before calculate states for boxes
+
     for (int i = 0; i < visibleItemCount_ + 1; i++) {
         itemLoadAnimations_[i] = 0;
     }
@@ -43,7 +45,6 @@ void ListView::onEnter(ExitCallback exitCallback){
     // animation: scrollbar
     m_ui.animate(animation_pixel_dots, 32, 400, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
     
-    onLoad();
     startLoadAnimation();
     scrollToTarget(0);
 }
