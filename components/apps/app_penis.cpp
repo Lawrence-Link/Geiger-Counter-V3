@@ -20,7 +20,9 @@
 #include <memory>
 #include <iostream>
 #include "focus/focus.h"
+#include "esp_log.h"
 #include "widgets/num_scroll/num_scroll.h"
+#include "widgets/text_button/text_button.h"
 
 static const unsigned char image_sans4_bits[] = {
     0xf0,0xff,0x0f,0xfc,0xfb,0x3f,0xfe,0xf7,0x7f,0xfe,0xeb,0x7f,0xff,0xf7,0xff,0xff,0xf7,0xff,0xff,0xf7,0xff,0xff,0xe3,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0x3f,0x1c,0xfe,0xbf,0xdd,0xfe,0xbf,0xdd,0xfe,0x7e,0x3e,0x7f,0xfe,0xff,0x7f,0xfc,0xff,0x3f,0xf0,0xff,0x0f};
@@ -38,10 +40,10 @@ private:
     PixelUI& m_ui;
     FocusManager focusMan;
     NumScroll num,  num2;
-
+    TextButton btn1;
 public:
     Penis(PixelUI& ui) : m_ui(ui), 
-    focusMan(ui), num(ui), num2(ui) {}
+    focusMan(ui), num(ui), num2(ui), btn1(ui) {}
     void draw() override {
         U8G2& display = m_ui.getU8G2();
         
@@ -65,6 +67,7 @@ public:
 
         num.draw();
         num2.draw();
+        btn1.draw();
 
         focusMan.draw();
     }
@@ -109,12 +112,18 @@ public:
         num2.setValue(0);
         num2.setFixedIntDigits(2);
 
+        btn1.setCallback([](){ESP_LOGI("penis", "HI");});
+        btn1.setText("Penis");
+        btn1.setCoordinate(67, 10);
+        btn1.setSize(34, 17);
+
         focusMan.addWidget(&num);
         focusMan.addWidget(&num2);
-        // focusMan.addWidget(&num2);
+        focusMan.addWidget(&btn1);
 
         num.onLoad();
         num2.onLoad();
+        btn1.onLoad();
     }
 
     void onExit() override {

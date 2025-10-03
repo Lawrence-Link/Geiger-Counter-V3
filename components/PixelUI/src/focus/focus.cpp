@@ -136,7 +136,7 @@ void FocusManager::draw() {
             if (m_current_focus_box.w <= 1 && m_current_focus_box.h <= 1) {
                 m_state = State::IDLE;
                 index = -1;
-                m_current_focus_box = {0, 64, 0, 0};  // 重置焦点框
+                m_current_focus_box = {0, 64, 0, 0}; 
                 return;
             }
         }

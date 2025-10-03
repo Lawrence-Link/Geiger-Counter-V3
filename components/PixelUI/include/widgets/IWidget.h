@@ -20,7 +20,6 @@ private:
 
     void setSelected(bool state) { Selected = state; }
     bool isSelected() const { return Selected; }
-
 protected:
     // 活动状态相关
     bool m_is_active = false;
