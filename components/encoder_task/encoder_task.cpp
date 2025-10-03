@@ -76,5 +76,5 @@ void start_encoder_task() {
     if (!input_event_queue) {
         input_event_queue = xQueueCreate(10, sizeof(InputEvent));
     }
-    xTaskCreate(encoder_task, "Encoder_Task", 4096, NULL, 4, NULL);
+    xTaskCreate(encoder_task, "Encoder_Task", 4096, NULL, 1, NULL);
 }

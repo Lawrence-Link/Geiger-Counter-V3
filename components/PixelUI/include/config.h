@@ -33,3 +33,4 @@ constexpr int MAX_LISTVIEW_DEPTH = 6;
 constexpr int CALLBACK_ANIMATION_STACK_SIZE = 2;
 constexpr int MAX_POPUP_NUM = 3;
 constexpr int MAX_ONSCREEN_WIDGET_NUM = 6;
+constexpr int MAX_INT_FIXED_WIDTH = 6;

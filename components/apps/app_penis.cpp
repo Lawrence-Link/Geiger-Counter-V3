@@ -19,6 +19,8 @@
 #include "core/app/app_system.h"
 #include <memory>
 #include <iostream>
+#include "focus/focus.h"
+#include "widgets/num_scroll/num_scroll.h"
 
 static const unsigned char image_sans4_bits[] = {
     0xf0,0xff,0x0f,0xfc,0xfb,0x3f,0xfe,0xf7,0x7f,0xfe,0xeb,0x7f,0xff,0xf7,0xff,0xff,0xf7,0xff,0xff,0xf7,0xff,0xff,0xe3,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0xff,0xdd,0xff,0x3f,0x1c,0xfe,0xbf,0xdd,0xfe,0xbf,0xdd,0xfe,0x7e,0x3e,0x7f,0xfe,0xff,0x7f,0xfc,0xff,0x3f,0xf0,0xff,0x0f};
@@ -34,8 +36,12 @@ bool state = 0;
 class Penis : public IApplication {
 private:
     PixelUI& m_ui;
+    FocusManager focusMan;
+    NumScroll num,  num2;
+
 public:
-    Penis(PixelUI& ui) : m_ui(ui) {}
+    Penis(PixelUI& ui) : m_ui(ui), 
+    focusMan(ui), num(ui), num2(ui) {}
     void draw() override {
         U8G2& display = m_ui.getU8G2();
         
@@ -44,9 +50,9 @@ public:
         if (timestpNow - timestpPrev > 50) {
             timestpPrev = timestpNow;
             if (state) {
-                m_ui.animate(height, 35, 50, EasingType::LINEAR);
+                m_ui.animate(height, 35, 50, EasingType::LINEAR, PROTECTION::PROTECTED);
             } else {
-                m_ui.animate(height, 28, 50, EasingType::LINEAR);
+                m_ui.animate(height, 28, 50, EasingType::LINEAR, PROTECTION::PROTECTED);
             }
             state = !state;
         }
@@ -56,19 +62,59 @@ public:
         display.drawEllipse(69, 30, 4, 4);
         display.drawEllipse(54, 30, 4, 4);
         display.drawRFrame(58, 27, 8, height, 3);
+
+        num.draw();
+        num2.draw();
+
+        focusMan.draw();
     }
 
     bool handleInput(InputEvent event) override {
-        if (event == InputEvent::BACK) {
-            requestExit(); 
-            return true;
+        // Check if an active widget (e.g., expanded histogram) is consuming input
+        IWidget* activeWidget = focusMan.getActiveWidget();
+        if (activeWidget) {
+            // Pass the event to the active widget
+            if (activeWidget->handleEvent(event)) {
+                // If the widget returns true, it signals that it has finished and control should return to FocusManager
+                focusMan.clearActiveWidget();
+            }
+            return true; // Event handled
         }
-        return false;
+        
+        // Handle input for focus navigation
+        if (event == InputEvent::BACK) {
+            requestExit();
+        } else if (event == InputEvent::RIGHT) {
+            focusMan.moveNext();
+        } else if (event == InputEvent::LEFT) {
+            focusMan.movePrev();
+        } else if (event == InputEvent::SELECT) {
+            focusMan.selectCurrent();
+        }
+        return true;
     }
     
     void onEnter(ExitCallback cb) override {
         IApplication::onEnter(cb);
         m_ui.setContinousDraw(true);
+        num.setPosition(10,10);
+        num.setRange(0,23);
+        num.setSize(24, 16);
+        num.setValue(0);
+        num.setFixedIntDigits(2);
+
+        num2.setPosition(37,10);
+        num2.setRange(0,59);
+        num2.setSize(24, 16);
+        num2.setValue(0);
+        num2.setFixedIntDigits(2);
+
+        focusMan.addWidget(&num);
+        focusMan.addWidget(&num2);
+        // focusMan.addWidget(&num2);
+
+        num.onLoad();
+        num2.onLoad();
     }
 
     void onExit() override {

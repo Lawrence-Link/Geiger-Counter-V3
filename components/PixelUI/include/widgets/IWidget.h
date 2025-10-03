@@ -5,14 +5,6 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -29,6 +21,11 @@ private:
     void setSelected(bool state) { Selected = state; }
     bool isSelected() const { return Selected; }
 
+protected:
+    // 活动状态相关
+    bool m_is_active = false;
+    uint32_t m_last_interaction_time = 0;
+
 public:
     virtual ~IWidget() = default;
     virtual void draw() = 0;
@@ -41,13 +38,53 @@ public:
     virtual bool handleEvent(InputEvent event) { return false; }
 
     virtual void onLoad() = 0;
-    virtual void onOffload () = 0;
+    virtual void onOffload() = 0;
 
     /**
      * @brief Triggers the onSelect action.
      * @return true if the widget wants to take over input control, false otherwise.
      */
     virtual bool onSelect() { return false; }
+
+    /**
+     * @brief Gets the timeout duration in milliseconds.
+     * @return Timeout duration. Return 0 to disable timeout.
+     */
+    virtual uint32_t getTimeout() const { return 0; }
+
+    /**
+     * @brief Called when the widget becomes active (takes over input control).
+     */
+    virtual void onActivate(uint32_t currentTime) {
+        m_is_active = true;
+        m_last_interaction_time = currentTime;
+    }
+
+    /**
+     * @brief Called when the widget is deactivated (returns control to FocusManager).
+     */
+    virtual void onDeactivate() {
+        m_is_active = false;
+    }
+
+    /**
+     * @brief Updates the last interaction time.
+     */
+    void updateInteractionTime(uint32_t currentTime) {
+        m_last_interaction_time = currentTime;
+    }
+
+    /**
+     * @brief Gets the last interaction time.
+     */
+    uint32_t getLastInteractionTime() const {
+        return m_last_interaction_time;
+    }
+
+    /**
+     * @brief Checks if the widget is currently active.
+     */
+    bool isActive() const { return m_is_active; }
 
     bool isFocusable() { return focusable; }
     void setFocusable(bool state) { focusable = state; }

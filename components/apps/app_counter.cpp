@@ -23,7 +23,7 @@
 #include <etl/stack.h>
 #include "widgets/histogram/histogram.h"
 #include "widgets/brace/brace.h"
-#include "widgets/iconButton/iconButton.h"
+#include "widgets/icon_button/icon_button.h"
 #include "focus/focus.h"
 #include "voltage_pid.hpp"
 #include "counter_task.h"
@@ -196,30 +196,30 @@ public:
         // Initialize and configure widgets
         // HISTOGRAM
         histogram.setCoordinate(97,54);
-        histogram.setMargin(56,18);
+        histogram.setSize(56,18);
         histogram.setFocusBox(FocusBox(70,46,55,17));
         histogram.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 76, 63);
         
         // BRACE 
         brace.setCoordinate(31,54);
         brace.setFocusBox(FocusBox(4, 46, 55, 17));
-        brace.setMargin(56,18);
+        brace.setSize(56,18);
         // Set a lambda function to draw the brace content (Max value)
         brace.setDrawContentFunction([this]() { braceContent(); });
 
         // ICON: Battery
         icon_battery.setSource(image_BAT_75_bits);
-        icon_battery.setMargin(10, 6);
+        icon_battery.setSize(10, 6);
         icon_battery.setCoordinate(12, 2);
         
         // ICON: Sounding
         icon_sounding.setSource(image_SOUND_OFF_bits);
-        icon_sounding.setMargin(7, 7);
+        icon_sounding.setSize(7, 7);
         icon_sounding.setCoordinate(26, 1);
         
         // ICON: Alarm
         icon_alarm.setSource(image_BELL_bits);
-        icon_alarm.setMargin(7, 7);
+        icon_alarm.setSize(7, 7);
         icon_alarm.setCoordinate(36, 1);
 
         // Add widgets to focus manager for navigation
@@ -406,7 +406,6 @@ public:
         snprintf(print_buffer, sizeof(print_buffer), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
         u8g2.drawStr(97, anim_clock_y, print_buffer);
         
-
         // Draw widgets (icons, brace, histogram)
         icon_sounding.draw();
         icon_alarm.draw();

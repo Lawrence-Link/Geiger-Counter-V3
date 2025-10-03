@@ -53,17 +53,13 @@ void ListView::onEnter(ExitCallback exitCallback){
 */
 void ListView::startLoadAnimation() {
     isInitialLoad_ = true;
-    
     int maxVisible = std::min(visibleItemCount_ + 1, (int)(m_itemLength + 1));
-    
+
     for (int i = 0; i < maxVisible; i++) {
         int duration = 250 + i * 60;
-        
         bool isLastAnimation = (i == maxVisible - 1);
-        
         auto callback = [this, i, isLastAnimation](int32_t value) {
             this->itemLoadAnimations_[i] = value;
-            
             if (isLastAnimation && value >= FIXED_POINT_ONE) { 
                 this->isInitialLoad_ = false;
                 this->m_ui.getAnimationManPtr()->clearAllProtectionMarks();

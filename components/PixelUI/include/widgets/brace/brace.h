@@ -28,7 +28,7 @@ public:
     void onOffload() override;
     void draw() override;
 
-    void setMargin(uint16_t mar_w, uint16_t mar_h) {margin_w_ = mar_w; margin_h_ = mar_h;}
+    void setSize(uint16_t mar_w, uint16_t mar_h) {margin_w_ = mar_w; margin_h_ = mar_h;}
     void setCoordinate(uint16_t coord_x, uint16_t coord_y) {coord_x_ = coord_x; coord_y_=coord_y;}
     void setDrawContentFunction(std::function<void()> func) { contentWithinBrace = func; }
 private:

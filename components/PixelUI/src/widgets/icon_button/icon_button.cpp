@@ -15,7 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "widgets/iconButton/iconButton.h"
+#include "widgets/icon_button/icon_button.h"
 
 IconButton::IconButton(PixelUI& ui) : m_ui(ui) {
 

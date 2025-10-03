@@ -37,6 +37,6 @@ public:
 
     void setCallback(std::function<void()> cb) {m_callback = cb;}
     void setCoordinate(uint16_t x, uint16_t y) {m_x = x; m_y = y;};
-    void setMargin(uint16_t w, uint16_t h) {m_w = w; m_h = h;}
+    void setSize(uint16_t w, uint16_t h) {m_w = w; m_h = h;}
     void setSource(const unsigned char* source) {src = source;};
 };

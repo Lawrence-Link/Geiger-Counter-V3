@@ -33,7 +33,7 @@ public:
     // Called when the app is paused by another app being pushed on top
     virtual void onPause() {};   
     // Called when the top app is popped and this app resumes
-    virtual void onResume() {};  
+    virtual void onResume() {}; 
 
 protected:
     void requestExit() {

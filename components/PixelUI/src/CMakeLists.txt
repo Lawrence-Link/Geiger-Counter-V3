@@ -18,7 +18,7 @@ add_library(pixelui STATIC
     
     widgets/histogram/histogram.cpp
     widgets/brace/brace.cpp
-    widgets/iconButton/iconButton.cpp
+    widgets/icon_button/icon_button.cpp
     focus/focus.cpp
     blinker/Blinker.cpp
     

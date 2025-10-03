@@ -210,16 +210,18 @@ static void counter_task(void *pvParameters) {
                 cpm_average_count++;
             }
 
-            if (calculated_cpm < cpm_warn_threshold) {
-                LedBlinker::getInstance().enqueueBlink(LedColor::GREEN);
+            bool en_led = SystemConf::getInstance().read_conf_enable_blink();
+            if (en_led) {
+                if (calculated_cpm < cpm_warn_threshold) {
+                    LedBlinker::getInstance().enqueueBlink(LedColor::GREEN);
+                }
+                else if (calculated_cpm < cpm_dngr_threshold) {
+                    LedBlinker::getInstance().enqueueBlink(LedColor::YELLOW);
+                }
+                else{
+                    LedBlinker::getInstance().enqueueBlink(LedColor::RED);
+                }
             }
-            else if (calculated_cpm < cpm_dngr_threshold) {
-                LedBlinker::getInstance().enqueueBlink(LedColor::YELLOW);
-            }
-            else{
-                LedBlinker::getInstance().enqueueBlink(LedColor::RED);
-            }
-
         } else {
             vTaskDelay(pdMS_TO_TICKS(10)); // Sleep briefly if queue is empty
         }
@@ -276,7 +278,7 @@ bool start_counter_task(const counter_task_config_t* config) {
     // 4. Create task
     // Stack size 8192 to fit 4000-byte local array with extra margin
     if (xTaskCreate(counter_task, "GeigerCounterTa", 8192, NULL, 
-                    configMAX_PRIORITIES - 5, &s_counter_task_handle) != pdPASS) {
+                    6, &s_counter_task_handle) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create counter task.");
         stop_counter_task();
         return false;
