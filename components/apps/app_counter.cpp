@@ -195,13 +195,13 @@ public:
         pcf8563_get_time(pcf8563_dev, &timeinfo, &tm_valid);
         // Initialize and configure widgets
         // HISTOGRAM
-        histogram.setCoordinate(97,54);
+        histogram.setPosition(97,54);
         histogram.setSize(56,18);
         histogram.setFocusBox(FocusBox(70,46,55,17));
         histogram.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 76, 63);
         
         // BRACE 
-        brace.setCoordinate(31,54);
+        brace.setPosition(31,54);
         brace.setFocusBox(FocusBox(4, 46, 55, 17));
         brace.setSize(56,18);
         // Set a lambda function to draw the brace content (Max value)
@@ -210,17 +210,17 @@ public:
         // ICON: Battery
         icon_battery.setSource(image_BAT_75_bits);
         icon_battery.setSize(10, 6);
-        icon_battery.setCoordinate(12, 2);
+        icon_battery.setPosition(12, 2);
         
         // ICON: Sounding
         icon_sounding.setSource(image_SOUND_OFF_bits);
         icon_sounding.setSize(7, 7);
-        icon_sounding.setCoordinate(26, 1);
+        icon_sounding.setPosition(26, 1);
         
         // ICON: Alarm
         icon_alarm.setSource(image_BELL_bits);
         icon_alarm.setSize(7, 7);
-        icon_alarm.setCoordinate(36, 1);
+        icon_alarm.setPosition(36, 1);
 
         // Add widgets to focus manager for navigation
         m_focusMan.addWidget(&brace);

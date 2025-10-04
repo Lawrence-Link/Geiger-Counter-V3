@@ -19,22 +19,27 @@
 
 #include "../IWidget.h"
 
-class TextButton : public IWidget {
+enum class POS {
+    TOP, BOTTOM, LEFT, RIGHT
+};
+
+class Label : public IWidget {
 private:
-    const char* src;
-    std::function<void()> m_callback;
-    int32_t m_x = 0, m_y = 0, m_w = 0, m_h = 0;
     PixelUI& m_ui;
+    int32_t m_x = 0, m_y = 0, m_w = 0, m_h = 0;
+    const char* src;
     int32_t anim_w = 0, anim_h = 0;
     int32_t anim_x = 0, anim_y = 0;
+    std::function<void()> m_callback;
+    POS load_pos;
 public:
-    TextButton(PixelUI& ui);
-    ~TextButton() = default;
+    Label(PixelUI& ui, uint16_t x, uint16_t y, const char* content, POS pos = POS::BOTTOM);
+    ~Label() = default;
     void onLoad() override;
     void onOffload() override;
     bool onSelect() override ;
     void draw() override;
-
+    void setLoadPos(POS pos);
     void setCallback(std::function<void()> cb) {m_callback = cb;}
     void setPosition(uint16_t x, uint16_t y) {m_x = x; m_y = y;};
 

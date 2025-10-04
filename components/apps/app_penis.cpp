@@ -102,9 +102,9 @@ public:
         m_ui.setContinousDraw(true);
         num.setPosition(10,10);
         num.setRange(0,23);
-        num.setSize(24, 16);
+        num.setSize(14, 16);
         num.setValue(0);
-        num.setFixedIntDigits(2);
+        num.setFixedIntDigits(1);
 
         num2.setPosition(37,10);
         num2.setRange(0,59);
@@ -114,7 +114,7 @@ public:
 
         btn1.setCallback([](){ESP_LOGI("penis", "HI");});
         btn1.setText("Penis");
-        btn1.setCoordinate(67, 10);
+        btn1.setPosition(67, 10);
         btn1.setSize(34, 17);
 
         focusMan.addWidget(&num);

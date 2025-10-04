@@ -19,34 +19,40 @@
 
 #include "PixelUI.h"
 #include "core/app/app_system.h"
+#include "core/ViewManager/ViewManager.h"
 #include "ui/ListView/ListView.h"
 #include "system_nvs_varibles.h"
-
 #include "esp_log.h"
 
-bool en_sound_click; // geiger click
-bool en_sound_navigate; // sound navigate
-bool en_sos = false;    // alert
-bool en_led = true;     // led
-float convertion_coefficient = 0.0f;
-int32_t brightness = 0;
-int32_t cpm_warn_threshold = 0;
-int32_t cpm_dngr_threshold = 0;
-int32_t cpm_hzdr_threshold = 0;
-int32_t operation_voltage = 380;
+static bool en_sound_click; // geiger click
+static bool en_sound_navigate; // sound navigate
+static bool en_sos = false;    // alert
+static bool en_led = true;     // led
+static bool en_interaction_tone;
+
+static float convertion_coefficient = 0.0f;
+static int32_t brightness = 0;
+static int32_t cpm_warn_threshold = 0;
+static int32_t cpm_dngr_threshold = 0;
+static int32_t cpm_hzdr_threshold = 0;
+static int32_t operation_voltage = 380;
 
 static const unsigned char image_settings_bits[] = {0xf0,0xff,0x0f,0xfc,0xff,0x3f,0xfe,0xff,0x7f,0xfe,0xe7,0x7f,0xff,0xe7,0xff,0x9f,0x81,0xf9,0x1f,0x3c,0xf8,0x3f,0xff,0xfc,0xbf,0xc3,0xfd,0x9f,0x3d,0xf9,0xdf,0xfe,0xff,0xc7,0x7e,0xe8,0xc7,0xbe,0xeb,0xdf,0x7e,0xfb,0x9f,0xed,0xf6,0xbf,0xd5,0xf6,0x3f,0x37,0xf7,0x1f,0xf4,0xef,0x9f,0xc5,0xdf,0xff,0x3f,0xbe,0xfe,0xe7,0x7d,0xfe,0xff,0x7b,0xfc,0xff,0x37,0xf0,0xff,0x0f};
 
 extern PixelUI ui;
+extern AppItem time_setting_app;
 
 auto& syscfg = SystemConf::getInstance();
 
 ListItem sub_Alarm[5] = {
     ListItem(">>> 剂量警告 <<<"),
     ListItem("- 启用", nullptr, 0, nullptr, ListItemExtra{&en_sos, nullptr}),
-    ListItem("- 警告阈值(CPM)", nullptr, 0, [](){  }, ListItemExtra{nullptr, &cpm_warn_threshold}),
-    ListItem("- 危险阈值(CPM)", nullptr, 0, [](){  }, ListItemExtra{nullptr, &cpm_dngr_threshold}),
-    ListItem("- 灾难阈值(CPM)", nullptr, 0, [](){  }, ListItemExtra{nullptr, &cpm_hzdr_threshold})
+    ListItem("- 警告阈值(CPM)", nullptr, 0, 
+        [](){ ui.showPopupValue4Digits(cpm_warn_threshold, "警告CPM", 100, 40, 3000, 1); }, ListItemExtra{nullptr, &cpm_warn_threshold}),
+    ListItem("- 危险阈值(CPM)", nullptr, 0, 
+        [](){ ui.showPopupValue4Digits(cpm_dngr_threshold, "危险CPM", 100, 40, 3000, 1); }, ListItemExtra{nullptr, &cpm_dngr_threshold}),
+    ListItem("- 灾难阈值(CPM)", nullptr, 0, 
+        [](){ ui.showPopupValue4Digits(cpm_hzdr_threshold, "灾难CPM", 100, 40, 3000, 1); }, ListItemExtra{nullptr, &cpm_hzdr_threshold})
 };
 
 ListItem sub_cvs_cfg[4] = {
@@ -63,13 +69,17 @@ ListItem sub_Tube_cfg[4] = {
     ListItem("- 转换系数")
 };
 
-ListItem itemList[7] = {
+ListItem itemList[9] = {
     ListItem(">>>> 设置 <<<<"),
     ListItem("- 屏幕亮度", nullptr, 0, [](){ ui.showPopupProgress(brightness, 0, 5, "亮度", 100, 40, 5000, 1, [](int32_t val){ui.getU8G2().setContrast(val * 51);}); }, ListItemExtra{nullptr, &brightness}),
     ListItem("- 剂量警告", sub_Alarm, 5),
     ListItem("- 盖革管", sub_Tube_cfg, 4),
     ListItem("- 计数音", nullptr, 0, nullptr, ListItemExtra{&en_sound_click, nullptr}),
+    ListItem("- 交互音", nullptr, 0, nullptr, ListItemExtra{&en_interaction_tone, nullptr}),
     ListItem("- 导航音", nullptr, 0, [](){syscfg.set_conf_enable_navi_tone(en_sound_navigate);}, ListItemExtra{&en_sound_navigate, nullptr}),
+    ListItem("- RTC时间", nullptr, 0, [](){
+        ui.getViewManagerPtr()->push(time_setting_app.createApp(ui));
+    }),
     ListItem("- LED指示", nullptr, 0, nullptr, ListItemExtra{&en_led, nullptr})
 };
 
@@ -95,22 +105,22 @@ public:
         cpm_hzdr_threshold = syscfg.read_conf_hzdr_threshold();
 
         operation_voltage = syscfg.read_conf_operation_voltage();
+        en_interaction_tone = syscfg.read_conf_enable_interaction_tone();
     }
 
     void onSave() override {
-        
-
         syscfg.set_conf_brightness(brightness);
         syscfg.set_conf_enable_alert(en_sos);
         syscfg.set_conf_enable_blink(en_led);
         syscfg.set_conf_enable_geiger_click(en_sound_click);
         syscfg.set_conf_enable_navi_tone(en_sound_navigate);
+        syscfg.set_conf_enable_interaction_tone(en_interaction_tone);
 
         syscfg.set_conf_warn_threshold(cpm_warn_threshold);
         syscfg.set_conf_dngr_threshold(cpm_dngr_threshold);
         syscfg.set_conf_hzdr_threshold(cpm_hzdr_threshold);
 
-        operation_voltage = syscfg.read_conf_operation_voltage();
+        // operation_voltage = syscfg.read_conf_operation_voltage();
 
         syscfg.save_conf_to_nvs();
         // syscfg.set_conf_tube_convertion_coefficient();
@@ -122,6 +132,6 @@ AppItem settings_app{
     .bitmap = image_settings_bits,
     
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<APP_SETTINGS>(ui, itemList, 7); 
+        return std::make_unique<APP_SETTINGS>(ui, itemList, 9); 
     },
 };

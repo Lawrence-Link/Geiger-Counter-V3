@@ -4,6 +4,7 @@
 #include "nvs.hpp"
 #include "nvs_handle_espp.hpp"
 #include "format.hpp"
+#include "esp_log.h"
 
 // NVS 命名空间宏定义 (长度 <= 15)
 #define CONF_NAMESPACE "sys_config"
@@ -32,15 +33,15 @@ void SystemConf::load_conf_from_nvs() {
     LOAD_OR_SET("geiger_click", geiger_click_status);
     LOAD_OR_SET("blink", blink_status);
     LOAD_OR_SET("navi_tone", navi_tone_status);
+    LOAD_OR_SET("intr_tone", en_interaction_tone);
     LOAD_OR_SET("bright", brightness);
     LOAD_OR_SET("tube_coeff", tube_convertion_coefficient);
-    
     LOAD_OR_SET("cpm_warn", cpm_warn_threshold);
     LOAD_OR_SET("cpm_dngr", cpm_dngr_threshold);
     LOAD_OR_SET("cpm_hzdr", cpm_hzdr_threshold);
     LOAD_OR_SET("oprt_volt", operation_voltage);
     
-    fmt::print("Configuration loaded. Brightness: {}, Alert: {}\n", brightness, alert_status);
+    fmt::print("Configuration loaded.");
 }
 
 /**
@@ -60,6 +61,7 @@ void SystemConf::save_conf_to_nvs() {
     storage.set("geiger_click", geiger_click_status, ec);
     storage.set("blink", blink_status, ec);
     storage.set("navi_tone", navi_tone_status, ec);
+    storage.set("intr_tone", en_interaction_tone, ec);
     storage.set("bright", brightness, ec);
     storage.set("tube_coeff", tube_convertion_coefficient, ec);
     storage.set("cpm_warn", cpm_warn_threshold, ec);

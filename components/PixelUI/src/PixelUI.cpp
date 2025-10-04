@@ -23,6 +23,7 @@
 
 #include "ui/Popup/PopupProgress.h"
 #include "ui/Popup/PopupInfo.h"
+#include "ui/Popup/PopupValue4Digits.h"
 
 #include "core/coroutine/Coroutine.h"
 #include <cinttypes>
@@ -235,6 +236,41 @@ void PixelUI::showPopupInfo(const char* text, const char* title, uint16_t width,
     if (!text) return;
     
     auto popup = std::make_shared<PopupInfo>(*this, width, height, text, title, duration, priority);
+    m_popupManagerPtr->addPopup(popup);
+    markDirty();
+}
+
+/**
+ * @brief Show a progress popup with animated border expansion.
+ * @param value Reference to the progress value that will be monitored.
+ * @param minValue Minimum value of the progress range.
+ * @param maxValue Maximum value of the progress range.
+ * @param title Optional title for the popup.
+ * @param width Width of the popup in pixels.
+ * @param height Height of the popup in pixels.
+ * @param duration Duration to display the popup in milliseconds.
+ * @param priority Priority level of the popup (higher number = higher priority).
+ */
+void PixelUI::showPopupValue4Digits(
+        int32_t& value,    
+        const char* title, 
+        uint16_t width, 
+        uint16_t height, 
+        uint16_t duration, 
+        uint8_t priority, 
+        std::function<void(int32_t val)> update_cb) {
+    
+    // Limits on size to save memory
+    if (width < 50) width = 50;
+    if (width > 120) width = 120;
+    if (height < 30) height = 30;
+    if (height > 60) height = 60;
+    
+    // Limits on duration
+    if (duration > 30000) duration = 30000; // Max 30 seconds
+    if (duration < 1000) duration = 1000;   // Min 1 second
+    
+    auto popup = std::make_shared<PopupValue4Digits>(*this, width, height, value, title, duration, priority, update_cb);
     m_popupManagerPtr->addPopup(popup);
     markDirty();
 }

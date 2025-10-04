@@ -40,7 +40,7 @@ void PopupBase::resetClipWindow() {
 bool PopupBase::updateState(uint32_t currentTime) {
     if (_startTime == 0) {
         _startTime = currentTime;
-        m_ui.animate(_currentBoxSize, _targetBoxSize, 300, EasingType::EASE_OUT_CUBIC);
+        m_ui.animate(_currentBoxSize, _targetBoxSize, 300, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
     }
     
     switch (_state) {

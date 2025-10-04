@@ -149,6 +149,25 @@ public:
      * @param priority Popup priority.
      */
     void showPopupInfo(const char* text, const char* title = "", uint16_t width = 80, uint16_t height = 30, uint16_t duration = 3000, uint8_t priority = 0);
+
+    /**
+     * @brief Shows an popup contain 4 digits.
+     * @param text The text content.
+     * @param title Optional title.
+     * @param width Popup width.
+     * @param height Popup height.
+     * @param duration Display duration.
+     * @param priority Popup priority.
+     * @param update_cb function callback when value changed.
+     */
+    void showPopupValue4Digits(
+        int32_t& value,
+        const char* title = "", 
+        uint16_t width = 80, 
+        uint16_t height = 30, 
+        uint16_t duration = 3000, 
+        uint8_t priority = 0, 
+        std::function<void(int32_t val)> update_cb = nullptr);
     
     /**
      * @brief Shows a progress popup.
@@ -160,6 +179,7 @@ public:
      * @param height Popup height.
      * @param duration Display duration.
      * @param priority Popup priority.
+     * @param update_cb function callback when value changed.
      */
     void showPopupProgress(int32_t& value, 
         int32_t minValue, 

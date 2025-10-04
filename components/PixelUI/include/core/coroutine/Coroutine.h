@@ -90,7 +90,9 @@ private:
 };
 
 #define CORO_BEGIN(ctx) switch((ctx).pc) { case 0:
+    
 #define CORO_END(ctx) (ctx).state = CoroutineState::FINISHED; return; }
+
 #define CORO_YIELD(ctx, line) do { (ctx).pc = line; return; case line:; } while(0)
 
 #define CORO_DELAY(ctx, ui, ms, line) do { \

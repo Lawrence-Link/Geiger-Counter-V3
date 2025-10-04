@@ -11,7 +11,11 @@ add_library(pixelui STATIC
     core/ViewManager/ViewManager.cpp
     core/coroutine/Coroutine.cpp
     
-    ui/Popup/Popup.cpp
+    ui/Popup/PopupBase.cpp
+    ui/Popup/PopupInfo.cpp
+    ui/Popup/PopupManager.cpp
+    ui/Popup/PopupProgress.cpp
+    
     ui/ListView/ListView.cpp
     ui/AppLauncher/AppLauncher.cpp
     ui/IconView/IconView.cpp
@@ -19,6 +23,11 @@ add_library(pixelui STATIC
     widgets/histogram/histogram.cpp
     widgets/brace/brace.cpp
     widgets/icon_button/icon_button.cpp
+    widgets/text_button/text_button.cpp
+    widgets/num_scroll/num_scroll.cpp
+    widgets/analog_clock/analog_clock.cpp
+    widgets/label/label.cpp
+
     focus/focus.cpp
     blinker/Blinker.cpp
     

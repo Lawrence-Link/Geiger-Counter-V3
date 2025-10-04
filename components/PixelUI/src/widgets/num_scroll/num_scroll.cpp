@@ -20,13 +20,38 @@ void NumScroll::onLoad() {
     m_anim_offset = 0;
     m_is_active = false;
 
-    // 更新焦点框，使用 margin 作为宽高
+    anim_w = 0;
+    anim_h = 0;
+
     FocusBox box;
-    box.x = m_x;
-    box.y = m_y;
-    box.w = m_margin_w;
-    box.h = m_margin_h;
+    box.x = m_x + 1;
+    box.y = m_y + 1;
+    box.w = m_margin_w - 2;
+    box.h = m_margin_h - 2;
     setFocusBox(box);
+
+    m_ui.animate(anim_w, anim_h, 
+                m_margin_w, m_margin_h, 
+                200, EasingType::EASE_OUT_CUBIC, 
+                PROTECTION::PROTECTED);
+}
+
+void NumScroll::onLoadNoAnim() {
+    m_anim_offset = 0;
+    m_is_active = false;
+
+    anim_w = 0;
+    anim_h = 0;
+
+    FocusBox box;
+    box.x = m_x + 1;
+    box.y = m_y + 1;
+    box.w = m_margin_w - 2;
+    box.h = m_margin_h - 2;
+    setFocusBox(box);
+
+    anim_w = m_margin_w;
+    anim_h = m_margin_h;
 }
 
 void NumScroll::onOffload() {
@@ -74,29 +99,36 @@ bool NumScroll::handleEvent(InputEvent event) {
 void NumScroll::draw() {
     U8G2& u8g2 = m_ui.getU8G2();
 
-    int center_x = m_x + m_margin_w / 2;
-    int center_y = m_y + m_margin_h / 2;
+    // 计算动画绘制区域（从中心扩张）
+    int32_t draw_x = m_x + (m_margin_w - anim_w) / 2;
+    int32_t draw_y = m_y + (m_margin_h - anim_h) / 2;
+    int center_x = draw_x + anim_w / 2;
+    int center_y = draw_y + anim_h / 2;
 
+    // 清除背景
     u8g2.setDrawColor(0);
-    u8g2.drawBox(m_x + 2, m_y + 2, m_margin_w - 4, m_margin_h - 4);
+    u8g2.drawBox(draw_x + 2, draw_y + 2, anim_w - 4, anim_h - 4);
     u8g2.setDrawColor(1);
 
+    // 绘制边框
     if (m_is_active) {
-        u8g2.drawFrame(m_x, m_y, m_margin_w, m_margin_h);
-        u8g2.drawFrame(m_x + 1, m_y + 1, m_margin_w - 2, m_margin_h - 2);
+        u8g2.drawFrame(draw_x, draw_y, anim_w, anim_h);
+        u8g2.drawFrame(draw_x + 1, draw_y + 1, anim_w - 2, anim_h - 2);
     } else {
-        u8g2.drawFrame(m_x, m_y, m_margin_w, m_margin_h);
+        u8g2.drawFrame(draw_x, draw_y, anim_w, anim_h);
     }
 
-    u8g2.setClipWindow(m_x + 3, m_y + 3,
-                       m_x + m_margin_w - 3,
-                       m_y + m_margin_h - 3);
+    // 设置裁剪窗口
+    u8g2.setClipWindow(draw_x + 3, draw_y + 3,
+                       draw_x + anim_w - 3,
+                       draw_y + anim_h - 3);
 
     u8g2.setFont(u8g2_font_tenfatguys_tn);
 
     const int digit_height = 16;
     char buffer[16];
 
+    // 绘制滚动数字
     for (int i = -1; i <= 1; i++) {
         int32_t value = m_current_value + i;
         if (value < m_min_value) value = m_min_value;

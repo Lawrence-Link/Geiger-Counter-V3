@@ -26,6 +26,7 @@ public:
     ~NumScroll() = default;
 
     void onLoad() override;
+    void onLoadNoAnim();
     void onOffload() override;
     void draw() override;
     bool handleEvent(InputEvent event) override;
@@ -42,6 +43,7 @@ public:
     void setSize(uint16_t w, uint16_t h) { m_margin_w = w; m_margin_h = h; }
 
 private:
+    private:
     PixelUI& m_ui;
 
     uint16_t m_x = 0;
@@ -55,8 +57,10 @@ private:
     int32_t m_max_value = 99;
     uint8_t m_fixed_digits = 0; 
 
-    // 动画
     int32_t m_anim_offset = 0;
+    
+    int32_t anim_w = 0;
+    int32_t anim_h = 0;
 
     static constexpr uint32_t TIMEOUT_MS = 5000;
 

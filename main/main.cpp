@@ -76,9 +76,8 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     Tune& tune = Tune::getInstance();
 
     Tune::Melody startup = {
-        {Notes::C5, 100},
-        {Notes::G5, 100},
-        {Notes::E5, 100}
+        {Notes::B5, 80},
+        {Notes::B5, 80},
     };
 
     Tune::Melody bluejay = {
@@ -105,7 +104,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
         {Notes::REST, Duration::QUARTER}
     };
 
-    tune.playMelody(startup);
+    if (syscfg.read_conf_enable_interaction_tone()) tune.playMelody(startup);
 
     startBatteryTask();
     u8g2.setFont(u8g2_font_helvB08_tr);

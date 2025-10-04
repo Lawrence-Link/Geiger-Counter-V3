@@ -29,7 +29,7 @@ public:
     void draw() override;
 
     void setSize(uint16_t mar_w, uint16_t mar_h) {margin_w_ = mar_w; margin_h_ = mar_h;}
-    void setCoordinate(uint16_t coord_x, uint16_t coord_y) {coord_x_ = coord_x; coord_y_=coord_y;}
+    void setPosition(uint16_t coord_x, uint16_t coord_y) {coord_x_ = coord_x; coord_y_=coord_y;}
     void setDrawContentFunction(std::function<void()> func) { contentWithinBrace = func; }
 private:
     uint16_t coord_x_ = 0, coord_y_ = 0;
