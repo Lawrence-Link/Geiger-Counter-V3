@@ -18,7 +18,6 @@
 #include "core/app/IApplication.h"
 #include "core/app/app_system.h"
 #include "app_registry.h"
-
 #include <memory>
 #include <etl/stack.h>
 #include "widgets/histogram/histogram.h"
@@ -27,17 +26,16 @@
 #include "focus/focus.h"
 #include "voltage_pid.hpp"
 #include "counter_task.h"
-
 #include "time_module.h"
-
 #include "pin_definitions.h"
 #include "system_nvs_varibles.h"
 #include "blinker/Blinker.h"
 #include <fastmath.h>
-
 #include "i2c.h" // for the handles
 #include "core/coroutine/Coroutine.h"
 #include "led.h"
+#include "tune.h"
+#include "esp_log.h"
 
 extern VoltagePID voltage_controller;
 extern int battery_percentage;
@@ -46,16 +44,20 @@ extern int battery_percentage;
 static const unsigned char image_info_bits[] = {
     0xf0,0xff,0x0f,0xfc,0xff,0x3f,0xde,0xff,0x7b,0x8e,0xff,0x71,0x87,0xff,0xe1,0x03,0xff,0xc0,0x03,0x7e,0xc0,0x01,0x7e,0x80,0x01,0x3c,0x80,0x01,0x3c,0x80,0x01,0x66,0x80,0x01,0xc3,0x80,0xff,0xc3,0xff,0xff,0xe7,0xff,0xff,0xff,0xff,0xff,0xfb,0xff,0xff,0x71,0xff,0xff,0x31,0xff,0xff,0x10,0xfe,0xff,0x10,0xfe,0x7e,0x10,0x74,0xfe,0x10,0x60,0xfc,0xe3,0x3f,0xf0,0xff,0x0f
 };
+
 // XBM data for main background
 static const unsigned char image_Background_bits[] = {0xfe,0x01,0x00,0x00,0x00,0x00,0x00,0xe0,0xff,0xff,0xff,0x0f,0x00,0x00,0x00,0x00,0x01,0x03,0x00,0x00,0x00,0x00,0x00,0x30,0x00,0x00,0x00,0x18,0x00,0x00,0x00,0x00,0x7d,0x06,0x00,0x00,0x00,0x00,0x00,0x18,0xff,0xb7,0x55,0x31,0x00,0x00,0x00,0x00,0x81,0xfc,0xff,0xff,0xff,0xff,0xff,0x8f,0x00,0x00,0x00,0xe2,0xff,0xff,0xff,0x7f,0x3d,0x01,0x00,0x00,0x00,0x00,0x00,0x40,0xb6,0xea,0xff,0x04,0x00,0x00,0x00,0x80,0x41,0xfe,0xff,0xff,0xaa,0xfe,0xff,0x3f,0x01,0x00,0x00,0xf9,0xff,0xff,0xff,0xab,0x9f,0x00,0x00,0x00,0x00,0x00,0x00,0x80,0xf8,0xff,0x7f,0x02,0x00,0x00,0x00,0x80,0x20,0xff,0xff,0xff,0xff,0x55,0xfd,0x7f,0xfc,0xff,0xff,0x6c,0xff,0xff,0xff,0xb5,0x40,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x06,0x00,0x80,0x01,0x00,0x00,0x00,0x80,0x80,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x03,0x00,0x00,0xff,0xff,0xff,0xff,0xff};
 
 // XBM data for icons (7x7)
 static const unsigned char image_SOUND_ON_bits[] = {0x24,0x46,0x57,0x57,0x57,0x46,0x24};
 static const unsigned char image_SOUND_OFF_bits[] = {0x04,0x06,0x57,0x27,0x57,0x06,0x04};
+
 // XBM data for BELL icon (6x7)
 static const unsigned char image_BELL_bits[] = {0x20,0x18,0x3c,0x3e,0x1f,0x1c,0x12};
+
 // XBM data for Alert icon (9x7)
 static const unsigned char image_Alert_bits[] = {0x10,0x00,0x38,0x00,0x28,0x00,0x6c,0x00,0x6c,0x00,0xfe,0x00,0xef,0x01};
+
 // XBM data for battery icons (10x6)
 static const unsigned char image_BAT_FULL_bits[] = {0xff,0x01,0xff,0x03,0xff,0x03,0xff,0x03,0xff,0x03,0xff,0x01};
 static const unsigned char image_BAT_75_bits[] = {0xff,0x01,0x3f,0x03,0x3f,0x03,0x3f,0x03,0x3f,0x03,0xff,0x01};
@@ -67,11 +69,39 @@ static const unsigned char image_BAT_empty_bits[] = {0xff,0x01,0x01,0x03,0x01,0x
 static int32_t cpm_warn_threshold = 300;
 static int32_t cpm_dngr_threshold = 600;
 static int32_t cpm_hzdr_threshold = 1000;
+static bool use_cpm;
 
 // Macro definitions for unit strings
-#define UNIT_STRING       "uSv/h"
-#define UNIT_PLACEHOLDER  "-.---uSv/h"
-#define EMPTY_PLACEHOLDER "-.---"
+#define UNIT_USV "uSv/h"
+#define UNIT_CPM "CPM"
+#define UNIT_PLACEHOLDER_USV  "-.---uSv/h"
+#define UNIT_PLACEHOLDER_CPM  "-.---CPM"
+#define EMPTY_PLACEHOLDER     "-.---"
+
+Tune::Melody sos = {
+    // S: (···)
+    {Notes::B5, 70},
+    {Notes::REST, 70},    
+    {Notes::B5, 70},      
+    {Notes::REST, 70},    
+    {Notes::B5, 70},      
+    {Notes::REST, 250},    
+    
+    // O: (---)
+    {Notes::B5, 250},      
+    {Notes::REST, 70},    
+    {Notes::B5, 250},      
+    {Notes::REST, 70},    
+    {Notes::B5, 250},      
+    {Notes::REST, 250},    
+    
+    // S: (···)
+    {Notes::B5, 70},      
+    {Notes::REST, 70},    
+    {Notes::B5, 70},      
+    {Notes::REST, 70},    
+    {Notes::B5, 70},      
+};
 
 /**
  * @brief Formats a floating-point number into a string in a meter-style format (up to 4 significant digits).
@@ -79,30 +109,36 @@ static int32_t cpm_hzdr_threshold = 1000;
  * @param buffer Pointer to the destination string buffer.
  * @param buffer_size Maximum capacity of the buffer.
  * @param value The float value to format.
- * @param withUnit Flag to include the unit string (uSv/h).
+ * @param unit  Optional unit string ("uSv/h", "CPM", or NULL for no unit).
  * @return The number of characters written (excluding the null terminator), or a negative value on failure.
  */
-int format_meter_style(char *buffer, size_t buffer_size, float value, bool withUnit) {
-    const char* unit_suffix = withUnit ? UNIT_STRING : "";
-
+int format_meter_style(char *buffer, size_t buffer_size, float value, const char *unit) {
     if (buffer_size == 0) return 0;
-
+    
+    bool withUnit = (unit != NULL && unit[0] != '\0');
+    
     // 1) Zero/near-zero value displays a placeholder
     if (fabsf(value) < 1e-7f) {
-        const char* placeholder = withUnit ? UNIT_PLACEHOLDER : EMPTY_PLACEHOLDER;
+        const char *placeholder;
+        if (withUnit) {
+            if (strcmp(unit, UNIT_CPM) == 0)
+                placeholder = UNIT_PLACEHOLDER_CPM;
+            else
+                placeholder = UNIT_PLACEHOLDER_USV;
+        } else {
+            placeholder = EMPTY_PLACEHOLDER;
+        }
         snprintf(buffer, buffer_size, "%s", placeholder);
         return (int)strlen(buffer);
     }
-
+    
     double d = (double)value;
     double absd = fabs(d);
-
     char tmp[64];
     
     // 2) Normal range: fixed-point with up to 3 decimal places
     if (absd >= 0.001 && absd < 10000.0) {
         snprintf(tmp, sizeof(tmp), "%.3f", d);
-
         // Strip trailing zeros and possible trailing dot
         char *pdot = strchr(tmp, '.');
         if (pdot) {
@@ -115,9 +151,13 @@ int format_meter_style(char *buffer, size_t buffer_size, float value, bool withU
         // 3) Scientific notation for very small or very large values
         snprintf(tmp, sizeof(tmp), "%.3g", d);
     }
-
+    
     // Combine number and unit suffix
-    snprintf(buffer, buffer_size, "%s%s", tmp, unit_suffix);
+    if (withUnit)
+        snprintf(buffer, buffer_size, "%s%s", tmp, unit);
+    else
+        snprintf(buffer, buffer_size, "%s", tmp);
+    
     return (int)strlen(buffer);
 }
 
@@ -131,6 +171,7 @@ private:
     IconButton icon_battery;
     IconButton icon_sounding;
     IconButton icon_alarm;
+    
     // State machine for the initial loading animation sequence
     enum class LoadState {
         INIT,          // Initial state
@@ -139,22 +180,59 @@ private:
         HISTO_LOADING, // Execute histogram.onLoad()
         DONE           // Loading complete
     } loadState = LoadState::INIT;
+    
     uint32_t state_timestamp = 0;  // Time of entering the current state
     bool first_time = false;
+    
     // Animation variables
     int32_t anim_mark_m = 0;      // Animation for the color bar width
     int32_t anim_bg = 0;          // Animation for the background clipping width
     int32_t anim_status_x = -27;  // Animation for the status text horizontal position
     int32_t anim_clock_y = 0;     // Animation for the clock vertical position
+    
+    // Brace 页面滚动相关
+    enum class BracePage {
+        MAX = 0,
+        AVG = 1
+    };
+    
+    BracePage currentBracePage = BracePage::MAX;
+    BracePage targetBracePage = BracePage::MAX;
+    int32_t anim_brace_y = 0;  // Brace 内容的垂直滚动动画
+    bool brace_animating = false;
+    
     char print_buffer[24];        // Buffer for formatted strings
+    
     uint32_t timestamp_prev;
     uint32_t timestamp_now;
+    
     Blinker blinker_description_bar;
     Blinker blinker_calibration_icon;
+    
     float current_cpm = 0;
     struct tm timeinfo;
     bool tm_valid;
+    
     std::shared_ptr<Coroutine> animationCoroutine_;
+    std::shared_ptr<Coroutine> alertSchedulerCoroutine_; // localData[0] is the indicator of an alert.
+
+    bool requireAlertSound = false;
+
+    Tune& tune = Tune::getInstance();
+
+    void alert_scheduler_coroutine_body(CoroutineContext& ctx, PixelUI& ui) {
+        CORO_BEGIN(ctx);
+    
+        while (true) {
+            while (!ctx.localData[0]) {
+                CORO_YIELD(ctx, __LINE__);
+            }
+            ctx.localData[0] = 0;
+            tune.playMelodyInterruptible(sos);
+            CORO_DELAY(ctx, ui, 3500, __LINE__);
+        }
+        CORO_END(ctx);
+    }
 
     void animation_coroutine_body(CoroutineContext& ctx, PixelUI& ui) 
     {
@@ -181,18 +259,20 @@ public:
     blinker_description_bar(ui, 100),
     blinker_calibration_icon(ui, 100)
     {}
-
+    
     // Called when the application is started
     void onEnter(ExitCallback cb) override {
         IApplication::onEnter(cb);
-
+        
         auto& syscfg = SystemConf::getInstance();
         cpm_warn_threshold = syscfg.read_conf_warn_threshold();
         cpm_dngr_threshold = syscfg.read_conf_dngr_threshold();
         cpm_hzdr_threshold = syscfg.read_conf_hzdr_threshold();
-
+        use_cpm = syscfg.read_conf_use_cpm();
+        
         m_ui.setContinousDraw(true);
         pcf8563_get_time(pcf8563_dev, &timeinfo, &tm_valid);
+        
         // Initialize and configure widgets
         // HISTOGRAM
         histogram.setPosition(97,54);
@@ -206,7 +286,14 @@ public:
         brace.setSize(56,18);
         // Set a lambda function to draw the brace content (Max value)
         brace.setDrawContentFunction([this]() { braceContent(); });
-
+        brace.setCallback([this](){braceCallback();});
+        
+        // 初始化 Brace 页面状态
+        currentBracePage = BracePage::MAX;
+        targetBracePage = BracePage::MAX;
+        anim_brace_y = 0;
+        brace_animating = false;
+        
         // ICON: Battery
         icon_battery.setSource(image_BAT_75_bits);
         icon_battery.setSize(10, 6);
@@ -221,21 +308,28 @@ public:
         icon_alarm.setSource(image_BELL_bits);
         icon_alarm.setSize(7, 7);
         icon_alarm.setPosition(36, 1);
-
+        
         // Add widgets to focus manager for navigation
         m_focusMan.addWidget(&brace);
         m_focusMan.addWidget(&histogram);  
-
+        
         timestamp_prev = timestamp_now = m_ui.getCurrentTime();
-
+        
         animationCoroutine_ = std::make_shared<Coroutine>(
             std::bind(&APP_COUNTER::animation_coroutine_body, this, std::placeholders::_1, std::placeholders::_2),
             m_ui
         );
+
+        alertSchedulerCoroutine_ = std::make_shared<Coroutine>(
+            std::bind(&APP_COUNTER::alert_scheduler_coroutine_body, this, std::placeholders::_1, std::placeholders::_2),
+            m_ui
+        );
+
         m_ui.addCoroutine(animationCoroutine_);
-
+        m_ui.addCoroutine(alertSchedulerCoroutine_); // 警报调度
+        
         first_time = false;
-
+        
         // Start hardware-related tasks
         voltage_controller.startTask();
         counter_task_config_t tube_conf = {
@@ -243,26 +337,81 @@ public:
         };
         start_counter_task(&tube_conf);
     }
-
-    // Drawing function for the Brace widget content (Max value)
+    
+    int bracePageCnt = 0;
+    
+    void braceCallback() {
+        if (brace_animating) return;  // 如果正在动画中，忽略输入
+        
+        // 计算下一个页面 (MAX -> AVG -> MAX)
+        targetBracePage = (currentBracePage == BracePage::MAX) ? BracePage::AVG : BracePage::MAX;
+        
+        // 启动向上滚动动画
+        const int PAGE_HEIGHT = 18;
+        anim_brace_y = 0;
+        m_ui.animate(anim_brace_y, PAGE_HEIGHT, 300, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
+        brace_animating = true;
+    }
+    
+    // Drawing function for the Brace widget content (Max/Avg value with scrolling)
     void braceContent() {
         U8G2& u8g2 = m_ui.getU8G2();
         u8g2.setFont(u8g2_font_5x7_tr);
-        // Format max value without unit for the number part
-        format_meter_style(print_buffer, sizeof(print_buffer), histogram.getMaxValue(), false);
-        u8g2.drawStr(30, 54, print_buffer);
-        u8g2.drawStr(31, 61, "uSv/h");
-        // Draw the "Max" label box
-        u8g2.drawRBox(8, 50, 20, 10, 2);
-        u8g2.setDrawColor(0); // Invert color for text inside the box
-        u8g2.drawStr(11, 58, "Max");
-        u8g2.setDrawColor(1); // Restore draw color
+        
+        const int PAGE_HEIGHT = 18;
+        
+        auto drawPage = [&](BracePage page, int y_base) {
+            const char* label = nullptr;
+            float value = 0.0f;
+            
+            switch (page) {
+                case BracePage::MAX:
+                    label = "Max";
+                    value = histogram.getMaxValue();
+                    break;
+                case BracePage::AVG:
+                    label = "Avg";
+                    value = histogram.getAverageValue();
+                    break;
+            }
+            
+            // 绘制数值
+            if (!use_cpm) {
+                format_meter_style(print_buffer, sizeof(print_buffer), value, NULL);
+                u8g2.drawStr(30, y_base - 4, print_buffer);
+                u8g2.drawStr(31, y_base + 3, "uSv/h");
+            } else {
+                snprintf(print_buffer, sizeof(print_buffer), "%d", (int)value);
+                u8g2.drawStr(30, y_base - 4, print_buffer);
+                u8g2.drawStr(31, y_base + 3, "CPM");
+            }
+            
+            // 绘制标签框
+            u8g2.drawRBox(8, y_base - 8, 20, 10, 2);
+            u8g2.setDrawColor(0);
+            u8g2.drawStr(11, y_base, label);
+            u8g2.setDrawColor(1);
+        };
+        
+        // 根据动画进度绘制页面
+        int current_y = 58 + anim_brace_y;  // 当前页面的 Y 坐标
+        int next_y = 58 + anim_brace_y - PAGE_HEIGHT;  // 下一个页面的 Y 坐标（从下方进入）
+        
+        // 绘制当前页面（向上移出）
+        if (current_y >= 45 && current_y <= 70) {  // 在可视范围内
+            drawPage(currentBracePage, current_y);
+        }
+        
+        // 绘制目标页面（从下方进入）
+        if (next_y >= 45 && next_y <= 70) {  // 在可视范围内
+            drawPage(targetBracePage, next_y);
+        }
     }
-
+    
     void onResume() override {
         m_ui.setContinousDraw(true);
     }
-
+    
     // Draws the radiation level status text and color bar
     void drawLabel() {
         U8G2& u8g2 = m_ui.getU8G2();
@@ -286,6 +435,8 @@ public:
                 blinker_description_bar.start();
             }
             else if (current_cpm < cpm_hzdr_threshold) {
+                alertSchedulerCoroutine_->getContext().localData[0] = 1;
+
                 u8g2.drawStr(5, 42, "DNGR");
                 u8g2.setClipWindow(29,36,128,42);
                 u8g2.drawStr(anim_status_x, 42, "UNSAFE DOSE");
@@ -294,6 +445,7 @@ public:
                 blinker_description_bar.start();
             }
             else {
+                alertSchedulerCoroutine_->getContext().localData[0] = 1;
                 u8g2.drawStr(5, 42, "HZDR");
                 u8g2.setClipWindow(29,36,128,42);
                 u8g2.drawStr(anim_status_x, 42, "SEVERE THREAT");
@@ -316,10 +468,10 @@ public:
         u8g2.drawBox(3, 35, anim_mark_m, 8);
         u8g2.setDrawColor(1);    
     }
-
+    
     void draw() override {
         timestamp_now = m_ui.getCurrentTime();
-
+        
         // Initial setup and animation start
         if (!first_time) {
             m_ui.animate(anim_mark_m, 23, 300, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
@@ -327,14 +479,21 @@ public:
             m_ui.animate(anim_clock_y, 8, 200, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
             
             blinker_description_bar.stopOnVisible();
-
             // Start the loading animation state machine
             state_timestamp = m_ui.getCurrentTime();
             first_time = true;
         }
+        
+        if (brace_animating && anim_brace_y >= 17) {  // animation near complete
+            // reset state
+            currentBracePage = targetBracePage;
+            anim_brace_y = 0;
+            brace_animating = false;
+        }
+        
         // --- UI Drawing ---
         U8G2& u8g2 = m_ui.getU8G2();
-
+        
         // Draw background with animation clipping
         u8g2.setClipWindow(0,7,anim_bg,18);
         u8g2.drawXBM(0, 7, 128, 10, image_Background_bits);
@@ -343,23 +502,33 @@ public:
         // Draw the main radiation reading
         u8g2.setFont(u8g2_font_profont17_tr);
         current_cpm = get_current_cpm();
+        
         // Format and draw the value (CPM * conversion coefficient)
-        format_meter_style(print_buffer, sizeof(print_buffer), current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient(), true);
+        if (!use_cpm) {
+            format_meter_style(print_buffer, sizeof(print_buffer), current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient(), UNIT_USV);
+        } else {
+            snprintf(print_buffer, sizeof(print_buffer), "%dCPM", (int)current_cpm);
+        }
         u8g2.drawStr(3, 31, print_buffer);
-
+        
         blinker_description_bar.update();
         blinker_calibration_icon.update();
-
+        
         // Update histogram data every second if not in startup mode
         if (timestamp_now - timestamp_prev >= 1000){
             if (!is_startup_mode()){
                 timestamp_prev = timestamp_now;
-                histogram.addData(current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient());
+                if (!use_cpm) {
+                    histogram.addData(current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient());
+                } else {
+                    histogram.addData(current_cpm);
+                }
                 blinker_calibration_icon.stop();
             } else {
                 // If in startup mode, display the calibration blinker
                 blinker_calibration_icon.start();
             }
+            
             const unsigned char* bat_source = nullptr;
             if (battery_percentage >= 75) {
                 bat_source = image_BAT_FULL_bits; // 100% or 75%+
@@ -373,32 +542,32 @@ public:
                 bat_source = image_BAT_empty_bits; // 0% or empty
             }
             icon_battery.setSource(bat_source);
+            
             pcf8563_get_time(pcf8563_dev, &timeinfo, &tm_valid);
         }
-
+        
         // Draw status label if the blinker is visible (for blinking effect)
         if (blinker_description_bar.is_visible()) {
             drawLabel();
         }
-
+        
         // Draw "CAL" text if the calibration blinker is visible
         if (blinker_calibration_icon.is_visible()) {
             u8g2.setFont(u8g2_font_4x6_tr);
             u8g2.drawStr(46, 7, "CAL");
         }
-
+        
         // Draw voltage display
         u8g2.setFont(u8g2_font_5x7_tr);
         uint16_t volt = voltage_controller.getVoltage();
         snprintf(print_buffer, sizeof(print_buffer), "%dV", volt);
         u8g2.drawStr(105, 42, print_buffer);
-
+        
         // Highlight voltage box if target voltage is reached
         if (abs(volt - voltage_controller.getTargetVolt()) < 10) {
             u8g2.setDrawColor(2); // Inverse/toggle draw color
             u8g2.drawBox(104, 35, 21, 8);
         }
-
         u8g2.setDrawColor(1); // Restore draw color
         
         // Draw clock
@@ -411,23 +580,32 @@ public:
         icon_alarm.draw();
         icon_battery.draw();
         brace.draw();
-
+        
         // If histogram is expanded (e.g., in stats view), draw stats overlay
         if (histogram.isExpanded()) {
             u8g2.clearBuffer(); // Clear screen for expanded view
             u8g2.drawStr(3, 10, "<STATS>");
             u8g2.drawStr(3, 20, "Max:");
-            snprintf(print_buffer, sizeof(print_buffer), "%.3gusv/h", histogram.getMaxValue());
+            if (!use_cpm) {
+                snprintf(print_buffer, sizeof(print_buffer), "%.3guSv/h", histogram.getMaxValue());
+            } else {
+                snprintf(print_buffer, sizeof(print_buffer), "%dCPM", (int)histogram.getMaxValue());
+            }
             u8g2.drawStr(3, 30, print_buffer);
+            
             u8g2.drawStr(3, 40, "Avg:");
-            snprintf(print_buffer, sizeof(print_buffer), "%.3gusv/h", histogram.getAverageValue());
+            if (!use_cpm){
+                snprintf(print_buffer, sizeof(print_buffer), "%.3gusv/h", histogram.getAverageValue());
+            } else {
+                snprintf(print_buffer, sizeof(print_buffer), "%dCPM", (int)histogram.getAverageValue());
+            }
             u8g2.drawStr(3, 50, print_buffer);
         }
         
         histogram.draw();
         m_focusMan.draw();
     }
-
+    
     // Handles user input events
     bool handleInput(InputEvent event) override {
         // Check if an active widget (e.g., expanded histogram) is consuming input
@@ -453,17 +631,20 @@ public:
         }
         return true;
     }
-
+    
     // Called when the application is exited
     void onExit() {
         voltage_controller.stop();
         stop_counter_task();
-
         if (animationCoroutine_) {
             m_ui.removeCoroutine(animationCoroutine_);
             animationCoroutine_.reset();
         }
 
+        if (alertSchedulerCoroutine_) {
+            m_ui.removeCoroutine(alertSchedulerCoroutine_);
+            alertSchedulerCoroutine_.reset();
+        }
         m_ui.clearAllAnimations();
         m_ui.setContinousDraw(false);
         m_ui.markFading();

@@ -12,18 +12,17 @@
  * Tune singleton library that supports:
  * 1. Melody playing with notes (frequency, duration, rests)
  * 2. Geiger counter click sounds (non-blocking)
- * 3. Melody interruption for new melodies
+ * 3. Melody interruption for new melodies with resume capability
  ******************************************************************************
  */
-
 #pragma once
-
 #include "buzzer.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include <vector>
+#include <stack>
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,12 +36,14 @@ typedef struct {
 
 bool tune_initialize(gpio_num_t gpio_num);
 bool tune_play_melody(const tune_note_t* notes, size_t note_count);
+bool tune_play_melody_interruptible(const tune_note_t* notes, size_t note_count);
 bool tune_geiger_click(void);
 void tune_stop(void);
 bool tune_is_playing(void);
 
 #ifdef __cplusplus
 }
+#endif
 
 // C++ 类接口
 class Tune {
@@ -61,8 +62,10 @@ public:
     // 消息类型
     enum MessageType {
         MSG_MELODY,
+        MSG_MELODY_INTERRUPTIBLE,  // 可中断的临时旋律
         MSG_GEIGER_CLICK,
-        MSG_STOP
+        MSG_STOP,
+        MSG_RESUME                 // 恢复之前中断的旋律
     };
     
     struct TuneMessage {
@@ -72,7 +75,17 @@ public:
         TuneMessage(MessageType t) : type(t), melody(nullptr) {}
         TuneMessage(MessageType t, Melody* m) : type(t), melody(m) {}
     };
-
+    
+    // 旋律播放状态
+    struct MelodyState {
+        Melody melody;
+        size_t current_note_index;
+        bool is_active;
+        
+        MelodyState() : current_note_index(0), is_active(false) {}
+        MelodyState(const Melody& m) : melody(m), current_note_index(0), is_active(true) {}
+    };
+    
     // 获取单例实例
     static Tune& getInstance();
     
@@ -88,8 +101,11 @@ public:
                    ledc_timer_t timer_num = LEDC_TIMER_1,  // 使用 timer 1，避免与 timer 0 冲突
                    ledc_channel_t channel = LEDC_CHANNEL_1);
     
-    // 播放旋律（会中断当前播放的旋律）
+    // 播放旋律（会中断当前播放的旋律，不保存状态）
     bool playMelody(const Melody& melody);
+    
+    // 播放可中断的临时旋律（播放完后会恢复之前的旋律）
+    bool playMelodyInterruptible(const Melody& melody);
     
     // 盖革计数器咔咔声（非阻塞）
     bool geigerClick();
@@ -108,8 +124,14 @@ private:
     static void taskForwarder(void* pvParameters);
     void tuneTask();
     void stopBuzzer();
+    
     // 播放单个音符
     void playNote(const Note& note);
+    
+    // 旋律栈管理
+    void pauseCurrentMelody();
+    void resumeMelody();
+    void clearCurrentMelody();
     
     // 成员变量
     Buzzer* buzzer_;
@@ -118,10 +140,14 @@ private:
     SemaphoreHandle_t playing_mutex_;
     bool is_initialized_;
     bool is_playing_;
-    Melody current_melody_;  // 存储当前旋律
+    
+    // 旋律栈管理
+    std::stack<MelodyState> melody_stack_;  // 旋律栈
+    MelodyState* current_melody_state_;      // 当前播放的旋律状态
+    Melody temp_melody_;                     // 临时存储传入的旋律
     
     // 常量
-    static const uint32_t kQueueSize = 5;
+    static const uint32_t kQueueSize = 10;   // 增加队列大小
     static const uint32_t kStackSize = 4096;
     static const char* kTag;
     
@@ -164,5 +190,3 @@ namespace Duration {
     constexpr uint32_t EIGHTH = 250;      // 八分音符
     constexpr uint32_t SIXTEENTH = 125;   // 十六分音符
 }
-
-#endif // __cplusplus

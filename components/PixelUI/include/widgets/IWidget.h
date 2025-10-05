@@ -21,7 +21,7 @@ private:
     void setSelected(bool state) { Selected = state; }
     bool isSelected() const { return Selected; }
 protected:
-    // 活动状态相关
+    // activation related
     bool m_is_active = false;
     uint32_t m_last_interaction_time = 0;
 

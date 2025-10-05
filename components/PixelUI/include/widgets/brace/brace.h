@@ -20,6 +20,7 @@
 #include "../IWidget.h"
 
 class Brace : public IWidget {
+
 public:
     Brace(PixelUI& ui);
     ~Brace() = default;
@@ -27,17 +28,21 @@ public:
     void onLoad() override;
     void onOffload() override;
     void draw() override;
+    bool onSelect() override { if (m_callback) m_callback(); return false;}
 
+    void setCallback(std::function<void()> cb) { m_callback = cb; };
     void setSize(uint16_t mar_w, uint16_t mar_h) {margin_w_ = mar_w; margin_h_ = mar_h;}
     void setPosition(uint16_t coord_x, uint16_t coord_y) {coord_x_ = coord_x; coord_y_=coord_y;}
     void setDrawContentFunction(std::function<void()> func) { contentWithinBrace = func; }
+    
 private:
     uint16_t coord_x_ = 0, coord_y_ = 0;
     uint16_t margin_w_ = 0, margin_h_ = 0;
     PixelUI& m_ui;
 
     std::function<void()> contentWithinBrace;
-    // animation related varibles:
+    std::function<void()> m_callback = nullptr;
+
     int32_t anim_w = 0;
     int32_t anim_h = 0;
     int32_t anim_x = 0;

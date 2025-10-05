@@ -40,6 +40,7 @@ public:
     bool read_conf_enable_blink() const { return blink_status; }
     bool read_conf_enable_navi_tone() const { return navi_tone_status; }
     bool read_conf_enable_interaction_tone() const { return en_interaction_tone; }
+    bool read_conf_use_cpm() const { return use_cpm; }
     uint8_t read_conf_brightness() const { return brightness; }
     int32_t read_conf_warn_threshold() const { return cpm_warn_threshold; }
     int32_t read_conf_dngr_threshold() const { return cpm_dngr_threshold; }
@@ -53,6 +54,7 @@ public:
     void set_conf_enable_blink(bool value) { blink_status = value; }
     void set_conf_enable_navi_tone(bool value) { navi_tone_status = value; }
     void set_conf_enable_interaction_tone(bool value) { en_interaction_tone = value; }
+    void set_conf_use_cpm(bool value) { use_cpm = value; }
     void set_conf_brightness(uint8_t value) { brightness = value; }
     void set_conf_warn_threshold(uint16_t value) { cpm_warn_threshold = value; }
     void set_conf_dngr_threshold(uint16_t value) { cpm_dngr_threshold = value; }
@@ -66,7 +68,7 @@ private:
     bool blink_status = true;   
     bool navi_tone_status = false; 
     bool en_interaction_tone = true;
-    
+    bool use_cpm = false;
     uint8_t brightness = 5;
     float tube_convertion_coefficient = 0.00662f;
 

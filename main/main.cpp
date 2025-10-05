@@ -77,6 +77,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
 
     Tune::Melody startup = {
         {Notes::B5, 80},
+        {Notes::REST, 80},
         {Notes::B5, 80},
     };
 
@@ -93,7 +94,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
         {Notes::B5, 210},      // 2b5
         {Notes::B5, 52}        // 8b5
     };
-    
+
     // 警报旋律
     Tune::Melody alarm = {
         {Notes::A5, Duration::EIGHTH},

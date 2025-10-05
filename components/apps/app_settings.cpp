@@ -30,6 +30,8 @@ static bool en_sos = false;    // alert
 static bool en_led = true;     // led
 static bool en_interaction_tone;
 
+static bool use_cpm;
+
 static float convertion_coefficient = 0.0f;
 static int32_t brightness = 0;
 static int32_t cpm_warn_threshold = 0;
@@ -69,11 +71,12 @@ ListItem sub_Tube_cfg[4] = {
     ListItem("- 转换系数")
 };
 
-ListItem itemList[9] = {
+ListItem itemList[10] = {
     ListItem(">>>> 设置 <<<<"),
     ListItem("- 屏幕亮度", nullptr, 0, [](){ ui.showPopupProgress(brightness, 0, 5, "亮度", 100, 40, 5000, 1, [](int32_t val){ui.getU8G2().setContrast(val * 51);}); }, ListItemExtra{nullptr, &brightness}),
     ListItem("- 剂量警告", sub_Alarm, 5),
     ListItem("- 盖革管", sub_Tube_cfg, 4),
+    ListItem("- 使用CPM", nullptr, 0, nullptr, ListItemExtra{&use_cpm, nullptr}),
     ListItem("- 计数音", nullptr, 0, nullptr, ListItemExtra{&en_sound_click, nullptr}),
     ListItem("- 交互音", nullptr, 0, nullptr, ListItemExtra{&en_interaction_tone, nullptr}),
     ListItem("- 导航音", nullptr, 0, [](){syscfg.set_conf_enable_navi_tone(en_sound_navigate);}, ListItemExtra{&en_sound_navigate, nullptr}),
@@ -106,6 +109,7 @@ public:
 
         operation_voltage = syscfg.read_conf_operation_voltage();
         en_interaction_tone = syscfg.read_conf_enable_interaction_tone();
+        use_cpm = syscfg.read_conf_use_cpm();
     }
 
     void onSave() override {
@@ -120,6 +124,7 @@ public:
         syscfg.set_conf_dngr_threshold(cpm_dngr_threshold);
         syscfg.set_conf_hzdr_threshold(cpm_hzdr_threshold);
 
+        syscfg.set_conf_use_cpm(use_cpm);
         // operation_voltage = syscfg.read_conf_operation_voltage();
 
         syscfg.save_conf_to_nvs();
@@ -132,6 +137,6 @@ AppItem settings_app{
     .bitmap = image_settings_bits,
     
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<APP_SETTINGS>(ui, itemList, 9); 
+        return std::make_unique<APP_SETTINGS>(ui, itemList, 10); 
     },
 };

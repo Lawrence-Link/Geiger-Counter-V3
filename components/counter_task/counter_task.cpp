@@ -278,7 +278,7 @@ bool start_counter_task(const counter_task_config_t* config) {
     // 4. Create task
     // Stack size 8192 to fit 4000-byte local array with extra margin
     if (xTaskCreate(counter_task, "GeigerCounterTa", 8192, NULL, 
-                    6, &s_counter_task_handle) != pdPASS) {
+                    configMAX_PRIORITIES-1, &s_counter_task_handle) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create counter task.");
         stop_counter_task();
         return false;
