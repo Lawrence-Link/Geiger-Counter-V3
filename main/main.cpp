@@ -14,7 +14,7 @@
 
 #include "pin_definitions.h"
 #include "i2c.h"
-
+#include "bme280_port.h"
 #include "voltage_pid.hpp"
 #include "encoder_task.h"
 #include "ui_heartbeat_task.h"
@@ -72,6 +72,8 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     auto& syscfg = SystemConf::getInstance();
     syscfg.load_conf_from_nvs();
     u8g2.setContrast(syscfg.read_conf_brightness() * 51);
+
+    bme280_start_reading();
 
     Tune& tune = Tune::getInstance();
 

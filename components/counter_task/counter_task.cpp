@@ -55,7 +55,6 @@ static void counter_task(void *pvParameters) {
     cpm_warn_threshold = syscfg.read_conf_warn_threshold();
     cpm_dngr_threshold = syscfg.read_conf_dngr_threshold();
     cpm_hzdr_threshold = syscfg.read_conf_hzdr_threshold();
-    en_click = syscfg.read_conf_enable_geiger_click();
     
     int64_t timestamp_history[RING_BUFFER_SIZE];
     size_t write_index = 0;
@@ -86,10 +85,9 @@ static void counter_task(void *pvParameters) {
 
     while (true) {
         int64_t new_timestamp;
-        
         // 1. Non-blocking pulse reception
         if (xQueueReceive(s_timestamp_queue, &new_timestamp, 0) == pdPASS) {
-            if (en_click) tune.geigerClick();
+            tune.geigerClick();
 
             float calculated_cpm = -1.0f; // Temporary CPM value
 

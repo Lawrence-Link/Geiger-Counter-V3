@@ -140,7 +140,7 @@ public:
 };
 
 AppItem cube_demo_app{
-    .title = "cube demo",
+    .title = "方块Demo",
     .bitmap = image_cube_bits,
     
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 

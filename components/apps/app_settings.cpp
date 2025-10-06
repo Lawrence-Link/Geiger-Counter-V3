@@ -133,7 +133,7 @@ public:
 };
 
 AppItem settings_app{
-    .title = "Settings",
+    .title = "设置",
     .bitmap = image_settings_bits,
     
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 

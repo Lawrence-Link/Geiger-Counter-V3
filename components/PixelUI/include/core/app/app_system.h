@@ -21,7 +21,6 @@
 #include "IApplication.h"
 #include "config.h"
 #include <algorithm>
-#include <memory>
 
 enum class MenuItemType {
     Action,

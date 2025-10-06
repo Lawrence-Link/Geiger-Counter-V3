@@ -21,8 +21,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
-#include <vector>
-#include <stack>
+#include "etl/stack.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -142,7 +141,7 @@ private:
     bool is_playing_;
     
     // 旋律栈管理
-    std::stack<MelodyState> melody_stack_;  // 旋律栈
+    etl::stack<MelodyState, 60> melody_stack_;  // 旋律栈
     MelodyState* current_melody_state_;      // 当前播放的旋律状态
     Melody temp_melody_;                     // 临时存储传入的旋律
     

@@ -26,10 +26,10 @@ enum class EXPAND_BASE {
     BOTTOM_RIGHT
 };
 
-class Histogram : public IWidget {
+class CurveChart : public IWidget {
 public:
-    Histogram(PixelUI& ui, uint16_t coord_x = 0, uint16_t coord_y = 0);
-    ~Histogram() = default;
+    CurveChart(PixelUI& ui, uint16_t coord_x = 0, uint16_t coord_y = 0);
+    ~CurveChart() = default;
 
     void onLoad() override;
     void onOffload() override;
@@ -83,7 +83,7 @@ private:
     void initializeDataBuffer();
     void updateStatistics(float new_value, float old_value, bool replacing_data);
     void recalculateExtremes();
-    void drawHistogramData(int center_x, int center_y, int half_width, int half_height, U8G2& u8g2);
+    void drawCuveData(int center_x, int center_y, int half_width, int half_height, U8G2& u8g2);
 
     bool is_expanded = false;
 };

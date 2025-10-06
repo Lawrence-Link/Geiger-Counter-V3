@@ -17,8 +17,6 @@
 
 #include "core/app/IApplication.h"
 #include "core/app/app_system.h"
-#include <memory>
-#include <iostream>
 #include "focus/focus.h"
 #include "esp_log.h"
 #include "widgets/num_scroll/num_scroll.h"
@@ -134,7 +132,7 @@ public:
 // self registering machanism, using a static AppRegistrar object to auto-register this app before main()
 
 AppItem app_penis{
-    .title = "PENIS",
+    .title = "阴茎",
     .bitmap = image_sans4_bits,
     
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 

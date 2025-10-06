@@ -130,7 +130,7 @@ void IconView::scrollToIndex(int newIndex) {
     
     if (selectedItemTitleEnabled_) {
         animation_item_title_Y = 70;
-        ui_.animate(animation_item_title_Y, 60, 300, EasingType::EASE_OUT_CUBIC);
+        ui_.animate(animation_item_title_Y, 62, 300, EasingType::EASE_OUT_CUBIC);
     }
     
     currentIndex_ = newIndex;
@@ -149,7 +149,7 @@ void IconView::updateProgressBar() {
 
 void IconView::drawTitle() {
     U8G2& display = ui_.getU8G2();
-    display.setFont(u8g2_font_tom_thumb_4x6_mf);
+    display.setFont(u8g2_font_5x7_mf);
     int titleWidth = display.getStrWidth(title_.c_str());
     display.drawStr((display.getWidth() - titleWidth) / 2, titleY_, title_.c_str());
 }
@@ -157,9 +157,9 @@ void IconView::drawTitle() {
 void IconView::drawProgressBar() {
     U8G2& display = ui_.getU8G2();
     for (int i = 0; i <= static_cast<int>(animation_pixel_dots); i++) {
-        display.drawPixel(i * 2, 50);
+        display.drawPixel(i * 2, 49);
     }
-    display.drawHLine(0, 50, animation_scroll_bar);
+    display.drawHLine(0, 49, animation_scroll_bar);
 }
 
 void IconView::drawStatusText() {
@@ -175,9 +175,9 @@ void IconView::drawSelectedItemTitle() {
     if (items_.empty()) return;
     U8G2& display = ui_.getU8G2();
     const auto& currentItem = items_[currentIndex_];
-    display.setFont(u8g2_font_tom_thumb_4x6_mf);
-    int titleWidth = display.getStrWidth(currentItem.title);
-    display.drawStr((display.getWidth() - titleWidth) / 2, animation_item_title_Y, currentItem.title);
+    display.setFont(u8g2_font_wqy12_t_gb2312);
+    int titleWidth = display.getUTF8Width(currentItem.title);
+    display.drawUTF8((display.getWidth() - titleWidth) / 2, animation_item_title_Y, currentItem.title);
 }
 
 void IconView::drawHorizontalIconList() {

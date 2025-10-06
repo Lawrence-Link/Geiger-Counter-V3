@@ -14,7 +14,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <cstring>
-#include <stack>
 
 const char* Tune::kTag = "tune";
 
@@ -301,17 +300,21 @@ bool Tune::playMelodyInterruptible(const Melody& melody) {
 }
 
 bool Tune::geigerClick() {
-    if (!is_initialized_) {
-        ESP_LOGE(kTag, "Tune not initialized");
-        return false;
-    }
+    // if (!is_initialized_) {
+    //     ESP_LOGE(kTag, "Tune not initialized");
+    //     return false;
+    // }
     
-    TuneMessage message(MSG_GEIGER_CLICK);
-    BaseType_t res = xQueueSend(message_queue_, &message, 0);
-    if (res != pdPASS) {
-        return false;
-    }
+    // TuneMessage message(MSG_GEIGER_CLICK);
+    // BaseType_t res = xQueueSend(message_queue_, &message, 0);
+    // if (res != pdPASS) {
+    //     return false;
+    // }
     
+    // return true;
+    if (!isPlaying()) {
+        buzzer_->Beep(kGeigerFreq, kGeigerDuration);
+    }
     return true;
 }
 

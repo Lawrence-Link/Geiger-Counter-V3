@@ -47,6 +47,7 @@ public:
     int32_t read_conf_hzdr_threshold() const { return cpm_hzdr_threshold; }
     int32_t read_conf_operation_voltage() const { return operation_voltage; }
     float read_conf_tube_convertion_coefficient() const { return tube_convertion_coefficient; }
+    int32_t read_rec_highscore_car_dodge() const { return highscore_car_dodge; }
 
     // --- (Setter APIs) ---
     void set_conf_enable_alert(bool value) { alert_status = value; }
@@ -61,6 +62,7 @@ public:
     void set_conf_hzdr_threshold(uint16_t value) { cpm_hzdr_threshold = value; }
     void set_conf_tube_convertion_coefficient(float value) { tube_convertion_coefficient = value; }
     void set_conf_operation_voltage(int32_t value) { operation_voltage = value; }
+    void set_rec_highscore_car_dodge(int32_t value) { highscore_car_dodge = value; }
 private:
     // --- default ---
     bool alert_status = true;
@@ -72,6 +74,7 @@ private:
     uint8_t brightness = 5;
     float tube_convertion_coefficient = 0.00662f;
 
+    int32_t highscore_car_dodge = 0;
     int32_t cpm_warn_threshold = 300;
     int32_t cpm_dngr_threshold = 600;
     int32_t cpm_hzdr_threshold = 1000;

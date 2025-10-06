@@ -5,7 +5,6 @@
 #include "core/app/IApplication.h"
 #include "core/app/app_system.h"
 #include "core/coroutine/Coroutine.h"
-#include <memory>
 
 extern bool showing_charging_anim;
 extern int battery_percentage;

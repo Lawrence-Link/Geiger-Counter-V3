@@ -1,0 +1,6 @@
+[submodule "components/BME280_SensorAPI"]
+	path = components/BME280_SensorAPI
+	url = git@github.com:boschsensortec/BME280_SensorAPI.git
+[submodule "components/bme280_espidf"]
+	path = components/bme280_espidf
+	url = git@github.com:zhenloopy/bme280_espidf.git
