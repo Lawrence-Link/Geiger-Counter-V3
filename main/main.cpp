@@ -107,7 +107,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
         {Notes::REST, Duration::QUARTER}
     };
 
-    if (syscfg.read_conf_enable_interaction_tone()) tune.playMelody(startup);
+    if (syscfg.read_conf_enable_interaction_tone()) tune.playMelodyInterruptible(startup);
 
     startBatteryTask();
     u8g2.setFont(u8g2_font_helvB08_tr);

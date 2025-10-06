@@ -18,7 +18,7 @@ private:
     int32_t ringPercent = 0;
     int32_t lightningOffsetX = 0;
     int batteryPercent = 50;
-
+    bool exit_flag = false;
     std::shared_ptr<Coroutine> animationCoroutine_;
 
     void animation_coroutine_body(CoroutineContext& ctx, PixelUI& ui) {
@@ -34,10 +34,9 @@ private:
         ui.animate(lightningOffsetX, -10, 600, EasingType::EASE_OUT_CUBIC);
         ui.animate(batteryPercent_anim, batteryPercent, 600, EasingType::EASE_OUT_CUBIC);
         CORO_DELAY(ctx, ui, 2200, 300); 
-        
-        requestExit();
-        
+        exit_flag = true;
         CORO_END(ctx);
+        
     }
 
 public:
@@ -58,9 +57,15 @@ public:
             display.setFont(u8g2_font_6x10_tf);
             display.drawStr(65, 36, buf);
         }
+
+        if (exit_flag) requestExit();
     }
 
     bool handleInput(InputEvent event) override {
+        if (animationCoroutine_) {
+            m_ui.removeCoroutine(animationCoroutine_);
+            animationCoroutine_.reset();
+        }
         requestExit();
         return true;
     }
