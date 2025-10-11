@@ -17,19 +17,36 @@
 
 #include "widgets/brace/brace.h"
 
+/**
+ * @brief Construct a new Brace object
+ * 
+ * @param ui Reference to the PixelUI instance
+ */
 Brace::Brace(PixelUI& ui) : m_ui(ui) {
-    onLoad();
-};
+    onLoad(); /**< Start the loading animations */
+}
 
+/**
+ * @brief Initialize animations for brace expansion
+ */
 void Brace::onLoad() {
+    /**< Animate width from 0 to margin_w_ over 550ms */
     m_ui.animate(anim_w, margin_w_, 550, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
+
+    /**< Animate height from 0 to margin_h_ over 600ms */
     m_ui.animate(anim_h, margin_h_, 600, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
 }
 
+/**
+ * @brief Called when the widget is removed/offloaded
+ */
 void Brace::onOffload() {
-
+    // No special cleanup required
 }
 
+/**
+ * @brief Draw the brace with corners and optional content inside
+ */
 void Brace::draw() {
     U8G2& u8g2 = m_ui.getU8G2();
 
@@ -41,33 +58,36 @@ void Brace::draw() {
     int clip_width = anim_w;
     int clip_height = anim_h;
 
-    // Set the clipping window based on the current brace dimensions
+    /**< Set the clipping window to restrict drawing inside the brace */
     u8g2.setClipWindow(
         clip_x, 
         clip_y, 
-        clip_x + clip_width,   // bottom right corner X
-
-        clip_y + clip_height   // bottom right corner Y
+        clip_x + clip_width,   /**< bottom-right X */
+        clip_y + clip_height   /**< bottom-right Y */
     );
 
+    /**< Draw the user-provided content inside the brace, if any */
     if (contentWithinBrace) {
         contentWithinBrace();
     }
+
+    /**< Reset clipping to full screen */
     u8g2.setMaxClipWindow();
 
-    // Top left corner
+    /**< Draw corner lines for the brace */
+    // Top-left corner
     u8g2.drawLine(coord_x_ - half_width, coord_y_ - half_height, coord_x_ - half_width + 4, coord_y_ - half_height);
     u8g2.drawLine(coord_x_ - half_width, coord_y_ - half_height, coord_x_ - half_width, coord_y_ - half_height + 4);
 
-    // Top right corner
+    // Top-right corner
     u8g2.drawLine(coord_x_ + half_width, coord_y_ - half_height, coord_x_ + half_width - 4, coord_y_ - half_height);
     u8g2.drawLine(coord_x_ + half_width, coord_y_ - half_height, coord_x_ + half_width, coord_y_ - half_height + 4);
 
-    // Bottom left corner
+    // Bottom-left corner
     u8g2.drawLine(coord_x_ - half_width, coord_y_ + half_height, coord_x_ - half_width + 4, coord_y_ + half_height);
     u8g2.drawLine(coord_x_ - half_width, coord_y_ + half_height, coord_x_ - half_width, coord_y_ + half_height - 4);
 
-    // Bottom right corner
+    // Bottom-right corner
     u8g2.drawLine(coord_x_ + half_width, coord_y_ + half_height, coord_x_ + half_width - 4, coord_y_ + half_height);
     u8g2.drawLine(coord_x_ + half_width, coord_y_ + half_height, coord_x_ + half_width, coord_y_ + half_height - 4);
 }

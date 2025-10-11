@@ -17,18 +17,32 @@
 
 #include "widgets/label/label.h"
 
-Label::Label(PixelUI& ui, uint16_t x, uint16_t y, const char* content, POS pos) : m_ui(ui), m_x(x), m_y(y), src(content), load_pos(pos) 
-{
-    
-}
+/**
+ * @brief Constructor for Label widget.
+ * @param ui Reference to the PixelUI instance for rendering and animation.
+ * @param x X coordinate of label reference point.
+ * @param y Y coordinate of label reference point.
+ * @param content Text content of the label.
+ * @param pos Label alignment position relative to (x, y).
+ */
+Label::Label(PixelUI& ui, uint16_t x, uint16_t y, const char* content, POS pos)
+    : m_ui(ui), m_x(x), m_y(y), src(content), load_pos(pos) 
+{ }
 
+/**
+ * @brief Initialize the label when loaded. Calculates animated starting position
+ *        based on alignment and triggers slide-in animation.
+ */
 void Label::onLoad() {
-    // calculate center coordinate.
     U8G2& u8g2 = m_ui.getU8G2();
     u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+
+    // Calculate font height
     int8_t font_height = u8g2.getFontAscent() + u8g2.getFontDescent();
+
+    // Set initial animated position based on alignment
     switch (load_pos) {
-        case POS::TOP:    {
+        case POS::TOP: {
             anim_x = m_x;
             anim_y = m_y - font_height; 
             m_ui.animate(anim_y, m_y, 300, EasingType::EASE_OUT_CUBIC, PROTECTION::NOT_PROTECTED);
@@ -38,41 +52,60 @@ void Label::onLoad() {
             anim_y = m_y + font_height; 
             m_ui.animate(anim_y, m_y, 300, EasingType::EASE_OUT_CUBIC, PROTECTION::NOT_PROTECTED);
         } break;
-        case POS::LEFT:   {
+        case POS::LEFT: {
             anim_x = m_x - u8g2.getUTF8Width(src);
             anim_y = m_y; 
             m_ui.animate(anim_y, m_y, 300, EasingType::EASE_OUT_CUBIC, PROTECTION::NOT_PROTECTED);
         } break;
-        case POS::RIGHT:  {
+        case POS::RIGHT: {
             anim_x = m_x + u8g2.getUTF8Width(src);
             anim_y = m_y; 
             m_ui.animate(anim_y, m_y, 300, EasingType::EASE_OUT_CUBIC, PROTECTION::NOT_PROTECTED);
         } break;
     }
 
+    // Set focus box slightly inside label boundaries
     setFocusBox(FocusBox(m_x + 1, m_y + 1, m_w - 2, m_h - 2));
 }
 
-void Label::onOffload() {}
+/**
+ * @brief Clean up resources when label is offloaded.
+ */
+void Label::onOffload() {
+    // No dynamic resources to release
+}
 
+/**
+ * @brief Render the label text on screen with clipping to avoid overflow.
+ */
 void Label::draw() {
     if (!src) return;
-    U8G2& u8g2 = m_ui.getU8G2();
 
-    u8g2.setFont(u8g2_font_wqy12_t_gb2312);    
-    // Height data of the font
-    int8_t font_ascent = u8g2.getAscent();   // Parts above the baseline
-    int8_t font_descent = u8g2.getDescent(); // Parts below the baseline
-    int8_t font_height = font_ascent - font_descent; // Total height
+    U8G2& u8g2 = m_ui.getU8G2();
+    u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+
+    // Compute font metrics
+    int8_t font_ascent = u8g2.getAscent();
+    int8_t font_descent = u8g2.getDescent();
+    int8_t font_height = font_ascent - font_descent;
+
+    // Compute text width
     int32_t text_width = u8g2.getUTF8Width((const char*)src);
 
-    u8g2.setClipWindow(m_x, m_y - font_height, m_x+text_width, m_y + 1);
-    
+    // Clip drawing area to label rectangle
+    u8g2.setClipWindow(m_x, m_y - font_height, m_x + text_width, m_y + 1);
+
+    // Draw text at animated position
     u8g2.drawUTF8(anim_x, anim_y, (const char*)src);
-    
+
+    // Reset clipping
     u8g2.setMaxClipWindow();
 }
 
+/**
+ * @brief Handle label selection. Triggers callback if defined.
+ * @return False, indicating event propagation continues.
+ */
 bool Label::onSelect() {
     if (m_callback) {
         m_callback();

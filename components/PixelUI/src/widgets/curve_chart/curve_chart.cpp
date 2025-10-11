@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 #include "widgets/curve_chart/curve_chart.h"
 #include <cmath>
 #include <algorithm>

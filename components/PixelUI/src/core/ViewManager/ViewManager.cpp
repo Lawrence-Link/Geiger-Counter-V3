@@ -49,7 +49,10 @@ void ViewManager::pop() {
     m_isTransitioning = true;
     m_ui.setDrawable(nullptr); 
     
-    m_viewStack.top()->onExit(); 
+    m_viewStack.top()->onExit();  
+
+    m_ui.markFading();
+
     m_viewStack.pop(); 
 
     if (!m_viewStack.empty()) {

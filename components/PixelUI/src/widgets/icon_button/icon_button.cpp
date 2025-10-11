@@ -17,27 +17,51 @@
 
 #include "widgets/icon_button/icon_button.h"
 
-IconButton::IconButton(PixelUI& ui) : m_ui(ui) {
+/**
+ * @brief Constructor for IconButton widget.
+ * @param ui Reference to the PixelUI instance for rendering and animation.
+ */
+IconButton::IconButton(PixelUI& ui) : m_ui(ui) {}
 
-}
-
+/**
+ * @brief Initialize the widget when loaded. Sets initial animation offsets.
+ */
 void IconButton::onLoad() {
+    // Set initial animated position slightly above the target y
     anim_x = m_x;
     anim_y = m_y - 10;
+
+    // Animate Y position to slide down into final position
     m_ui.animate(anim_y, m_y, 100, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
 }
 
-void IconButton::onOffload() {}
+/**
+ * @brief Clean up resources when widget is offloaded.
+ */
+void IconButton::onOffload() {
+    // No dynamic resources allocated, nothing to clean
+}
 
+/**
+ * @brief Render the icon button on the screen.
+ */
 void IconButton::draw() {
     if (!src) {
-        return;
+        return; // No image source, nothing to draw
     }
+
     U8G2& u8g2 = m_ui.getU8G2();
+
+    // Draw XBM bitmap at current animated position
     u8g2.drawXBM(anim_x, anim_y, m_w, m_h, src);
 }
 
+/**
+ * @brief Handle button selection (click).
+ * @return False, indicating event propagation is not stopped.
+ */
 bool IconButton::onSelect() {
+    // Trigger user-defined callback if available
     if (m_callback) {
         m_callback();
     }

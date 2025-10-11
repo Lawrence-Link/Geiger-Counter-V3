@@ -85,6 +85,9 @@ public:
      */
     bool isActive() const { return m_is_active; }
 
+    /**
+     * @brief Checks if the widget is focusable
+     */
     bool isFocusable() { return focusable; }
     void setFocusable(bool state) { focusable = state; }
 

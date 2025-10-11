@@ -17,20 +17,38 @@
 
 #pragma once
 
-// Maximum of concurrent animation going on.
+// Maximum number of concurrent animations allowed in the system
 constexpr int MAX_ANIMATION_COUNT = 35; 
+
+// Maximum length of text strings for widgets that contains text
 constexpr int MAX_TEXT_LENGTH = 30;
 
-// Maximum item that can be iterated during initialization.
+// Maximum number of apps that can be registered
 constexpr int MAX_APP_NUM = 10;
+
+// Maximum slots in a single AppView
 constexpr int MAX_APPVIEW_SLOT_NUM = 10;
 
+// Maximum slots in a ListView
 constexpr int MAX_LISTVIEW_SLOT_NUM = 30;
+
+// Maximum number of characters in a ListItem name
 constexpr int MAX_LISTITEM_NAME_NUM = 30;
+
+// Number of items shown per page in a ListView
 constexpr int LISTVIEW_ITEMS_PER_PAGE = 4;
+
+// Maximum depth of nested ListViews
 constexpr int MAX_LISTVIEW_DEPTH = 6;
 
+// Stack size for callback animations (for internal coroutine/animation safety)
 constexpr int CALLBACK_ANIMATION_STACK_SIZE = 2;
+
+// Maximum number of popups that can appear simultaneously
 constexpr int MAX_POPUP_NUM = 3;
+
+// Maximum number of widgets displayed on screen at the same time
 constexpr int MAX_ONSCREEN_WIDGET_NUM = 6;
+
+// Maximum width (number of digits) for fixed-width integer display
 constexpr int MAX_INT_FIXED_WIDTH = 6;

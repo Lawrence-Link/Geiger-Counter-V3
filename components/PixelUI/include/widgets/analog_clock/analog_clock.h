@@ -41,7 +41,7 @@ public:
 
 private:
     enum class AnimState {
-        EXPANDING,    // 表盘和刻度同步扩张
+        EXPANDING,
         FINISHED
     };
 
