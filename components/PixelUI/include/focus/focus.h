@@ -36,7 +36,7 @@ private:
 
 public:
     FocusManager(PixelUI& ui) : m_ui(ui) {};
-    ~FocusManager() = default;
+    ~FocusManager() {clearActiveWidget();};
 
     etl::vector<IWidget*, MAX_ONSCREEN_WIDGET_NUM> m_Widgets;
     

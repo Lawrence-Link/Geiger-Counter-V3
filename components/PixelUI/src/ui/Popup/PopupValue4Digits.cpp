@@ -13,7 +13,7 @@ PopupValue4Digits::PopupValue4Digits(PixelUI& ui, uint16_t width, uint16_t heigh
       _value(value), _title(title), 
       num_thousands(ui), num_hundreds(ui), num_tens(ui), num_ones(ui), m_focusMan(ui), m_cb(cb_function)
 {
-
+    m_ui.setContinousDraw(true);
     U8G2& u8g2 = m_ui.getU8G2();
     
     int center_x = u8g2.getDisplayWidth() / 2;

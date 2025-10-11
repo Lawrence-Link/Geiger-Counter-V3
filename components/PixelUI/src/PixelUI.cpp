@@ -142,44 +142,112 @@ void PixelUI::animate(int32_t& x, int32_t& y, int32_t targetX, int32_t targetY, 
  * including the current drawable content and any active popups.
  */
 void PixelUI::renderer() {
+    // 1. 前置检查和脏标记逻辑
     if (m_viewManagerPtr->isTransitioning()) {
         return;
     }
     
+    // 检查Popup数量是否改变
+    static uint8_t lastPopupCount = 0;
+    uint8_t currentPopupCount = m_popupManagerPtr->getPopupCounts();
+    if (currentPopupCount != lastPopupCount) {
+        markDirty();
+        lastPopupCount = currentPopupCount;
+    }
+    
+    // 检查动画或连续刷新
     if (getActiveAnimationCount() || isContinousRefreshEnabled()) {
         markDirty();
     }
-    if (isDirty_) {
-        if (!isFading_){
+    
+    if (!isFading_) {
+        // 标准渲染路径
+        this->getU8G2().clearBuffer();
+        if (currentDrawable_) {
+            currentDrawable_->draw();
+        }
+        m_popupManagerPtr->drawPopups();
+        this->getU8G2().sendBuffer();
+        if (m_refresh_callback) m_refresh_callback();
+        isDirty_ = false;
+        
+    } else {
+        // 淡出渲染路径
+        
+        // Step 0: 绘制完整内容并显示，然后等待 40ms
+        if (m_fadeStep == 0) {
             this->getU8G2().clearBuffer();
-            
-            // current drawable content controlled by applications
-            if (currentDrawable_ && isDirty_) {
+            if (currentDrawable_) {
                 currentDrawable_->draw();
-                isDirty_ = false;
             }
-            
-            // render popups on top of everything else
             m_popupManagerPtr->drawPopups();
-
+            
+            // ✅ 关键：先发送显示完整画面
             this->getU8G2().sendBuffer();
             if (m_refresh_callback) m_refresh_callback();
-        } else {
+            
+            // 设置下一步和时间戳
+            m_fadeStep = 1;
+            m_lastFadeTime = getCurrentTime();
+            return; // ✅ 返回，等待 40ms 后再执行 step 1
+        }
+        
+        // Step 1-4: 检查是否已经过了 40ms
+        if (m_fadeStep >= 1 && m_fadeStep <= 4) {
+            // ✅ 时间未到，直接返回
+            if (getCurrentTime() - m_lastFadeTime < 40) {
+                return;
+            }
+            
+            // ✅ 时间已到，执行淡出效果（累积修改）
             uint8_t * buf_ptr = this->getU8G2().getBufferPtr();
             uint16_t buf_len = 1024;
-            for (int fade = 1; fade <= 4; fade++){
-                switch (fade)
-                {
-                    case 1: for (uint16_t i = 0; i < buf_len; ++i)  if (i % 2 != 0) buf_ptr[i] = buf_ptr[i] & 0xAA; break;
-                    case 2: for (uint16_t i = 0; i < buf_len; ++i)  if (i % 2 != 0) buf_ptr[i] = buf_ptr[i] & 0x00; break;
-                    case 3: for (uint16_t i = 0; i < buf_len; ++i)  if (i % 2 == 0) buf_ptr[i] = buf_ptr[i] & 0x55; break;
-                    case 4: for (uint16_t i = 0; i < buf_len; ++i)  if (i % 2 == 0) buf_ptr[i] = buf_ptr[i] & 0x00; break;
-                }
-                this->getU8G2().sendBuffer();
-                if (m_refresh_callback) m_refresh_callback();
-                m_func_delay(40);
+            
+            switch (m_fadeStep) {
+                case 1:
+                    for (uint16_t i = 0; i < buf_len; ++i) {
+                        if (i % 2 != 0) {
+                            buf_ptr[i] = buf_ptr[i] & 0xAA;
+                        }
+                    }
+                    break;
+                    
+                case 2:
+                    for (uint16_t i = 0; i < buf_len; ++i) {
+                        if (i % 2 != 0) {
+                            buf_ptr[i] = buf_ptr[i] & 0x00;
+                        }
+                    }
+                    break;
+                    
+                case 3:
+                    for (uint16_t i = 0; i < buf_len; ++i) {
+                        if (i % 2 == 0) {
+                            buf_ptr[i] = buf_ptr[i] & 0x55;
+                        }
+                    }
+                    break;
+                    
+                case 4:
+                    for (uint16_t i = 0; i < buf_len; ++i) {
+                        if (i % 2 == 0) {
+                            buf_ptr[i] = buf_ptr[i] & 0x00;
+                        }
+                    }
+                    break;
             }
-            isFading_ = false;
+            
+            this->getU8G2().sendBuffer();
+            if (m_refresh_callback) m_refresh_callback();
+            
+            // 更新时间戳并推进到下一步
+            m_lastFadeTime = getCurrentTime();
+            m_fadeStep++;
+            
+            if (m_fadeStep > 4) {
+                isFading_ = false;
+                m_fadeStep = 0;
+            }
         }
     }
 }
@@ -273,4 +341,13 @@ void PixelUI::showPopupValue4Digits(
     auto popup = std::make_shared<PopupValue4Digits>(*this, width, height, value, title, duration, priority, update_cb);
     m_popupManagerPtr->addPopup(popup);
     markDirty();
+}
+
+void PixelUI::markFading() {
+    if (!isFading_) { 
+        isFading_ = true;
+        m_fadeStep = 1;                  
+        m_lastFadeTime = getCurrentTime(); 
+        markDirty();
+    }
 }

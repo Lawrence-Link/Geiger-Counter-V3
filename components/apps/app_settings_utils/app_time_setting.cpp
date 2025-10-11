@@ -212,14 +212,14 @@ public:
     }
 
     void onExit() override {
-        m_ui.setContinousDraw(false);
-        m_ui.markFading();
-
         // cleanup the coroutine
         if (animationCoroutine_) {
             m_ui.removeCoroutine(animationCoroutine_);
             animationCoroutine_.reset();
         }
+        m_ui.clearAllAnimations();
+        m_ui.setContinousDraw(false);
+        m_ui.markFading();
     }
 };
 

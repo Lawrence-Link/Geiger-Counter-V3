@@ -312,9 +312,9 @@ bool Tune::geigerClick() {
     // }
     
     // return true;
-    if (is_playing_) {
+    // if (is_playing_) {
         buzzer_->Beep(kGeigerFreq, kGeigerDuration);
-    }
+    // }
     return true;
 }
 

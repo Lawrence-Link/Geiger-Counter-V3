@@ -85,9 +85,10 @@ static void counter_task(void *pvParameters) {
 
     while (true) {
         int64_t new_timestamp;
+        en_click = syscfg.read_conf_enable_geiger_click();
         // 1. Non-blocking pulse reception
         if (xQueueReceive(s_timestamp_queue, &new_timestamp, 0) == pdPASS) {
-            tune.geigerClick();
+            if (en_click) tune.geigerClick();
 
             float calculated_cpm = -1.0f; // Temporary CPM value
 

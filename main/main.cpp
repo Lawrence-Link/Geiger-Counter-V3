@@ -25,6 +25,7 @@
 #include "nvs.hpp"
 #include "nvs_handle_espp.hpp"
 #include "tune.h"
+#include "boot_bmp.h"
 
 // Global variables
 U8G2 u8g2;
@@ -83,6 +84,86 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
         {Notes::B5, 80},
     };
 
+// Tune::Melody badapple = {
+//     {311, Duration::EIGHTH},     // DS5
+//     {Notes::F5, Duration::EIGHTH},
+//     {370, Duration::EIGHTH},     // FS5
+//     {415, Duration::EIGHTH},     // GS5
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {Notes::REST, Duration::EIGHTH},
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {622, Duration::EIGHTH},     // DS6
+//     {554, Duration::EIGHTH},     // CS6
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {Notes::REST, Duration::EIGHTH},
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {311, Duration::SIXTEENTH},  // DS5
+//     {Notes::REST, Duration::EIGHTH},
+//     {311, Duration::EIGHTH},     // DS5
+//     {466, Duration::EIGHTH},     // AS5
+//     {415, Duration::EIGHTH},     // GS5
+//     {370, Duration::EIGHTH},     // FS5
+//     {Notes::F5, Duration::EIGHTH},
+//     {311, Duration::EIGHTH},     // DS5
+//     {Notes::F5, Duration::EIGHTH},
+//     {370, Duration::EIGHTH},     // FS5
+//     {415, Duration::EIGHTH},     // GS5
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {Notes::REST, Duration::EIGHTH},
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {415, Duration::EIGHTH},     // GS5
+//     {370, Duration::EIGHTH},     // FS5
+//     {Notes::F5, Duration::EIGHTH},
+//     {311, Duration::EIGHTH},     // DS5
+//     {Notes::F5, Duration::EIGHTH},
+//     {370, Duration::EIGHTH},     // FS5
+//     {Notes::F5, Duration::EIGHTH},
+//     {311, Duration::EIGHTH},     // DS5
+//     {Notes::D5, Duration::EIGHTH},
+//     {Notes::F5, Duration::EIGHTH},
+//     {311, Duration::EIGHTH},     // DS5
+//     {Notes::F5, Duration::EIGHTH},
+//     {370, Duration::EIGHTH},     // FS5
+//     {415, Duration::EIGHTH},     // GS5
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {Notes::REST, Duration::EIGHTH},
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {622, Duration::EIGHTH},     // DS6
+//     {554, Duration::EIGHTH},     // CS6
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {Notes::REST, Duration::EIGHTH},
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {311, Duration::SIXTEENTH},  // DS5
+//     {Notes::REST, Duration::QUARTER}, // 8p
+//     {311, Duration::SIXTEENTH},  // DS5
+//     {466, Duration::EIGHTH},     // AS5
+//     {415, Duration::EIGHTH},     // GS5
+//     {370, Duration::EIGHTH},     // FS5
+//     {Notes::F5, Duration::EIGHTH},
+//     {311, Duration::EIGHTH},     // DS5
+//     {Notes::F5, Duration::EIGHTH},
+//     {370, Duration::EIGHTH},     // FS5
+//     {415, Duration::EIGHTH},     // GS5
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {Notes::REST, Duration::EIGHTH},
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {415, Duration::EIGHTH},     // GS5
+//     {Notes::REST, Duration::EIGHTH},
+//     {370, Duration::EIGHTH},     // FS5
+//     {Notes::F5, Duration::SIXTEENTH},
+//     {Notes::REST, Duration::EIGHTH},
+//     {Notes::F5, Duration::SIXTEENTH},
+//     {370, Duration::SIXTEENTH},  // FS5
+//     {Notes::REST, Duration::EIGHTH},
+//     {370, Duration::SIXTEENTH},  // FS5
+//     {415, Duration::SIXTEENTH},  // GS5
+//     {Notes::REST, Duration::EIGHTH},
+//     {415, Duration::SIXTEENTH},  // GS5
+//     {466, Duration::SIXTEENTH},  // AS5
+//     {Notes::REST, Duration::EIGHTH},
+//     {466, Duration::SIXTEENTH}   // AS5
+// };
+
     Tune::Melody bluejay = {
         {Notes::B4, 105},      // 4b
         {Notes::REST, 26},     // p
@@ -107,11 +188,14 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
         {Notes::REST, Duration::QUARTER}
     };
 
-    if (syscfg.read_conf_enable_interaction_tone()) tune.playMelodyInterruptible(startup);
+    if (syscfg.read_conf_enable_interaction_tone()) tune.playMelody(startup);
 
     startBatteryTask();
+    
     u8g2.setFont(u8g2_font_helvB08_tr);
     u8g2.drawStr(1, 61, "By PixelUI");
+    u8g2.drawXBM(61, 0 ,65, 64, image_boot_bits);
+    
     u8g2.sendBuffer();
 
     vTaskDelay(pdMS_TO_TICKS(1000));

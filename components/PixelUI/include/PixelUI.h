@@ -199,7 +199,7 @@ public:
     /**
      * @brief Marks the UI as fading out.
      */
-    void markFading() { isFading_ = true; }
+    void markFading();
 
     bool handleInput(InputEvent event) {
         if (inputCallback_) return inputCallback_(event);
@@ -215,7 +215,7 @@ public:
 protected:
 
     void setDrawable(std::shared_ptr<IDrawable> drawable) { currentDrawable_ = drawable; }
-
+    bool isFading() const { return isFading_; }
 private:
     U8G2& u8g2_;
 
@@ -238,4 +238,6 @@ private:
     bool isContinousRefreshEnabled() const { return continousMode_; }
     void (*m_func_debug_print)(const char*) = nullptr;
     uint32_t getActiveAnimationCount() const { return m_animationManagerPtr->activeCount(); }
+    uint8_t m_fadeStep = 0;
+    uint32_t m_lastFadeTime = 0;
 };

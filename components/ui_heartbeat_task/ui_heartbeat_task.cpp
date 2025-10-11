@@ -17,5 +17,5 @@ static void ui_heartbeat_task(void* p) {
 }
 
 void start_ui_heartbeat_task() {
-    xTaskCreate(ui_heartbeat_task, "UI_Heartbeat", 16384, NULL, 3, NULL);
+    xTaskCreate(ui_heartbeat_task, "UI_Heartbeat", 8192, NULL, 3, NULL);
 }

@@ -66,7 +66,7 @@ private:
 
 public:
     AppEnvironment(PixelUI& ui) : m_ui(ui), 
-    focusMan(m_ui), chart_temp(m_ui, 99, 11), chart_humi(m_ui, 99, 32), chart_baro(m_ui, 99, 53)
+    focusMan(m_ui), chart_temp(m_ui, 99, 11), chart_humi(m_ui, 99, 32), chart_baro(m_ui, 99, 54)
     {}
 
     void onEnter(ExitCallback cb) override {
@@ -74,12 +74,12 @@ public:
         m_ui.setContinousDraw(true);
         timestamp_1s_now = timestamp_1s_prev = m_ui.getCurrentTime();
 
-        chart_temp.setSize(56,20);
-        chart_temp.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 110, 20);
-        chart_humi.setSize(56,20);
-        chart_humi.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 110, 20);
-        chart_baro.setSize(56,20);
-        chart_baro.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 110, 20);
+        chart_temp.setSize(56,19);
+        chart_temp.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 110, 19);
+        chart_humi.setSize(56,19);
+        chart_humi.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 110, 19);
+        chart_baro.setSize(56,19);
+        chart_baro.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 110, 19);
 
         focusMan.addWidget(&chart_temp);
         focusMan.addWidget(&chart_humi);

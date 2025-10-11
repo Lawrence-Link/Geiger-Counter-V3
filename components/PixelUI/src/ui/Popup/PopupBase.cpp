@@ -59,6 +59,7 @@ bool PopupBase::updateState(uint32_t currentTime) {
             break;
         }
         case PopupState::CLOSING: {
+            m_ui.markDirty();
             if (_currentBoxSize <= 0) {
                 _currentBoxSize = 0;
                 return false;
