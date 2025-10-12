@@ -221,7 +221,10 @@ void ListView::selectCurrent(){
         *switchValPtr = !currentState;
     }
 
-    if (m_itemList[currentCursor].pFunc) m_itemList[currentCursor].pFunc();
+    if (m_itemList[currentCursor].pFunc) { 
+        m_ui.markFading();
+        m_itemList[currentCursor].pFunc(); 
+    }
 }
 
 /**

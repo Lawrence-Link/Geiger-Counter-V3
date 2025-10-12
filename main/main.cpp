@@ -178,16 +178,6 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
         {Notes::B5, 52}        // 8b5
     };
 
-    // 警报旋律
-    Tune::Melody alarm = {
-        {Notes::A5, Duration::EIGHTH},
-        {Notes::REST, Duration::EIGHTH},
-        {Notes::A5, Duration::EIGHTH},
-        {Notes::REST, Duration::EIGHTH},
-        {Notes::A5, Duration::EIGHTH},
-        {Notes::REST, Duration::QUARTER}
-    };
-
     if (syscfg.read_conf_enable_interaction_tone()) tune.playMelody(startup);
 
     startBatteryTask();
@@ -214,6 +204,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     start_encoder_task();
     start_ui_heartbeat_task();
 
+    float vtar = syscfg.read_conf_operation_voltage();
     voltage_controller.setTarget(380.0f);
     voltage_controller.setPID(1.5f, 7.0f, 0.00f);  
     
@@ -237,7 +228,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
             tickNowChargingAnim = ui.getCurrentTime();
         }
 
-        if (countdown_enable_charging_anim) {
+        if (countdown_enable_charging_anim) { // 防止冲入 avoid reenter the charging animation
             if (tickNowChargingAnim - tickPrevChargingAnim > 1000 && gpio_get_level(PIN_USB_STATUS)) {
                 countdown_enable_charging_anim = false;
                 ui.getViewManagerPtr()->push(charge_app.createApp(ui));

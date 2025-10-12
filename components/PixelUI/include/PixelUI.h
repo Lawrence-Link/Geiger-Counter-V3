@@ -189,7 +189,7 @@ public:
         uint16_t height = 40, 
         uint16_t duration = 3000, 
         uint8_t priority = 0, 
-        std::function<void(int32_t val)> update_cb = nullptr);
+        std::function<void(int32_t val)> update_cb = nullptr, bool use_apparent_val = false);
 
     /**
      * @brief Marks the display buffer as dirty, forcing a redraw.

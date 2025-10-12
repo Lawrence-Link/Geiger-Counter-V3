@@ -170,7 +170,7 @@ void PixelUI::renderer() {
 void PixelUI::showPopupProgress(int32_t& value, int32_t minValue, int32_t maxValue,
                                 const char* title, uint16_t width, uint16_t height,
                                 uint16_t duration, uint8_t priority,
-                                std::function<void(int32_t val)> update_cb) {
+                                std::function<void(int32_t val)> update_cb, bool use_apparent_val) {
     if (minValue >= maxValue) return;
     if (width < 50) width = 50; 
     if (width > 120) width = 120;
@@ -181,7 +181,7 @@ void PixelUI::showPopupProgress(int32_t& value, int32_t minValue, int32_t maxVal
 
     auto popup = std::make_shared<PopupProgress>(*this, width, height, value,
                                                  minValue, maxValue, title,
-                                                 duration, priority, update_cb);
+                                                 duration, priority, update_cb, use_apparent_val);
     m_popupManagerPtr->addPopup(popup);
     markDirty();
 }

@@ -22,11 +22,11 @@ private:
     void formatValueAsPercentage(char* buffer, size_t bufferSize) const;
     
     std::function<void(int32_t value)> m_cb;
-
+    bool use_apparent_val;
 public:
     PopupProgress(PixelUI& ui, uint16_t width, uint16_t height, 
                   int32_t& value, int32_t minValue, int32_t maxValue,
-                  const char* title = "", uint16_t duration = 3000, uint8_t priority = 0, std::function<void(int32_t value)> cb_function = nullptr);
+                  const char* title = "", uint16_t duration = 3000, uint8_t priority = 0, std::function<void(int32_t value)> cb_function = nullptr, bool UseApparentVal = false);
     ~PopupProgress() = default;
 
     void drawContent(int16_t centerX, int16_t centerY, int16_t currentWidth, int16_t currentHeight) override;
