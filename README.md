@@ -1,32 +1,21 @@
-# _Sample project_
+# 基于 ESP32-C6 与 PixelUI 的 盖革计数器 N1
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
-
-This is the simplest buildable example. The example is used by command `idf.py create-project`
-that copies the project to user specified path and set it's name. For more information follow the [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project)
+[OSHWHub上的工程点这里](https://oshwhub.com/qstorey/geiger-counter-n1/)
 
 
+> 此工程在ESP-IDF v5.5.1下进行开发构建。
+至少使用内置4MB FLASH的ESP32-C6。
 
-## How to use example
-We encourage the users to use the example as a template for the new projects.
-A recommended way is to follow the instructions on a [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project).
+## 构造前的配置 (must read): 
+> - 在 idf.py menuconfig 中请将分区表配置为预设"Single factory app(large), no OTA", 以充分利用闪存空间。
 
-## Example folder contents
+> - 硬件JTAG接口默认与LED冲突，请使用espefuse工具设定 efuse bit "DIS_PAD_JTAG" = 1 以禁用JTAG，解放GPIO (见下方bash script). 根据指示输入BURN 以永久禁用JTAG PAD。
+> ```bash
+> ./espefuse --port /dev/ttyACM1(你的COM口) --chip esp32c6 burn_efuse DIS_PAD_JTAG 1
+> ```
 
-The project **sample_project** contains one source file in C language [main.c](main/main.c). The file is located in folder [main](main).
+## 一些小建议
+这个设计使用C6的ADC实现电压环输入。考虑到每一个ESP32-C6的体质有些许差异，建议你在voltage_pid.cpp中调节CORRECTION_OFFSET, 让ADC在目标工作区间整体线性程度更好。
 
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt`
-files that provide set of directives and instructions describing the project's source files and targets
-(executable, library, or both). 
+在为CORRECTION_OFFSET = 0的情况下，启动计数应用，电压环应开始工作。 此时在4.7MOhm电阻之前测得实际电压V1',经过分压器后测得电压为V2。为了估计实际高压V1，应该使V1约等于V1' = V2 * (1/div) - CORRECTION_OFFSET. 简单来说， 如果实际数值比理论大，应下调这一数值。
 
-Below is short explanation of remaining files in the project folder.
-
-```
-├── CMakeLists.txt
-├── main
-│   ├── CMakeLists.txt
-│   └── main.c
-└── README.md                  This is the file you are currently reading
-```
-Additionally, the sample project contains Makefile and component.mk files, used for the legacy Make based build system. 
-They are not used or needed when building with CMake and idf.py.
