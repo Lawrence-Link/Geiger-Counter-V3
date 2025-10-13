@@ -28,33 +28,36 @@
 
 // Struct to hold extra data for a list item, like values for switches or sliders.
 struct ListItemExtra{
+    char* text = nullptr;
     bool* switchValue = nullptr; // Pointer to a boolean value for a switch.
     int32_t* intValue = nullptr;     // Pointer to an integer value for a slider or counter.
+    float* float_dot1f_Value = nullptr;
 };
 
 // Represents a single item in a list view.
 struct ListItem{
-    mutable char Title[MAX_LISTITEM_NAME_NUM]; // The display title of the item. 'mutable' allows it to be changed even if the struct is 'const'.
+    mutable char title[MAX_LISTITEM_NAME_NUM]; // The display title of the item. 'mutable' allows it to be changed even if the struct is 'const'.
     ListItem * nextList = nullptr;                       // Pointer to a sub-menu (another list).
     size_t nextListLength = 0;                     // The number of items in the sub-menu.
     std::function<void()> pFunc = nullptr;               // A function to execute when the item is selected.
     ListItemExtra extra = {nullptr,nullptr};                       // Extra data for dynamic UI elements.
-private:
-    // Animation values for visual effects on individual items.
-    int32_t anim_val1 = 0;
-    int32_t anim_val2 = 0;
-public:
-    // Constructor to initialize the list item.
-    ListItem(const char* title,
-             ListItem* next = nullptr,
-             size_t nextLen = 0,
-             std::function<void()> func = nullptr,
-             ListItemExtra ex = {})
-        : nextList(next), nextListLength(nextLen), pFunc(func), extra(ex)
-    {
-        strncpy(Title, title, sizeof(Title));
-        Title[sizeof(Title)-1] = 0; // Ensure null-termination.
-    }
+    bool use_fade = false; // Whether render fade animation when navigate to new app.
+// private:
+//     // Animation values for visual effects on individual items.
+//     int32_t anim_val1 = 0;
+//     int32_t anim_val2 = 0; 
+// public:
+//     // Constructor to initialize the list item.
+//     ListItem(const char* title,
+//              ListItem* next = nullptr,
+//              size_t nextLen = 0,
+//              std::function<void()> func = nullptr,
+//              ListItemExtra ex = {})
+//         : nextList(next), nextListLength(nextLen), pFunc(func), extra(ex)
+//     {
+//         strncpy(Title, title, sizeof(Title));
+//         Title[sizeof(Title)-1] = 0; // Ensure null-termination.
+//     }
     // int32_t getVal1 () const {return anim_val1;}
     // int32_t getVal2 () const {return anim_val2;}
     // void updateExtra() {}

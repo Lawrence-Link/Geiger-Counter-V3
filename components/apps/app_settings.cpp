@@ -23,6 +23,7 @@
 #include "ui/ListView/ListView.h"
 #include "system_nvs_varibles.h"
 #include "esp_log.h"
+#include "voltage_pid.hpp"
 
 static bool en_sound_click; // geiger click
 static bool en_sound_navigate; // sound navigate
@@ -39,52 +40,109 @@ static int32_t cpm_dngr_threshold = 0;
 static int32_t cpm_hzdr_threshold = 0;
 static int32_t operation_voltage = 380;
 
+static float vkp;
+static float vki;
+static float vkd;
+
+static char str_coeff[12];
+
 __attribute__((aligned(4)))
 static const unsigned char image_settings_bits[] = {0xf0,0xff,0x0f,0xfc,0xff,0x3f,0xfe,0xff,0x7f,0xfe,0xe7,0x7f,0xff,0xe7,0xff,0x9f,0x81,0xf9,0x1f,0x3c,0xf8,0x3f,0xff,0xfc,0xbf,0xc3,0xfd,0x9f,0x3d,0xf9,0xdf,0xfe,0xff,0xc7,0x7e,0xe8,0xc7,0xbe,0xeb,0xdf,0x7e,0xfb,0x9f,0xed,0xf6,0xbf,0xd5,0xf6,0x3f,0x37,0xf7,0x1f,0xf4,0xef,0x9f,0xc5,0xdf,0xff,0x3f,0xbe,0xfe,0xe7,0x7d,0xfe,0xff,0x7b,0xfc,0xff,0x37,0xf0,0xff,0x0f};
 
 extern PixelUI ui;
 extern AppItem time_setting_app;
+extern VoltagePID voltage_controller;
 
 auto& syscfg = SystemConf::getInstance();
 
 ListItem sub_Alarm[5] = {
     ListItem(">>> 剂量警告 <<<"),
-    ListItem("- 启用", nullptr, 0, nullptr, ListItemExtra{&en_sos, nullptr}),
-    ListItem("- 警告阈值(CPM)", nullptr, 0, 
-        [](){ ui.showPopupValue4Digits(cpm_warn_threshold, "警告CPM", 100, 40, 3000, 1); }, ListItemExtra{nullptr, &cpm_warn_threshold}),
-    ListItem("- 危险阈值(CPM)", nullptr, 0, 
-        [](){ ui.showPopupValue4Digits(cpm_dngr_threshold, "危险CPM", 100, 40, 3000, 1); }, ListItemExtra{nullptr, &cpm_dngr_threshold}),
-    ListItem("- 灾难阈值(CPM)", nullptr, 0, 
-        [](){ ui.showPopupValue4Digits(cpm_hzdr_threshold, "灾难CPM", 100, 40, 3000, 1); }, ListItemExtra{nullptr, &cpm_hzdr_threshold})
+    ListItem{.title = "- 启用", .extra = {.switchValue=&en_sos}},
+    ListItem{.title = "- 警告阈值(CPM)",
+            .pFunc = [](){ ui.showPopupValue4Digits(cpm_warn_threshold, "警告CPM", 100, 40, 3000, 1); }, 
+            .extra = ListItemExtra{.intValue = &cpm_warn_threshold}},
+    ListItem{
+        .title = "- 危险阈值(CPM)",
+        .pFunc = [](){ ui.showPopupValue4Digits(cpm_dngr_threshold, "危险CPM", 100, 40, 3000, 1); }, 
+        .extra = ListItemExtra{.intValue = &cpm_dngr_threshold}},
+    ListItem{.title = "- 灾难阈值(CPM)",
+        .pFunc = [](){ ui.showPopupValue4Digits(cpm_hzdr_threshold, "灾难CPM", 100, 40, 3000, 1); }, 
+        .extra = ListItemExtra{.intValue = &cpm_hzdr_threshold}}
 };
 
 ListItem sub_cvs_cfg[4] = {
     ListItem(">>> 恒压PID调试 <<<"),
-    ListItem("- Kp 比例", nullptr, 0, [](){  }),
-    ListItem("- Ki 积分", nullptr),
-    ListItem("- Kd 微分", nullptr)
+    ListItem{.title = "- Kp 比例", .extra = {.float_dot1f_Value = &vkp}},
+    ListItem{.title = "- Ki 积分", .extra = {.float_dot1f_Value = &vki}},
+    ListItem{.title = "- Kd 微分", .extra = {.float_dot1f_Value = &vkd}}
 };
 
 ListItem sub_Tube_cfg[4] = {
     ListItem(">>> 盖革管 <<<"),
-    ListItem("- 工作电压", nullptr, 0, [](){ ui.showPopupProgress(operation_voltage, 340, 400, "工作电压", 100, 40, 5000, 1, nullptr, true);}, ListItemExtra{nullptr, &operation_voltage}),
-    ListItem("- 恒压调试", sub_cvs_cfg, 4),
-    ListItem("- 转换系数")
+    ListItem{
+        .title = "- 工作电压", 
+        .pFunc = [](){ ui.showPopupProgress(operation_voltage, 340, 400, "工作电压", 100, 40, 5000, 1, nullptr, true);}, 
+        .extra = ListItemExtra{.intValue = &operation_voltage}
+    },
+    ListItem{.title = "- 转换系数", .extra = {.text = str_coeff}},
+    ListItem{.title = "- 恒压调试", .nextList = sub_cvs_cfg, .nextListLength = 4}
 };
 
 ListItem itemList[10] = {
     ListItem(">>>> 设置 <<<<"),
-    ListItem("- 屏幕亮度", nullptr, 0, [](){ ui.showPopupProgress(brightness, 0, 5, "亮度", 100, 40, 5000, 1, [](int32_t val){ui.getU8G2().setContrast(val * 51);}); }, ListItemExtra{nullptr, &brightness}),
-    ListItem("- 剂量警告", sub_Alarm, 5),
-    ListItem("- 盖革管", sub_Tube_cfg, 4),
-    ListItem("- 使用CPM", nullptr, 0, nullptr, ListItemExtra{&use_cpm, nullptr}),
-    ListItem("- 计数音", nullptr, 0, nullptr, ListItemExtra{&en_sound_click, nullptr}),
-    ListItem("- 交互音", nullptr, 0, nullptr, ListItemExtra{&en_interaction_tone, nullptr}),
-    ListItem("- 导航音", nullptr, 0, [](){syscfg.set_conf_enable_navi_tone(en_sound_navigate);}, ListItemExtra{&en_sound_navigate, nullptr}),
-    ListItem("- RTC时间", nullptr, 0, [](){
-        ui.getViewManagerPtr()->push(time_setting_app.createApp(ui));
-    }),
-    ListItem("- LED指示", nullptr, 0, nullptr, ListItemExtra{&en_led, nullptr})
+    ListItem{
+        .title = "- 屏幕亮度",
+        .pFunc = [](){ ui.showPopupProgress(brightness, 0, 5, "亮度", 100, 40, 5000, 1, [](int32_t val){ui.getU8G2().setContrast(val * 51);}); },
+        .extra = ListItemExtra{
+            .intValue = &brightness
+        }
+    },
+    ListItem{
+        .title = "- 剂量警告",
+        .nextList = sub_Alarm,
+        .nextListLength = 5
+    },
+    ListItem{
+        .title = "- 盖革管",
+        .nextList = sub_Tube_cfg,
+        .nextListLength = 4
+    },
+    ListItem{
+        .title = "- 使用CPM",
+        .extra = ListItemExtra{
+            .switchValue = &use_cpm
+        }
+    },
+    ListItem{
+        .title = "- 计数音",
+        .extra = ListItemExtra{
+            .switchValue = &en_sound_click
+        }
+    },
+    ListItem{
+        .title = "- 交互音",
+        .extra = ListItemExtra{
+            .switchValue = &en_interaction_tone
+        }
+    },
+    ListItem{
+        .title = "- 导航音",
+        .pFunc = [](){syscfg.set_conf_enable_navi_tone(en_sound_navigate);},
+        .extra = ListItemExtra{
+            .switchValue = &en_sound_navigate
+        }
+    },
+    ListItem{
+        .title = "- RTC时间",
+        .pFunc = [](){ ui.getViewManagerPtr()->push(time_setting_app.createApp(ui)); },
+        .use_fade = true
+    },
+    ListItem{
+        .title = "- LED指示",
+        .extra = ListItemExtra{
+            .switchValue = &en_led
+        }
+    }
 };
 
 class APP_SETTINGS : public ListView {
@@ -110,7 +168,14 @@ public:
 
         operation_voltage = syscfg.read_conf_operation_voltage();
         en_interaction_tone = syscfg.read_conf_enable_interaction_tone();
+        
+        vkp = syscfg.read_conf_volt_pid_kp();
+        vki = syscfg.read_conf_volt_pid_ki();
+        vkd = syscfg.read_conf_volt_pid_kd();
+
         use_cpm = syscfg.read_conf_use_cpm();
+
+        sprintf(str_coeff, "%.6f", convertion_coefficient);
     }
 
     void onSave() override {
@@ -129,6 +194,7 @@ public:
         // operation_voltage = syscfg.read_conf_operation_voltage();
         syscfg.set_conf_operation_voltage(operation_voltage);
         syscfg.save_conf_to_nvs();
+        voltage_controller.setTarget(operation_voltage);
         // syscfg.set_conf_tube_convertion_coefficient();
     }
 };

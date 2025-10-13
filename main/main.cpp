@@ -205,8 +205,14 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     start_ui_heartbeat_task();
 
     float vtar = syscfg.read_conf_operation_voltage();
-    voltage_controller.setTarget(380.0f);
-    voltage_controller.setPID(1.5f, 7.0f, 0.00f);  
+    
+    float v_kp = syscfg.read_conf_volt_pid_kp();
+    float v_ki = syscfg.read_conf_volt_pid_ki();
+    float v_kd = syscfg.read_conf_volt_pid_kd();
+
+    // CONFIG_voltage_controller
+    voltage_controller.setTarget(vtar);
+    voltage_controller.setPID(v_kp, v_ki, v_kd);
     
     static uint32_t tickPrevChargingAnim = ui.getCurrentTime();
     static uint32_t tickNowChargingAnim = ui.getCurrentTime();

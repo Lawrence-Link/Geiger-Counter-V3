@@ -49,6 +49,10 @@ public:
     float read_conf_tube_convertion_coefficient() const { return tube_convertion_coefficient; }
     int32_t read_rec_highscore_car_dodge() const { return highscore_car_dodge; }
 
+    float read_conf_volt_pid_kp() const { return voltage_pid_Kp; }
+    float read_conf_volt_pid_ki() const { return voltage_pid_Ki; }
+    float read_conf_volt_pid_kd() const { return voltage_pid_Kd; }
+
     // --- (Setter APIs) ---
     void set_conf_enable_alert(bool value) { alert_status = value; }
     void set_conf_enable_geiger_click(bool value) { geiger_click_status = value; }
@@ -73,6 +77,10 @@ private:
     bool use_cpm = false;
     uint8_t brightness = 5;
     float tube_convertion_coefficient = 0.00662f;
+
+    float voltage_pid_Kp = 1.5f;
+    float voltage_pid_Ki = 7.0f;
+    float voltage_pid_Kd = 0.0f;
 
     int32_t highscore_car_dodge = 0;
     int32_t cpm_warn_threshold = 300;

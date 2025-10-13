@@ -154,7 +154,7 @@ void ListView::scrollToTarget(size_t target){
     int32_t targetCursorY = topMargin_ + screenCursorIndex * (FontHeight + spacing_) - 1;
     
     m_ui.animate(CursorY, targetCursorY, 150, EasingType::EASE_IN_OUT_CUBIC);
-    m_ui.animate(CursorWidth, u8g2.getUTF8Width(m_itemList[currentCursor].Title) + 6, 500, EasingType::EASE_OUT_CUBIC);
+    m_ui.animate(CursorWidth, u8g2.getUTF8Width(m_itemList[currentCursor].title) + 6, 500, EasingType::EASE_OUT_CUBIC);
     m_ui.animate(progress_bar_top, ((int64_t)currentCursor * 64) / (m_itemLength + 1) + 1, 400, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
     m_ui.animate(progress_bar_bottom, ((int64_t)1 * 64) / (m_itemLength + 1), 400, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
 }
@@ -219,11 +219,15 @@ void ListView::selectCurrent(){
         m_ui.addAnimation(animation);
 
         *switchValPtr = !currentState;
+        return;
     }
 
     if (m_itemList[currentCursor].pFunc) { 
-        m_ui.markFading();
         m_itemList[currentCursor].pFunc(); 
+    }
+
+    if (m_itemList[currentCursor].use_fade) {
+        m_ui.markFading();
     }
 }
 
@@ -332,7 +336,7 @@ void ListView::draw() {
                     drawX = 4 + (FIXED_POINT_ONE - loadProgress) * 30 / FIXED_POINT_ONE;
                 }
             }
-            u8g2.drawUTF8(drawX, itemY, m_itemList[itemIndex].Title);
+            u8g2.drawUTF8(drawX, itemY, m_itemList[itemIndex].title);
             
             // Draw switch box if present
             if (m_itemList[itemIndex].extra.switchValue) {
@@ -342,11 +346,22 @@ void ListView::draw() {
                 u8g2.drawUTF8(u8g2.getDisplayWidth() - 25, itemY - 1, *m_itemList[itemIndex].extra.switchValue ? "ON" : "OFF");
             }
 
+            if (m_itemList[itemIndex].extra.text) {
+                u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getUTF8Width(m_itemList[itemIndex].extra.text) - 4, itemY, m_itemList[itemIndex].extra.text);
+            }
+
             // Draw integer value if present
             if (m_itemList[itemIndex].extra.intValue) {
                 char buf[5] = {0};
                 snprintf(buf, 5, "%" PRIu32, *m_itemList[itemIndex].extra.intValue);
-                u8g2.drawStr(u8g2.getDisplayWidth() - 24, itemY, buf);
+                u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getUTF8Width(buf) - 8, itemY, buf);
+            }
+
+            // Draw integer value if present
+            if (m_itemList[itemIndex].extra.float_dot1f_Value) {
+                char buf[5] = {0};
+                snprintf(buf, 5, "%.1f", *m_itemList[itemIndex].extra.float_dot1f_Value);
+                u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getUTF8Width(buf) - 8, itemY, buf);
             }
         }
     }
