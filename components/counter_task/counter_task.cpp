@@ -79,6 +79,8 @@ static void counter_task(void *pvParameters) {
     int cpm_average_count = 0;
     const int64_t OUTPUT_INTERVAL_US = 1000000;   // 1 second in microseconds
 
+    current_cpm = 0;
+    
     ESP_LOGI(TAG, "Counter task started. Local array size: %zu bytes.", sizeof(timestamp_history));
 
     auto& tune = Tune::getInstance();
