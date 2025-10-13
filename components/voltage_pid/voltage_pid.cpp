@@ -60,6 +60,7 @@ VoltagePID::VoltagePID(adc_unit_t unit,
         .timer_num = _pwmTimer,
         .freq_hz = 4000,
         .clk_cfg = LEDC_AUTO_CLK,
+        .deconfigure = false
     };
     ESP_ERROR_CHECK(ledc_timer_config(&timer_conf));
 
@@ -71,6 +72,8 @@ VoltagePID::VoltagePID(adc_unit_t unit,
         .timer_sel = _pwmTimer,
         .duty = 0,
         .hpoint = 0,
+        .sleep_mode = LEDC_SLEEP_MODE_KEEP_ALIVE,
+        .flags = {.output_invert = 0}
     };
     ESP_ERROR_CHECK(ledc_channel_config(&ch_conf));
 }

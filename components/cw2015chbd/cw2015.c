@@ -9,14 +9,14 @@
 static const char *TAG = "cw2015";
 static i2c_master_dev_handle_t s_dev_handle = NULL;
 
-static esp_err_t i2c_write_reg(uint8_t reg, const uint8_t *data, size_t len)
-{
-    uint8_t buf[1 + len];
-    buf[0] = reg;
-    memcpy(&buf[1], data, len);
+// static esp_err_t i2c_write_reg(uint8_t reg, const uint8_t *data, size_t len)
+// {
+//     uint8_t buf[1 + len];
+//     buf[0] = reg;
+//     memcpy(&buf[1], data, len);
 
-    return i2c_master_transmit(s_dev_handle, buf, sizeof(buf), pdMS_TO_TICKS(1000));
-}
+//     return i2c_master_transmit(s_dev_handle, buf, sizeof(buf), pdMS_TO_TICKS(1000));
+// }
 
 static esp_err_t i2c_read_reg(uint8_t reg, uint8_t *out, size_t len)
 {
@@ -104,7 +104,7 @@ void dump_cw2015_regs(i2c_master_dev_handle_t dev)
     }
 
     // 如果 VCELL raw 非全 0，则分别用两种常见解析方法解释
-    uint16_t raw = ((uint16_t)buf[0] << 8) | buf[1]; 
+    // uint16_t raw = ((uint16_t)buf[0] << 8) | buf[1]; 
     // 为了可靠，重新读 VCELL 并解释：
     uint8_t vcell_bytes[2];
     if (i2c_read_reg_simple(dev, 0x02, vcell_bytes, 2) == ESP_OK) {

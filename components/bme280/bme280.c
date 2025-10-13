@@ -486,7 +486,7 @@ int8_t bme280_set_regs(uint8_t *reg_addr, const uint8_t *reg_data, uint32_t len,
 {
     int8_t rslt;
     uint8_t temp_buff[20]; /* Typically not to write more than 10 registers */
-    uint32_t temp_len;
+    // uint32_t temp_len;
     uint32_t reg_addr_cnt;
 
     if (len > BME280_MAX_LEN)
@@ -520,12 +520,12 @@ int8_t bme280_set_regs(uint8_t *reg_addr, const uint8_t *reg_data, uint32_t len,
                  * burst write
                  */
                 interleave_reg_addr(reg_addr, temp_buff, reg_data, len);
-                temp_len = ((len * 2) - 1);
+                // temp_len = ((len * 2) - 1);
             }
-            else
-            {
-                temp_len = len;
-            }
+            // else
+            // {
+            //     temp_len = len;
+            // }
 
             dev->intf_rslt = dev->write(reg_addr[0], temp_buff);
 

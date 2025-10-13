@@ -176,6 +176,7 @@ public:
 
             case InputEvent::BACK:
                 requestExit(); 
+                return true;
             default:
                 return false;
         }

@@ -18,6 +18,7 @@
 #include "ui/Popup/PopupProgress.h"
 #include "PixelUI.h"
 #include <cstdio>
+#include <cinttypes>
 
 /**
  * @brief Construct a progress popup
@@ -123,7 +124,7 @@ void PopupProgress::drawContent(int16_t centerX, int16_t centerY, int16_t curren
     if (!use_apparent_val) {
         formatValueAsPercentage(percentBuffer, sizeof(percentBuffer));
     } else {
-        sprintf(percentBuffer, "%ld", _value);
+        sprintf(percentBuffer, "%" PRId32, _value);
     }
     int16_t percentWidth = u8g2.getStrWidth(percentBuffer);
     u8g2.drawStr(centerX - percentWidth / 2, centerY + 17, percentBuffer);
