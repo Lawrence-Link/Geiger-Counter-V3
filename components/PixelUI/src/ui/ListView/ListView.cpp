@@ -199,7 +199,7 @@ void ListView::selectCurrent(){
         m_ui.markFading();
         startLoadAnimation();
         scrollToTarget(0);
-        return;
+        // return;
     }
 
     if (m_itemList[currentCursor].extra.switchValue) {
@@ -219,15 +219,14 @@ void ListView::selectCurrent(){
         m_ui.addAnimation(animation);
 
         *switchValPtr = !currentState;
-        return;
+        // return;
     }
 
     if (m_itemList[currentCursor].pFunc) { 
         m_itemList[currentCursor].pFunc(); 
-    }
-
-    if (m_itemList[currentCursor].use_fade) {
-        m_ui.markFading();
+        if (m_itemList[currentCursor].use_fade) {
+            m_ui.markFading();
+        }
     }
 }
 
