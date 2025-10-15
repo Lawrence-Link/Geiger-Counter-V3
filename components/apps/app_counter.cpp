@@ -600,22 +600,22 @@ public:
         // If histogram is expanded (e.g., in stats view), draw stats overlay
         if (histogram.isExpanded()) {
             u8g2.clearBuffer(); // Clear screen for expanded view
-            u8g2.drawStr(3, 10, "<STATS>");
-            u8g2.drawStr(3, 20, "Max:");
+            u8g2.drawStr(0, 10, "<STATS>");
+            u8g2.drawStr(0, 20, "Max:");
             if (!use_cpm) {
                 snprintf(print_buffer, sizeof(print_buffer), "%.3guSv/h", histogram.getMaxValue());
             } else {
                 snprintf(print_buffer, sizeof(print_buffer), "%dCPM", (int)histogram.getMaxValue());
             }
-            u8g2.drawStr(3, 30, print_buffer);
+            u8g2.drawStr(0, 30, print_buffer);
             
-            u8g2.drawStr(3, 40, "Avg:");
+            u8g2.drawStr(0, 40, "Avg:");
             if (!use_cpm){
                 snprintf(print_buffer, sizeof(print_buffer), "%.3guSv/h", histogram.getAverageValue());
             } else {
                 snprintf(print_buffer, sizeof(print_buffer), "%dCPM", (int)histogram.getAverageValue());
             }
-            u8g2.drawStr(3, 50, print_buffer);
+            u8g2.drawStr(0, 50, print_buffer);
         }
         
         histogram.draw();

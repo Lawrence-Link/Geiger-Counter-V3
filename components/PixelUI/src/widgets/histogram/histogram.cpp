@@ -356,7 +356,7 @@ void Histogram::drawHistogramData(int center_x, int center_y, int half_width, in
         int x_pos = center_x + half_width - 2 - i;
         if (x_pos < center_x - half_width + 2) break;
 
-        int y_bottom = center_y + half_height - 2;
+        int y_bottom = center_y + half_height - 1;
         int y_top = y_bottom - bar_height;
 
         if (bar_height > 0) {
