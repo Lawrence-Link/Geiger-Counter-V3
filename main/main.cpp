@@ -33,6 +33,7 @@ PixelUI ui(u8g2);
 
 extern AppItem charge_app;
 extern AppItem sillycat_app;
+extern AppItem boot_app;
 
 static const char *TAG = "main";
 
@@ -182,13 +183,13 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
 
     startBatteryTask();
     
-    u8g2.setFont(u8g2_font_helvB08_tr);
-    u8g2.drawStr(1, 61, "By PixelUI");
-    u8g2.drawXBM(61, 0 ,65, 64, image_boot_bits);
+    // u8g2.setFont(u8g2_font_helvB08_tr);
+    // u8g2.drawStr(1, 61, "By PixelUI");
+    // u8g2.drawXBM(61, 0 ,65, 64, image_boot_bits);
     
-    u8g2.sendBuffer();
+    // u8g2.sendBuffer();
 
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    // vTaskDelay(pdMS_TO_TICKS(1000));
 
     // Register applications
     registerApps();
@@ -196,6 +197,8 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     ui.getViewManagerPtr()->push(sillycat_app.createApp(ui));
     auto appView = AppLauncher::createAppLauncherView(ui, *ui.getViewManagerPtr());
     ui.getViewManagerPtr()->push(appView);
+
+    ui.getViewManagerPtr()->push(boot_app.createApp(ui));
 
     // Initialize UI
     ui.setDelayFunction(delay_ms);
