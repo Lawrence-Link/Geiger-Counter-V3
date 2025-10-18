@@ -28,3 +28,9 @@
 
 # LICENSED UNDER GPL3.0
 此工程使用GPL3.0协议。
+此工程依赖以下开源代码, 并且进行了定制裁减：
+|Github仓库|简称|使用许可证|
+|----------|--|---------|
+|olikarus/u8g2          | "U8g2lib"                   |  BSD License
+|ETLCPP/etl             | "Embedded Template Library" |  MIT License
+|Lawrence-Link/PixelUI  | "PixelUI"                   |  GNU GPL-3 License
