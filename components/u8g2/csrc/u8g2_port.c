@@ -8,6 +8,7 @@
 #include "u8g2_port.h"
 #include "esp_log.h"
 #include "esp_rom_sys.h"
+#include "pin_definitions.h"
 
 static const char *TAG = "U8G2_PORT";
 
@@ -233,7 +234,11 @@ uint8_t u8g2_esp32_gpio_and_delay_cb(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
             break;
 
         case U8X8_MSG_GPIO_RESET:
-            // SH1106使用软件复位，无需硬件复位引脚
+            if (arg_int == 0) {
+                gpio_set_level(PIN_OLED_RST, 0);  // 拉低RESET引脚开始复位
+            } else {
+                gpio_set_level(PIN_OLED_RST, 1);  // 拉高RESET引脚解除复位
+            }
             break;
 
         default:

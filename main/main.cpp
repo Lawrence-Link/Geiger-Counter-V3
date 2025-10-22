@@ -56,15 +56,15 @@ void delay_ms(uint32_t ms) {
 
 extern "C" void app_main(void) // mainly reserved for ui rendering
 {   
+    I2C_Devices_Init();
+    GPIO_init();
+
     // Initialize display
     esp_err_t ret = u8g2_init_sh1106(u8g2.getU8g2());
     if (ret != ESP_OK) {
         ESP_LOGI(TAG, "Failed to initialize U8G2: %s\n", esp_err_to_name(ret));
         return;
     }
-
-    I2C_Devices_Init();
-    GPIO_init();
 
     // initialize nvs driver
     std::error_code ec;

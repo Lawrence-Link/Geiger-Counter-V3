@@ -32,7 +32,7 @@ void GPIO_init() {
     // pin config: output, no intr
     io_conf.intr_type = GPIO_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;            
-    io_conf.pin_bit_mask = (1ULL << PIN_BUZZER); 
+    io_conf.pin_bit_mask = (1ULL << PIN_BUZZER) | (1ULL << PIN_OLED_RST); 
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE; 
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;   
 

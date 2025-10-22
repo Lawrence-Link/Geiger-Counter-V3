@@ -6,5 +6,5 @@ file(GLOB_RECURSE SOURCES_CSRC "csrc/*.c")
 idf_component_register(
     SRCS ${SOURCES_CPPSRC} ${SOURCES_CSRC}
     INCLUDE_DIRS "cppsrc" "csrc"
-    REQUIRES "driver" "esp_common" 
+    REQUIRES "driver" "esp_common" "gpio_stuff"
 )

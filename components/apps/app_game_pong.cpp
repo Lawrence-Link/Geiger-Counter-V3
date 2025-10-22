@@ -328,7 +328,8 @@ public:
     }
 };
 
-// 自注册机制 - 更新名称
+// 自注册机制 - 更新名称 
+
 AppItem game_pong_app{
     .title = "Pong",
     .bitmap = image_games_bits,
