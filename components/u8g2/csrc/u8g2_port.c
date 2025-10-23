@@ -142,17 +142,13 @@ static esp_err_t spi_write_data(const uint8_t *data, size_t len)
     return ret;
 }
 
-/**
- * @brief 设置DC引脚状态
- * @param level 引脚电平 (0=命令, 1=数据)
- */
 static void set_dc_level(uint32_t level)
 {
     gpio_set_level(U8G2_PIN_DC, level);
 }
 
 /**
- * @brief U8G2 SPI通信回调函数
+ * @brief U8G2 hardware spi communication callback
  */
 uint8_t u8g2_esp32_spi_byte_cb(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr)
 {
@@ -171,21 +167,20 @@ uint8_t u8g2_esp32_spi_byte_cb(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void 
             break;
 
         case U8X8_MSG_BYTE_INIT:
-            // SPI初始化在u8g2_port_init()中完成
-            ESP_LOGI(TAG, "SPI byte init");
+            // SPI initialization was already done in the esp32_port_init
             break;
 
         case U8X8_MSG_BYTE_SET_DC:
-            // 设置DC引脚状态：0=命令，1=数据
+            // 0 = CMD, 1 = DATA
             set_dc_level(arg_int);
             break;
 
         case U8X8_MSG_BYTE_START_TRANSFER:
-            // 开始传输，CS已经接地，无需操作
+            // Beginning of the transmission, since CS is already grounded, no more operation is needed.
             break;
 
         case U8X8_MSG_BYTE_END_TRANSFER:
-            // 结束传输，CS已经接地，无需操作
+            // End of the transmission, since CS is already grounded, no more operation is needed.
             break;
 
         default:
@@ -263,35 +258,31 @@ esp_err_t u8g2_init_sh1106(u8g2_t *u8g2)
 
     ESP_LOGI(TAG, "Initializing U8G2 with SH1106 display");
 
-    // 初始化移植层
     esp_err_t ret = u8g2_port_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize U8G2 port: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    // 初始化U8G2结构体
-    // 使用SH1106 128x64显示器的U8G2构造函数
+    #ifdef USE_SH1106
     u8g2_Setup_sh1106_128x64_noname_f(u8g2, 
-                                       U8G2_R0,  // 旋转角度：0度
+                                       U8G2_R0,
                                        u8g2_esp32_spi_byte_cb,
                                        u8g2_esp32_gpio_and_delay_cb);
+    #endif 
 
-    // 初始化显示器
+    #ifdef USE_SSD1306
+    u8g2_Setup_ssd1306_128x64_noname_f(u8g2, 
+                                       U8G2_R0,
+                                       u8g2_esp32_spi_byte_cb,
+                                       u8g2_esp32_gpio_and_delay_cb);
+    #endif
+
     u8g2_InitDisplay(u8g2);
 
-    // 执行软件复位
-    // ret = sh1106_software_reset();
-    // if (ret != ESP_OK) {
-    //     ESP_LOGE(TAG, "Failed to reset SH1106: %s", esp_err_to_name(ret));
-    //     return ret;
-    // }
+    u8g2_SetPowerSave(u8g2, 0); // Power on the display
 
-    // 打开显示器电源
-    u8g2_SetPowerSave(u8g2, 0);
-
-    // 清除显示缓冲区
-    u8g2_ClearBuffer(u8g2);
+    u8g2_ClearBuffer(u8g2); // Clear screen buffer
     u8g2_SendBuffer(u8g2);
 
     ESP_LOGI(TAG, "U8G2 SH1106 initialization completed successfully");

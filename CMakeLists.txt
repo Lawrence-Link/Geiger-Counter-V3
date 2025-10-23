@@ -7,15 +7,16 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 为所有 C 编译启用 LTO
+# Enable LTO for C and C++
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${LTO_FLAGS}")
-
-# 为所有 C++ 编译启用 LTO
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LTO_FLAGS}")
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LTO_FLAGS}")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${LTO_FLAGS}")
 
+# Choose driver IC you use.
+# add_definitions(-DUSE_SH1106)
+add_definitions(-DUSE_SSD1306)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
