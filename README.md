@@ -7,12 +7,13 @@
 至少使用内置4MB FLASH的ESP32-C6。
 
 ## 构造前的配置 (must read): 
-> - 在 idf.py menuconfig 中请将分区表配置为预设"Single factory app(large), no OTA", 以充分利用闪存空间。
+1. idf.py menuconfig 中分区表已配置为预设"Single factory app(large), no OTA", 以充分利用闪存空间。
 
-> - 硬件JTAG接口默认与LED冲突，请使用espefuse工具设定 efuse bit "DIS_PAD_JTAG" = 1 以禁用JTAG，解放GPIO (见下方bash script). 根据指示输入BURN 以永久禁用JTAG PAD。
-> ```bash
-> ./espefuse --port /dev/ttyACM1(你的COM口) --chip esp32c6 burn_efuse DIS_PAD_JTAG 1
-> ```
+2. 硬件JTAG接口默认与LED冲突，请使用espefuse工具设定 efuse bit "DIS_PAD_JTAG" = 1 以禁用JTAG，解放GPIO (见下方bash script). 根据指示输入BURN 以永久禁用JTAG PAD。
+```bash
+./espefuse --port /dev/ttyACM1(你的COM口) --chip esp32c6 burn_efuse DIS_PAD_JTAG 1
+```
+3. 你现在可以在根CMakeLists.txt里配置OLED使用SSD1306驱动芯片还是SH1106，取消注释你所使用的OLED驱动，将你不使用的注释掉。
 
 ## 一些小建议
 - 这个设计使用C6的ADC实现电压环输入。考虑到每一个ESP32-C6的体质有些许差异，建议你在voltage_pid.cpp中调节CORRECTION_OFFSET, 让ADC在目标工作区间整体线性程度更好。

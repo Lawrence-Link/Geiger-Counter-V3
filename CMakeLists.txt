@@ -15,8 +15,8 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LTO_FLAGS}")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${LTO_FLAGS}")
 
 # Choose driver IC you use.
-# add_definitions(-DUSE_SH1106)
-add_definitions(-DUSE_SSD1306)
+add_definitions(-DUSE_SH1106)
+# add_definitions(-DUSE_SSD1306)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
