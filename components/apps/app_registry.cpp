@@ -6,6 +6,7 @@ extern AppItem cube_demo_app;
 extern AppItem app_environment;
 extern AppItem racing_game_app;
 extern AppItem game_pong_app;
+extern AppItem about_app;
 
 void registerApps() {
     auto& app_man = AppManager::getInstance();
@@ -15,4 +16,5 @@ void registerApps() {
     app_man.registerApp(racing_game_app);
     app_man.registerApp(game_pong_app);
     // app_man.registerApp(cube_demo_app);
+    app_man.registerApp(about_app);
 }

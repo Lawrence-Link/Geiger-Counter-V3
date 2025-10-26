@@ -1,8 +1,8 @@
-idf_component_register(SRCS "app_boot.cpp" "app_settings_utils/app_time_setting.cpp" 
+idf_component_register(SRCS "app_about.cpp" "app_boot.cpp" "app_settings_utils/app_time_setting.cpp" 
 "app_counter.cpp" "app_settings.cpp" "app_environment.cpp" "app_registry.cpp" "app_ui_utils/app_charging_animation.cpp" 
-"app_cube.cpp" "app_ui_utils/app_silly_cat.cpp" "racing_game.cpp" "app_game_pong.cpp"
+"app_cube.cpp" "app_ui_utils/app_silly_cat.cpp" "racing_game.cpp" "app_game_pong.cpp" "app_about.cpp"
                     INCLUDE_DIRS "."
-                    REQUIRES "PixelUI" "voltage_pid" "main" "time_module" "counter_task" "system_nvs_varibles" "led" "bme280")
+                    REQUIRES "PixelUI" "voltage_pid" "main" "time_module" "counter_task" "system_nvs_varibles" "led" "bme280" idf::app_update)
 
 # 防止静态注册被优化
 # target_compile_options(${COMPONENT_LIB} PRIVATE 

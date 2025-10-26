@@ -48,7 +48,7 @@ public:
         product_name.draw();
         u8g2.drawHLine(14, 40, line_width);
         u8g2.setFont(u8g2_font_wqy12_t_gb2312);
-        // u8g2.drawUTF8(1, 63, "For 核子Nucleon");
+        // u8g2.drawUTF8(1, 63, "SE: 核子Nucleon");
         if (exit_flag) { requestExit(); }   
     }
 
