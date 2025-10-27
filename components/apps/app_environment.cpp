@@ -46,10 +46,14 @@ private:
     int32_t anim_img_humidity_x = -45;
     int32_t anim_img_barometer_x = -45;
 
-    std::shared_ptr<Coroutine> coroutine_load;
+    Coroutine coroutine_anim;
+
     char print_buffer[15];
 
-    void animation_coroutine_body(CoroutineContext& ctx, PixelUI& ui) 
+public:
+    AppEnvironment(PixelUI& ui) : m_ui(ui), 
+    focusMan(m_ui), chart_temp(m_ui, 99, 11), chart_humi(m_ui, 99, 32), chart_baro(m_ui, 99, 54),
+    coroutine_anim([this](CoroutineContext& ctx) 
     {
         CORO_BEGIN(ctx);
         CORO_DELAY(ctx, m_ui, 50, 1);
@@ -62,11 +66,8 @@ private:
         chart_baro.onLoad();
         m_ui.animate(anim_img_barometer_x, 0, 320, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
         CORO_END(ctx);
-    }
+    })
 
-public:
-    AppEnvironment(PixelUI& ui) : m_ui(ui), 
-    focusMan(m_ui), chart_temp(m_ui, 99, 11), chart_humi(m_ui, 99, 32), chart_baro(m_ui, 99, 54)
     {}
 
     void onEnter(ExitCallback cb) override {
@@ -85,10 +86,10 @@ public:
         focusMan.addWidget(&chart_humi);
         focusMan.addWidget(&chart_baro);
 
-        coroutine_load = std::make_shared<Coroutine>(std::bind(&AppEnvironment::animation_coroutine_body, this, std::placeholders::_1, std::placeholders::_2),
-            m_ui);
+        coroutine_anim.reset();
+        coroutine_anim.start();
 
-        m_ui.addCoroutine(coroutine_load);
+        m_ui.addCoroutine(&coroutine_anim);
     }
 
     void draw() override {
@@ -148,6 +149,7 @@ public:
     
 
     void onExit() override {
+        m_ui.removeCoroutine(&coroutine_anim);
         m_ui.setContinousDraw(false);
         m_ui.markFading();
     }

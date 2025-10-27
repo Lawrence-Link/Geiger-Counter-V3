@@ -17,14 +17,11 @@ private:
     bool focusable = false;
     bool Selected = false;
     FocusBox focus;
-
-    void setSelected(bool state) { Selected = state; }
-    bool isSelected() const { return Selected; }
 protected:
     // activation related
     bool m_is_active = false;
     uint32_t m_last_interaction_time = 0;
-
+    void setFocusBox(const FocusBox& pos) {focus = pos;}
 public:
     virtual ~IWidget() = default;
     virtual void draw() = 0;
@@ -91,6 +88,5 @@ public:
     bool isFocusable() { return focusable; }
     void setFocusable(bool state) { focusable = state; }
 
-    void setFocusBox(const FocusBox& pos) {focus = pos;}
     FocusBox getFocusBox() { return focus; }
 };

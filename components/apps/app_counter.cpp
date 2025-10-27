@@ -223,41 +223,14 @@ private:
     float current_cpm = 0;
     struct tm timeinfo;
     bool tm_valid;
-    
-    std::shared_ptr<Coroutine> animationCoroutine_;
-    std::shared_ptr<Coroutine> alertSchedulerCoroutine_; // localData[0] is the indicator of an alert.
+
+    Coroutine coroutine_anim;
+    Coroutine coroutine_alarm;
 
     bool requireAlertSound = false;
     bool en_dosage_alert;
     bool en_click = false;
     Tune& tune = Tune::getInstance();
-
-    void alert_scheduler_coroutine_body(CoroutineContext& ctx, PixelUI& ui) {
-        CORO_BEGIN(ctx);
-    
-        while (true) {
-            while (!ctx.localData[0]) {
-                CORO_YIELD(ctx, __LINE__);
-            }
-            ctx.localData[0] = 0;
-            if (en_dosage_alert) tune.playMelodyInterruptible(sos);
-            CORO_DELAY(ctx, ui, 3500, __LINE__);
-        }
-        CORO_END(ctx);
-    }
-
-    void animation_coroutine_body(CoroutineContext& ctx, PixelUI& ui) 
-    {
-        CORO_BEGIN(ctx);
-            brace.onLoad();
-        CORO_DELAY(ctx, m_ui, 80, 100);
-            histogram.onLoad();
-            icon_battery.onLoad();
-            icon_sounding.onLoad();
-            icon_alarm.onLoad();
-            m_ui.animate(anim_status_x, 29, 450, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
-        CORO_END(ctx);
-    }
 
 public:
     APP_COUNTER(PixelUI& ui) : 
@@ -269,7 +242,35 @@ public:
     icon_sounding(ui),
     icon_alarm(ui),
     blinker_description_bar(ui, 100),
-    blinker_calibration_icon(ui, 100)
+    blinker_calibration_icon(ui, 100),
+    coroutine_anim([this](CoroutineContext& ctx) 
+    {
+        CORO_BEGIN(ctx);
+            brace.onLoad();
+        CORO_DELAY(ctx, m_ui, 80, 100);
+            histogram.onLoad();
+            icon_battery.onLoad();
+            icon_sounding.onLoad();
+            icon_alarm.onLoad();
+            m_ui.animate(anim_status_x, 29, 450, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
+        CORO_END(ctx);
+    }
+    ),
+
+    coroutine_alarm([this](CoroutineContext& ctx) {
+        CORO_BEGIN(ctx);
+    
+        while (true) {
+            while (!ctx.localData[0]) {
+                CORO_YIELD(ctx, __LINE__);
+            }
+            ctx.localData[0] = 0;
+            if (en_dosage_alert) tune.playMelodyInterruptible(sos);
+            CORO_DELAY(ctx, m_ui, 3500, __LINE__);
+        }
+        CORO_END(ctx);
+    })
+
     {}
     
     // Called when the application is started
@@ -291,12 +292,12 @@ public:
         // HISTOGRAM
         histogram.setPosition(97,54);
         histogram.setSize(56,18);
-        histogram.setFocusBox(FocusBox(70,46,55,17));
+        // histogram.setFocusBox(FocusBox(70,46,55,17));
         histogram.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 76, 63);
         
         // BRACE 
         brace.setPosition(31,54);
-        brace.setFocusBox(FocusBox(4, 46, 55, 17));
+        // brace.setFocusBox(FocusBox(4, 46, 55, 17));
         brace.setSize(56,18);
         // Set a lambda function to draw the brace content (Max value)
         brace.setDrawContentFunction([this]() { braceContent(); });
@@ -331,18 +332,12 @@ public:
         
         timestamp_prev = timestamp_now = m_ui.getCurrentTime();
         
-        animationCoroutine_ = std::make_shared<Coroutine>(
-            std::bind(&APP_COUNTER::animation_coroutine_body, this, std::placeholders::_1, std::placeholders::_2),
-            m_ui
-        );
+        coroutine_anim.reset();
+        coroutine_alarm.reset();
+        coroutine_anim.start();
 
-        alertSchedulerCoroutine_ = std::make_shared<Coroutine>(
-            std::bind(&APP_COUNTER::alert_scheduler_coroutine_body, this, std::placeholders::_1, std::placeholders::_2),
-            m_ui
-        );
-
-        m_ui.addCoroutine(animationCoroutine_);
-        m_ui.addCoroutine(alertSchedulerCoroutine_); // 警报调度
+        m_ui.addCoroutine(&coroutine_anim);
+        m_ui.addCoroutine(&coroutine_alarm); // 警报调度
         
         first_time = false;
         
@@ -451,7 +446,7 @@ public:
                 blinker_description_bar.start();
             }
             else if (current_cpm < cpm_hzdr_threshold) {
-                alertSchedulerCoroutine_->getContext().localData[0] = 1;
+                coroutine_alarm.getContext().localData[0] = 1;
 
                 u8g2.drawStr(5, 42, "DNGR");
                 u8g2.setClipWindow(29,36,128,42);
@@ -461,7 +456,7 @@ public:
                 blinker_description_bar.start();
             }
             else {
-                alertSchedulerCoroutine_->getContext().localData[0] = 1;
+                coroutine_alarm.getContext().localData[0] = 1;
                 u8g2.drawStr(5, 42, "HZDR");
                 u8g2.setClipWindow(29,36,128,42);
                 u8g2.drawStr(anim_status_x, 42, "SEVERE THREAT");
@@ -652,15 +647,10 @@ public:
     void onExit() {
         voltage_controller.stop();
         stop_counter_task();
-        if (animationCoroutine_) {
-            m_ui.removeCoroutine(animationCoroutine_);
-            animationCoroutine_.reset();
-        }
+        
+        m_ui.removeCoroutine(&coroutine_alarm);
+        m_ui.removeCoroutine(&coroutine_anim);
 
-        if (alertSchedulerCoroutine_) {
-            m_ui.removeCoroutine(alertSchedulerCoroutine_);
-            alertSchedulerCoroutine_.reset();
-        }
         m_ui.clearAllAnimations();
         m_ui.setContinousDraw(false);
         m_ui.markFading();

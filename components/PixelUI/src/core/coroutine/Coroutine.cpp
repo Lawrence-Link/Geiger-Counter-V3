@@ -6,7 +6,7 @@
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it is useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
@@ -22,8 +22,8 @@
 /**
  * @brief Constructor of the coroutine class
  */
-Coroutine::Coroutine(CoroutineFunction func, PixelUI& ui) 
-    : function_(func), ui_(ui) {
+Coroutine::Coroutine(CoroutineFunction func) 
+    : function_(func) {
     context_.state = CoroutineState::CREATED;
 }
 
@@ -47,9 +47,20 @@ void Coroutine::resume(uint32_t currentTime) {
     }
     
     if (context_.state == CoroutineState::RUNNING) {
-        function_(context_, ui_);
+        function_(context_); // <-- 不再传递 ui_
     }
 }
+
+/**
+ * @brief Reset a coroutine to its initial state
+ */
+void Coroutine::reset() {
+    context_.state = CoroutineState::CREATED;
+    context_.pc = 0;
+    context_.waitUntil = 0;
+    // 注意: localData 未清零，这通常是期望的行为，但如果需要可以添加
+}
+
 
 /**
  * @brief check whether a coroutine should run or not
@@ -81,7 +92,7 @@ CoroutineScheduler::CoroutineScheduler(PixelUI& ui) : ui_(ui) {}
  * * Adds a new coroutine to the list of scheduled items and immediately starts its execution.
  * @param coroutine A shared pointer to the Coroutine object to be added.
  */
-void CoroutineScheduler::addCoroutine(std::shared_ptr<Coroutine> coroutine) {
+void CoroutineScheduler::addCoroutine(Coroutine* coroutine) { // <-- 改为 Coroutine*
     // Check if the pointer is null
     if (!coroutine) return; 
     
@@ -89,7 +100,8 @@ void CoroutineScheduler::addCoroutine(std::shared_ptr<Coroutine> coroutine) {
     coroutines_.push_back(coroutine);
     
     // Start the coroutine (e.g., set its initial state or execute the first step)
-    coroutine->start();
+    // 注意：我们将 start() 的调用移到了 app_about.cpp 中，以保持一致性
+    // coroutine->start(); // <-- 这一行可以保留，也可以像 app_about.cpp 中那样在添加前调用
 }
 
 /**
@@ -97,7 +109,7 @@ void CoroutineScheduler::addCoroutine(std::shared_ptr<Coroutine> coroutine) {
  * * Removes the specified coroutine by comparing the shared pointers.
  * @param coroutine A shared pointer to the Coroutine object to be removed.
  */
-void CoroutineScheduler::removeCoroutine(std::shared_ptr<Coroutine> coroutine) {
+void CoroutineScheduler::removeCoroutine(Coroutine* coroutine) { // <-- 改为 Coroutine*
     // Use the erase-remove idiom to safely remove the matching element from the vector.
     coroutines_.erase(
         std::remove(coroutines_.begin(), coroutines_.end(), coroutine),
@@ -117,7 +129,7 @@ void CoroutineScheduler::update(uint32_t currentTime) {
     // Use the erase-remove_if idiom to remove all coroutines for which isFinished() returns true.
     coroutines_.erase(
         std::remove_if(coroutines_.begin(), coroutines_.end(),
-            [](const std::shared_ptr<Coroutine>& coro) {
+            [](const Coroutine* coro) { // <-- 改为 Coroutine*
                 return coro->isFinished(); // Check if the coroutine has completed its work
             }),
         coroutines_.end()

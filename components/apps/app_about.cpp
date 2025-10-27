@@ -39,23 +39,22 @@ private:
     int32_t anim_phrase_4_y = 75;
     bool once_flag = false;
 
-    std::shared_ptr<Coroutine> animationCoroutine_;
-
-    void animation_coroutine_body(CoroutineContext& ctx, PixelUI& ui) {
-        CORO_BEGIN(ctx);
-        CORO_DELAY(ctx, ui, 160, 100);
-        m_ui.animate(anim_phrase_1_y, 51, 300, EasingType::EASE_OUT_QUAD);
-        CORO_DELAY(ctx, ui, 200, 200);
-        m_ui.animate(anim_phrase_2_y, 60, 300, EasingType::EASE_OUT_QUAD);
-        CORO_DELAY(ctx, ui, 200, 300);
-        m_ui.animate(anim_phrase_3_y, 52, 300, EasingType::EASE_OUT_QUAD);
-        CORO_DELAY(ctx, ui, 200, 400);
-        m_ui.animate(anim_phrase_4_y, 61, 300, EasingType::EASE_OUT_QUAD);
-        CORO_END(ctx);
-    }
+    Coroutine coroutine_anim;
 
 public:
-    About(PixelUI& ui):m_ui(ui), bl(ui) {};
+    About(PixelUI& ui):m_ui(ui), bl(ui),
+    coroutine_anim([this](CoroutineContext& ctx) {
+        CORO_BEGIN(ctx);
+        CORO_DELAY(ctx, m_ui, 160, 100);
+        m_ui.animate(anim_phrase_1_y, 51, 300, EasingType::EASE_OUT_QUAD);
+        CORO_DELAY(ctx, m_ui, 200, 200);
+        m_ui.animate(anim_phrase_2_y, 60, 300, EasingType::EASE_OUT_QUAD);
+        CORO_DELAY(ctx, m_ui, 200, 300);
+        m_ui.animate(anim_phrase_3_y, 52, 300, EasingType::EASE_OUT_QUAD);
+        CORO_DELAY(ctx, m_ui, 200, 400);
+        m_ui.animate(anim_phrase_4_y, 61, 300, EasingType::EASE_OUT_QUAD);
+        CORO_END(ctx);
+    }) {};
     void draw() override {
 
         if (!once_flag) {
@@ -108,19 +107,15 @@ public:
         m_ui.markDirty(); 
         bl.set_interval(2000);
         bl.start();
-        animationCoroutine_ = std::make_shared<Coroutine>( // add coroutine for the *Amazing* setup animation
-            std::bind(&About::animation_coroutine_body, this, std::placeholders::_1, std::placeholders::_2),
-            m_ui
-        );
+        
+        coroutine_anim.reset();
+        coroutine_anim.start();
 
-        m_ui.addCoroutine(animationCoroutine_);
+        m_ui.addCoroutine(&coroutine_anim);
     }
 
     void onExit() {
-        if (animationCoroutine_) {
-            m_ui.removeCoroutine(animationCoroutine_);
-            animationCoroutine_.reset();
-        }
+        m_ui.removeCoroutine(&coroutine_anim);
         m_ui.setContinousDraw(false);
         m_ui.markFading();
     }

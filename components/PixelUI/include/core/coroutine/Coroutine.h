@@ -6,7 +6,7 @@
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it is useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
@@ -18,6 +18,7 @@
 #pragma once
 
 #include <functional>
+#include <vector>
 #include <memory>
 
 class PixelUI;
@@ -45,18 +46,19 @@ struct CoroutineContext {
 /**
  * @brief definition for the CoroutineFunction type
  */
-using CoroutineFunction = std::function<void(CoroutineContext&, PixelUI&)>;
+using CoroutineFunction = std::function<void(CoroutineContext&)>;
 
 /**
  * @brief Coroutine class
  */
 class Coroutine {
 public:
-    Coroutine(CoroutineFunction func, PixelUI& ui);
+    Coroutine(CoroutineFunction func);
     ~Coroutine() = default;
 
     void start();
     void resume(uint32_t currentTime);
+    void reset(); // <-- 重置方法
     bool isFinished() const { return context_.state == CoroutineState::FINISHED; }
     bool shouldRun(uint32_t currentTime) const;
     
@@ -66,7 +68,6 @@ public:
 private:
     CoroutineFunction function_;
     CoroutineContext context_;
-    PixelUI& ui_;
 };
 
 /**
@@ -76,15 +77,15 @@ class CoroutineScheduler {
 public:
     explicit CoroutineScheduler(PixelUI& ui);
     
-    void addCoroutine(std::shared_ptr<Coroutine> coroutine);
-    void removeCoroutine(std::shared_ptr<Coroutine> coroutine);
+    void addCoroutine(Coroutine* coroutine);
+    void removeCoroutine(Coroutine* coroutine);
     void update(uint32_t currentTime);
     void clear();
     
     size_t getActiveCount() const;
 
 private:
-    std::vector<std::shared_ptr<Coroutine>> coroutines_;
+    std::vector<Coroutine*> coroutines_; 
     PixelUI& ui_;
 };
 
@@ -104,7 +105,6 @@ private:
     (ctx).state = CoroutineState::RUNNING; \
 } while(0)
 
-// (可选但推荐) 同样修复 CORO_WAIT_ANIMATION 宏
 #define CORO_WAIT_ANIMATION(ctx, ui, line) do { \
     (ctx).pc = line; \
     (ctx).state = CoroutineState::SUSPENDED; \

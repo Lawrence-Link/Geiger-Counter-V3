@@ -58,8 +58,8 @@ public:
      */
     void begin();
 
-    void addCoroutine(std::shared_ptr<Coroutine> coroutine);
-    void removeCoroutine(std::shared_ptr<Coroutine> coroutine);
+    void addCoroutine(Coroutine* coroutine);
+    void removeCoroutine(Coroutine* coroutine);
     void clearAllCoroutines() { m_coroutineSchedulerPtr->clear(); }
     
     size_t getActiveCoroutineCount() { return m_coroutineSchedulerPtr->getActiveCount(); }

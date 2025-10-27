@@ -43,7 +43,7 @@ PixelUI::PixelUI(U8G2& u8g2) : u8g2_(u8g2), _currentTime(0) {
  * @brief Add a coroutine to the scheduler
  * @param coroutine Shared pointer to the Coroutine object
  */
-void PixelUI::addCoroutine(std::shared_ptr<Coroutine> coroutine) { 
+void PixelUI::addCoroutine(Coroutine* coroutine) { 
     m_coroutineSchedulerPtr->addCoroutine(coroutine); 
 }
 
@@ -51,7 +51,7 @@ void PixelUI::addCoroutine(std::shared_ptr<Coroutine> coroutine) {
  * @brief Remove a coroutine from the scheduler
  * @param coroutine Shared pointer to the Coroutine object
  */
-void PixelUI::removeCoroutine(std::shared_ptr<Coroutine> coroutine) { 
+void PixelUI::removeCoroutine(Coroutine* coroutine) { 
     m_coroutineSchedulerPtr->removeCoroutine(coroutine); 
 }
 

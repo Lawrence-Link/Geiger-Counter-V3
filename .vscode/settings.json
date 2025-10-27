@@ -5,6 +5,18 @@
   "idf.openOcdConfigs": [
     "board/esp32c6-builtin.cfg"
   ],
+
+  "vim.normalModeKeyBindings": [
+  {
+    "before": ["H"],
+    "after": ["^"]
+  },
+  {
+    "before": ["L"],
+    "after": ["g", "_"]
+  }
+  ],
+
   "idf.port": "/dev/ttyACM0",
   "idf.toolsPath": "/home/lawrence/.espressif",
   "idf.customExtraVars": {

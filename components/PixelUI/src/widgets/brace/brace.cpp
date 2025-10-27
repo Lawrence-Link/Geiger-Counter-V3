@@ -35,6 +35,13 @@ void Brace::onLoad() {
 
     /**< Animate height from 0 to margin_h_ over 600ms */
     m_ui.animate(anim_h, margin_h_, 600, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
+
+    FocusBox fbox;
+    fbox.x = coord_x_ - margin_w_ / 2 + 1;
+    fbox.y = coord_y_ - margin_h_ / 2 + 1;
+    fbox.w = margin_w_ - 1;
+    fbox.h = margin_h_ - 1;
+    setFocusBox(fbox);
 }
 
 /**

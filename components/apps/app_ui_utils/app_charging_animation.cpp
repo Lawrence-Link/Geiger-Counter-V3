@@ -19,28 +19,24 @@ private:
     int32_t lightningOffsetX = 0;
     int batteryPercent = 50;
     bool exit_flag = false;
-    std::shared_ptr<Coroutine> animationCoroutine_;
 
-    void animation_coroutine_body(CoroutineContext& ctx, PixelUI& ui) {
-        CORO_BEGIN(ctx);
-        
-        ui.animate(lightIconSize, 7, 400, EasingType::EASE_IN_CUBIC, PROTECTION::PROTECTED);
-        ui.animate(ringPercent, batteryPercent, 600, EasingType::EASE_OUT_CUBIC);
-        CORO_DELAY(ctx, ui, 1200, 100);
-
-        ui.animate(ringPercent, 0, 600, EasingType::EASE_OUT_CUBIC);
-        CORO_DELAY(ctx, ui, 900, 200);   
-
-        ui.animate(lightningOffsetX, -10, 600, EasingType::EASE_OUT_CUBIC);
-        ui.animate(batteryPercent_anim, batteryPercent, 600, EasingType::EASE_OUT_CUBIC);
-        CORO_DELAY(ctx, ui, 2200, 300); 
-        exit_flag = true;
-        CORO_END(ctx);
-        
-    }
+    Coroutine coroutine_anim;
 
 public:
-    Charge(PixelUI& ui) : m_ui(ui) {}
+    Charge(PixelUI& ui) : m_ui(ui),
+    coroutine_anim([this](CoroutineContext& ctx) {
+        CORO_BEGIN(ctx);
+            m_ui.animate(lightIconSize, 7, 400, EasingType::EASE_IN_CUBIC, PROTECTION::PROTECTED);
+            m_ui.animate(ringPercent, batteryPercent, 600, EasingType::EASE_OUT_CUBIC);
+        CORO_DELAY(ctx, m_ui, 1200, 100);
+            m_ui.animate(ringPercent, 0, 600, EasingType::EASE_OUT_CUBIC);
+        CORO_DELAY(ctx, m_ui, 900, 200);   
+            m_ui.animate(lightningOffsetX, -10, 600, EasingType::EASE_OUT_CUBIC);
+            m_ui.animate(batteryPercent_anim, batteryPercent, 600, EasingType::EASE_OUT_CUBIC);
+        CORO_DELAY(ctx, m_ui, 2200, 300); 
+            exit_flag = true;
+        CORO_END(ctx);
+    }) {}
 
     void draw() override {
         m_ui.markDirty();
@@ -62,10 +58,7 @@ public:
     }
 
     bool handleInput(InputEvent event) override {
-        if (animationCoroutine_) {
-            m_ui.removeCoroutine(animationCoroutine_);
-            animationCoroutine_.reset();
-        }
+        m_ui.removeCoroutine(&coroutine_anim);
         requestExit();
         return true;
     }
@@ -79,12 +72,11 @@ public:
         lightningOffsetX = 0;
         batteryPercent = battery_percentage;
         
-        animationCoroutine_ = std::make_shared<Coroutine>( // add coroutine for the *Amazing* setup animation
-            std::bind(&Charge::animation_coroutine_body, this, std::placeholders::_1, std::placeholders::_2),
-            m_ui
-        );
+        coroutine_anim.reset();
+        coroutine_anim.start();
+
         // register coroutine
-        m_ui.addCoroutine(animationCoroutine_);
+        m_ui.addCoroutine(&coroutine_anim);
 
         m_ui.setContinousDraw(true);
         m_ui.markDirty();
@@ -96,10 +88,7 @@ public:
         m_ui.markFading();
         
         // remove the coroutine instance when exit
-        if (animationCoroutine_) {
-            m_ui.removeCoroutine(animationCoroutine_);
-            animationCoroutine_.reset();
-        }
+        m_ui.removeCoroutine(&coroutine_anim);
     }
 
 private:

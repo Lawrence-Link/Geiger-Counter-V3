@@ -27,28 +27,27 @@ private:
     PixelUI& m_ui;
     Label product_name;
     bool exit_flag = false;
-    std::shared_ptr<Coroutine> animationCoroutine_;
-
-    void animation_coroutine_body(CoroutineContext& ctx, PixelUI& ui) {
-        CORO_BEGIN(ctx);
-        CORO_DELAY(ctx, ui, 160, 100);
-        product_name.onLoad();
-        m_ui.animate(line_width, 97, 1000, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
-        CORO_DELAY(ctx, ui, 1000, 200);
-        exit_flag = true;
-        CORO_END(ctx);
-    }
+    Coroutine coroutine_anim;
     int32_t line_width = 0;
 
 public:
-    App_Boot(PixelUI& ui):m_ui(ui), product_name(ui, 16, 36, "Geiger Counter N1", POS::BOTTOM) {};
+    App_Boot(PixelUI& ui):m_ui(ui), product_name(ui, 16, 36, "Geiger Counter N1", POS::BOTTOM),
+    coroutine_anim([this](CoroutineContext& ctx) {
+        CORO_BEGIN(ctx);
+        CORO_DELAY(ctx, m_ui, 160, 100);
+        product_name.onLoad();
+        m_ui.animate(line_width, 97, 1000, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
+        CORO_DELAY(ctx, m_ui, 1000, 200);
+        exit_flag = true;
+        CORO_END(ctx);
+    }) {};
     void draw() override {
         m_ui.markDirty();
         U8G2& u8g2 = m_ui.getU8G2();
         product_name.draw();
         u8g2.drawHLine(14, 40, line_width);
         u8g2.setFont(u8g2_font_wqy12_t_gb2312);
-        // u8g2.drawUTF8(1, 63, "SE: 核子Nucleon");
+        // u8g2.drawUTF8(1, 63, "");
         if (exit_flag) { requestExit(); }   
     }
 
@@ -62,26 +61,23 @@ public:
         m_ui.setContinousDraw(true);
         m_ui.markDirty(); 
 
-        animationCoroutine_ = std::make_shared<Coroutine>( // add coroutine for the *Amazing* setup animation
-            std::bind(&App_Boot::animation_coroutine_body, this, std::placeholders::_1, std::placeholders::_2),
-            m_ui
-        );
+        coroutine_anim.reset();
+        coroutine_anim.start();
         // register coroutine
-        m_ui.addCoroutine(animationCoroutine_);
+        m_ui.addCoroutine(&coroutine_anim);
     }
 
     void onExit() {
         m_ui.setContinousDraw(false);
         m_ui.clearAllAnimations();
         m_ui.markFading();
-        if (animationCoroutine_) {
-            m_ui.removeCoroutine(animationCoroutine_);
-            animationCoroutine_.reset();
-        }
+        m_ui.removeCoroutine(&coroutine_anim);
     }
 };
 
 AppItem boot_app{
+    .title = nullptr,
+    .bitmap = nullptr,
     .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
         return std::make_unique<App_Boot>(ui); 
     },
