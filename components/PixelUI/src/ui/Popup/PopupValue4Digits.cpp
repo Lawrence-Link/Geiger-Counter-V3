@@ -96,11 +96,19 @@ void PopupValue4Digits::drawContent(int16_t centerX, int16_t centerY, int16_t cu
         u8g2.drawUTF8(centerX - titleWidth / 2, centerY - 7, _title);
     }
 
+    int16_t rectX = centerX - currentWidth / 2;
+    int16_t rectY = centerY - currentHeight / 2;
+
     // Draw the four numeric widgets
+    setupClipWindow(rectX, rectY, currentWidth, currentHeight);
     num_thousands.draw();
+    setupClipWindow(rectX, rectY, currentWidth, currentHeight);
     num_hundreds.draw();
+    setupClipWindow(rectX, rectY, currentWidth, currentHeight);
     num_tens.draw();
+    setupClipWindow(rectX, rectY, currentWidth, currentHeight);
     num_ones.draw();
+    setupClipWindow(rectX, rectY, currentWidth, currentHeight);
 
     // Draw focus highlight via FocusManager
     m_focusMan.draw();
