@@ -54,9 +54,9 @@ public:
     AppEnvironment(PixelUI& ui) : 
     m_ui(ui), 
     focusMan(m_ui), 
-    chart_temp(m_ui, 99, 11, 56, 19), 
-    chart_humi(m_ui, 99, 32, 56, 19), 
-    chart_baro(m_ui, 99, 54, 56, 19),
+    chart_temp(m_ui, 71, 2, 56, 19), 
+    chart_humi(m_ui, 71, 23, 56, 19), 
+    chart_baro(m_ui, 71, 44, 56, 19),
     coroutine_anim([this](CoroutineContext& ctx) 
     {
         CORO_BEGIN(ctx);
