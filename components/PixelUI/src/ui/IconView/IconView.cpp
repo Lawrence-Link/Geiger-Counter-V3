@@ -50,6 +50,8 @@ void IconView::onEnter(ExitCallback exitCallback) {
 void IconView::onResume() {
     animation_scroll_bar = 0;
     scrollOffset_ -= 50;
+    animation_selector_length = 30;
+    animation_pixel_dots = 0;
     ui_.animate(animation_pixel_dots, 63, 300, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
     updateProgressBar();
     scrollToIndex(currentIndex_);
