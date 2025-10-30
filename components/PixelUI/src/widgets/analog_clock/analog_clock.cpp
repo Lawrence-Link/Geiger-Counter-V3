@@ -23,7 +23,12 @@
  * 
  * @param ui Reference to the PixelUI instance
  */
-Clock::Clock(PixelUI& ui) : m_ui(ui) {
+Clock::Clock(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t radius) : 
+    m_ui(ui),
+    m_x(pos_x),
+    m_y(pos_y),
+    m_radius(radius)
+{
     setFocusable(false); /**< Clock is display-only, cannot be focused */
 }
 

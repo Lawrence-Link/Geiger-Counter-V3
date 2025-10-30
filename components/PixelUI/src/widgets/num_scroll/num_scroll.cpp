@@ -24,7 +24,13 @@
  * @brief Constructor for NumScroll widget.
  * @param ui Reference to PixelUI instance for rendering and animation.
  */
-NumScroll::NumScroll(PixelUI& ui) : m_ui(ui) {
+NumScroll::NumScroll(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h) : 
+    m_ui(ui),
+    m_x(x),
+    m_y(y),
+    m_w(w),
+    m_h(h)
+ {
     setFocusable(true);
 }
 
@@ -42,13 +48,13 @@ void NumScroll::onLoad() {
     FocusBox box;
     box.x = m_x + 1;
     box.y = m_y + 1;
-    box.w = m_margin_w - 2;
-    box.h = m_margin_h - 2;
+    box.w = m_w - 2;
+    box.h = m_h - 2;
     setFocusBox(box);
 
     // Animate size from 0 to margin size
     m_ui.animate(anim_w, anim_h,
-                 m_margin_w, m_margin_h,
+                 m_w, m_h,
                  200, EasingType::EASE_OUT_CUBIC,
                  PROTECTION::PROTECTED);
 }
@@ -66,13 +72,13 @@ void NumScroll::onLoadNoAnim() {
     FocusBox box;
     box.x = m_x + 1;
     box.y = m_y + 1;
-    box.w = m_margin_w - 2;
-    box.h = m_margin_h - 2;
+    box.w = m_w - 2;
+    box.h = m_h - 2;
     setFocusBox(box);
 
     // Set final size immediately
-    anim_w = m_margin_w;
-    anim_h = m_margin_h;
+    anim_w = m_w;
+    anim_h = m_h;
 }
 
 /**
@@ -136,8 +142,8 @@ void NumScroll::draw() {
     U8G2& u8g2 = m_ui.getU8G2();
 
     // Compute animated drawing area (centered)
-    int32_t draw_x = m_x + (m_margin_w - anim_w) / 2;
-    int32_t draw_y = m_y + (m_margin_h - anim_h) / 2;
+    int32_t draw_x = m_x + (m_w - anim_w) / 2;
+    int32_t draw_y = m_y + (m_h - anim_h) / 2;
     int center_x = draw_x + anim_w / 2;
     int center_y = draw_y + anim_h / 2;
 

@@ -36,9 +36,12 @@ PopupValue4Digits::PopupValue4Digits(PixelUI& ui, uint16_t width, uint16_t heigh
                                      std::function<void(int32_t value)> cb_function)
     : PopupBase(ui, width, height, priority, duration),  // Base class constructor
       _value(value), _title(title), 
-      num_thousands(ui), num_hundreds(ui), num_tens(ui), num_ones(ui), // Stack-based numeric widgets
-      m_focusMan(ui),  // FocusManager handles focus switching
-      m_cb(cb_function) // Optional callback function
+    num_thousands(ui, 0, 0, 0, 0),
+    num_hundreds(ui, 0, 0, 0, 0), 
+    num_tens(ui, 0, 0, 0, 0), 
+    num_ones(ui, 0, 0, 0, 0), // Stack-based numeric widgets
+    m_focusMan(ui),  // FocusManager handles focus switching
+    m_cb(cb_function) // Optional callback function
 {
     m_ui.setContinousDraw(true); // Continuous drawing to avoid flicker
     U8G2& u8g2 = m_ui.getU8G2();

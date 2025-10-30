@@ -23,12 +23,13 @@ class IconButton : public IWidget {
 private:
     const unsigned char* src;
     std::function<void()> m_callback;
-    int32_t m_x = 0, m_y = 0, m_w = 0, m_h = 0;
+    
     PixelUI& m_ui;
+    int32_t pos_x = 0, pos_y = 0, m_w = 0, m_h = 0;
 
     int32_t anim_x = 0, anim_y = 0;
 public:
-    IconButton(PixelUI& ui);
+    IconButton(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
     ~IconButton() = default;
     void onLoad() override;
     void onOffload() override;
@@ -36,7 +37,7 @@ public:
     void draw() override;
 
     void setCallback(std::function<void()> cb) {m_callback = cb;}
-    void setPosition(uint16_t x, uint16_t y) {m_x = x; m_y = y;};
+    void setPosition(uint16_t x, uint16_t y) {pos_x = x; pos_y = y;};
     void setSize(uint16_t w, uint16_t h) {m_w = w; m_h = h;}
     void setSource(const unsigned char* source) {src = source;};
 };

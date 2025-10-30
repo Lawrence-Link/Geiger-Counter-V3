@@ -235,12 +235,12 @@ private:
 public:
     APP_COUNTER(PixelUI& ui) : 
     m_ui(ui), 
-    histogram(ui), 
-    brace(ui), 
+    histogram(ui, 69, 45, 56, 18), 
+    brace(ui, 3, 45, 56, 18), 
     m_focusMan(ui), 
-    icon_battery(ui),
-    icon_sounding(ui),
-    icon_alarm(ui),
+    icon_battery(ui, 12, 2, 10, 6),
+    icon_sounding(ui, 26, 1, 7, 7),
+    icon_alarm(ui, 37, 1, 7, 7),
     blinker_description_bar(ui, 100),
     blinker_calibration_icon(ui, 100),
     coroutine_anim([this](CoroutineContext& ctx) 
@@ -289,42 +289,26 @@ public:
         pcf8563_get_time(pcf8563_dev, &timeinfo, &tm_valid);
         
         // Initialize and configure widgets
-        // HISTOGRAM
-        histogram.setPosition(97,54);
-        histogram.setSize(56,18);
-        // histogram.setFocusBox(FocusBox(70,46,55,17));
+
         histogram.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 76, 63);
         
-        // BRACE 
-        brace.setPosition(31,54);
-        // brace.setFocusBox(FocusBox(4, 46, 55, 17));
-        brace.setSize(56,18);
-        // Set a lambda function to draw the brace content (Max value)
         brace.setDrawContentFunction([this]() { braceContent(); });
-        brace.setCallback([this](){braceCallback();});
-        
-        // 初始化 Brace 页面状态
-        currentBracePage = BracePage::MAX;
+        brace.setCallback([this](){braceCallback(); });
+                currentBracePage = BracePage::MAX;
         targetBracePage = BracePage::MAX;
         anim_brace_y = 0;
         brace_animating = false;
         
         // ICON: Battery
         icon_battery.setSource(image_BAT_75_bits);
-        icon_battery.setSize(10, 6);
-        icon_battery.setPosition(12, 2);
         
         // ICON: Sounding
         if (en_click) icon_sounding.setSource(image_SOUND_ON_bits);
         else          icon_sounding.setSource(image_SOUND_OFF_bits);
-        icon_sounding.setSize(7, 7);
-        icon_sounding.setPosition(26, 1);
         
         // ICON: Alarm
         if (en_dosage_alert) icon_alarm.setSource(image_BELL_bits);
         else                 icon_alarm.setSource(image_BELL_OFF_bits);
-        icon_alarm.setSize(7, 7);
-        icon_alarm.setPosition(36, 1);
         
         // Add widgets to focus manager for navigation
         m_focusMan.addWidget(&brace);

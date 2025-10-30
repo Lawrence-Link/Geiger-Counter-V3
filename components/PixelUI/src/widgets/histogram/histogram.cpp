@@ -18,37 +18,57 @@
 #include "widgets/histogram/histogram.h"
 #include <cmath>
 #include <algorithm>
+#include <limits> // Added for std::numeric_limits
 
 /**
  * @brief Constructor for Histogram widget.
  * @param ui Reference to the PixelUI instance for rendering and animation.
- * @param coord_x X coordinate of the widget center.
- * @param coord_y Y coordinate of the widget center.
+ * @param pos_x X coordinate of the widget's top-left corner.
+ * @param pos_y Y coordinate of the widget's top-left corner.
  */
-Histogram::Histogram(PixelUI& ui, uint16_t coord_x, uint16_t coord_y) 
-    : m_ui(ui), coord_x_(coord_x), coord_y_(coord_y) 
+Histogram::Histogram(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t size_w, uint16_t size_h) : 
+    m_ui(ui), 
+    pos_x_(pos_x), 
+    pos_y_(pos_y),
+    size_w_(size_w),
+    size_h_(size_h)
 {
-    // Constructor does not automatically initialize animation or data buffer
+    // pos_x_ and pos_y_ now represent the top-left anchor point.
+    int32_t start_anim_x = (size_w_ / 2);
+    int32_t start_anim_y = (size_h_ / 2);
+
+    anim_w = 4; 
+    anim_h = 4;
+
+    anim_x = start_anim_x;
+    anim_y = start_anim_y;
 }
 
 /**
  * @brief Initialize widget when loaded. Sets up animations, focus, and internal buffer.
  */
 void Histogram::onLoad() {
-    // Reset animation offsets
-    anim_x = 0;
-    anim_y = 0;
+    int32_t start_anim_x = (size_w_ / 2);
+    int32_t start_anim_y = (size_h_ / 2);
 
-    // Animate size from zero to margin size
-    m_ui.animate(anim_w, margin_w_, 550, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
-    m_ui.animate(anim_h, margin_h_, 600, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
+    anim_w = 0; 
+    anim_h = 0;
 
-    // Set focus box slightly smaller than margin for visual highlighting
+    anim_x = start_anim_x;
+    anim_y = start_anim_y;
+
+    m_ui.animate(anim_w, size_w_, 550, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
+    m_ui.animate(anim_h, size_h_, 600, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
+
+    m_ui.animate(anim_x, 0, 550, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
+    m_ui.animate(anim_y, 0, 600, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
+    
+    // ---------------------------------
     FocusBox fbox;
-    fbox.x = coord_x_ - margin_w_ / 2 + 1;
-    fbox.y = coord_y_ - margin_h_ / 2 + 1;
-    fbox.w = margin_w_ - 1;
-    fbox.h = margin_h_ - 1;
+    fbox.x = pos_x_ + 1; // Top-Left X + 1
+    fbox.y = pos_y_ + 1; // Top-Left Y + 1
+    fbox.w = size_w_ - 1;
+    fbox.h = size_h_ - 1;
     setFocusBox(fbox);
 
     // Initialize the internal data buffer
@@ -61,7 +81,12 @@ void Histogram::onLoad() {
 void Histogram::initializeDataBuffer() {
     // Allocate buffer based on expanded width or default size
     m_buffer_size = exp_w > 0 ? exp_w : 200;
-    m_data_buffer = new float[m_buffer_size];
+    
+    // Check if buffer already exists before allocating
+    // if (m_data_buffer != nullptr) {
+    //     delete[] m_data_buffer;
+    // }
+    m_data_buffer = std::make_unique<float[]> (m_buffer_size);
 
     // Clear buffer
     for (int i = 0; i < m_buffer_size; ++i) {
@@ -80,10 +105,7 @@ void Histogram::initializeDataBuffer() {
  * @brief Free resources when widget is offloaded.
  */
 void Histogram::onOffload() {
-    if (m_data_buffer != nullptr) {
-        delete[] m_data_buffer;
-        m_data_buffer = nullptr;
-    }
+    
 }
 
 /**
@@ -125,13 +147,16 @@ void Histogram::updateStatistics(float new_value, float old_value, bool replacin
         // Buffer not full, simple update
         m_sum_value += new_value;
         m_max_value = std::max(m_max_value, new_value);
-        m_min_value = std::min(m_min_value, new_value);
+        // Only update min if a valid (non-max) value is added or if min is still at its maximum possible value
+        if (m_min_value == std::numeric_limits<float>::max() || new_value < m_min_value) {
+            m_min_value = new_value;
+        }
     } else {
         // Replace existing value
         m_sum_value = m_sum_value - old_value + new_value;
 
-        // Recalculate extremes if old value was max or min
-        if (old_value == m_max_value || old_value == m_min_value) {
+        // Recalculate extremes if old value was max or min (recalculating min if old_value was the placeholder max is safer)
+        if (old_value == m_max_value || old_value == m_min_value || m_min_value == std::numeric_limits<float>::max()) {
             recalculateExtremes();
         } else {
             m_max_value = std::max(m_max_value, new_value);
@@ -146,7 +171,8 @@ void Histogram::updateStatistics(float new_value, float old_value, bool replacin
 void Histogram::recalculateExtremes() {
     if (m_data_count == 0) {
         m_max_value = 0.0f;
-        m_min_value = 0.0f;
+        m_min_value = std::numeric_limits<float>::max(); // Reset min to max
+        m_sum_value = 0.0f;
         return;
     }
 
@@ -180,9 +206,10 @@ float Histogram::getAverageValue() const {
 
 /**
  * @brief Get the minimum value in the histogram.
- * @return Minimum float value in buffer.
+ * @return Minimum float value in buffer (or 0.0f if empty).
  */
 float Histogram::getMinValue() const {
+    if (m_data_count == 0) return 0.0f;
     return m_min_value;
 }
 
@@ -241,6 +268,7 @@ void Histogram::expandWidget() {
 
     m_ui.animate(anim_w, exp_w, 400, EasingType::EASE_OUT_QUAD);
     m_ui.animate(anim_h, exp_h, 350, EasingType::EASE_OUT_QUAD);
+    // Animate the Top-Left position to the calculated target offsets
     m_ui.animate(anim_x, target_x, 400, EasingType::EASE_OUT_QUAD);
     m_ui.animate(anim_y, target_y, 350, EasingType::EASE_OUT_QUAD);
 }
@@ -249,37 +277,43 @@ void Histogram::expandWidget() {
  * @brief Animate widget contraction back to original size and position.
  */
 void Histogram::contractWidget() {
-    m_ui.animate(anim_w, margin_w_, 350, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
-    m_ui.animate(anim_h, margin_h_, 400, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
+    m_ui.animate(anim_w, size_w_, 350, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
+    m_ui.animate(anim_h, size_h_, 400, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
+    // Animate the Top-Left position back to (0, 0) offset
     m_ui.animate(anim_x, 0, 350, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
     m_ui.animate(anim_y, 0, 400, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
 }
 
 /**
  * @brief Calculate target animation offsets for expansion based on the base corner.
+ * The offsets (anim_x, anim_y) are applied to the top-left corner (pos_x_, pos_y_).
  * @param target_x Output target x offset.
  * @param target_y Output target y offset.
  */
 void Histogram::calculateExpandPosition(int32_t& target_x, int32_t& target_y) {
-    int32_t width_diff = exp_w - margin_w_;
-    int32_t height_diff = exp_h - margin_h_;
+    int32_t width_diff = exp_w - size_w_;
+    int32_t height_diff = exp_h - size_h_;
 
     switch (base_) {
         case EXPAND_BASE::TOP_LEFT:
-            target_x = width_diff / 2;
-            target_y = height_diff / 2;
+            // Top-Left corner (pos_x_ + anim_x) should stay fixed at pos_x_
+            target_x = 0;
+            target_y = 0;
             break;
         case EXPAND_BASE::TOP_RIGHT:
-            target_x = -width_diff / 2;
-            target_y = height_diff / 2;
+            // Top-Right corner (pos_x_ + anim_x + anim_w) should stay fixed
+            target_x = -width_diff;
+            target_y = 0;
             break;
         case EXPAND_BASE::BOTTOM_LEFT:
-            target_x = width_diff / 2;
-            target_y = -height_diff / 2;
+            // Bottom-Left corner (pos_y_ + anim_y + anim_h) should stay fixed
+            target_x = 0;
+            target_y = -height_diff;
             break;
         case EXPAND_BASE::BOTTOM_RIGHT:
-            target_x = -width_diff / 2;
-            target_y = -height_diff / 2;
+            // Bottom-Right corner should stay fixed
+            target_x = -width_diff;
+            target_y = -height_diff;
             break;
     }
 }
@@ -289,59 +323,68 @@ void Histogram::calculateExpandPosition(int32_t& target_x, int32_t& target_y) {
  */
 void Histogram::draw() {
     U8G2& u8g2 = m_ui.getU8G2();
-    int current_x = coord_x_ + anim_x;
-    int current_y = coord_y_ + anim_y;
-    int half_width = anim_w / 2;
-    int half_height = anim_h / 2;
+    
+    // tl_x and tl_y are the animated top-left corner coordinates
+    int tl_x = pos_x_ + anim_x; 
+    int tl_y = pos_y_ + anim_y; 
+    int current_w = anim_w;
+    int current_h = anim_h;
 
-    // Clear background area
+    // Clear background area (relative to top-left)
     u8g2.setDrawColor(0);
-    u8g2.drawBox(current_x - half_width + 2, current_y - half_height, 2 * half_width - 4, 2 * half_height);
+    u8g2.drawBox(tl_x + 2, tl_y, current_w - 4, current_h);
     u8g2.setDrawColor(1);
 
-    // Draw border corners
-    u8g2.drawLine(current_x - half_width, current_y - half_height, current_x - half_width + 4, current_y - half_height);
-    u8g2.drawLine(current_x - half_width, current_y - half_height, current_x - half_width, current_y - half_height + 4);
-    u8g2.drawLine(current_x + half_width, current_y - half_height, current_x + half_width - 4, current_y - half_height);
-    u8g2.drawLine(current_x + half_width, current_y - half_height, current_x + half_width, current_y + half_height + 4);
-    u8g2.drawLine(current_x - half_width, current_y + half_height, current_x - half_width + 4, current_y + half_height);
-    u8g2.drawLine(current_x - half_width, current_y + half_height, current_x - half_width, current_y + half_height - 4);
-    u8g2.drawLine(current_x + half_width, current_y + half_height, current_x + half_width - 4, current_y + half_height);
-    u8g2.drawLine(current_x + half_width, current_y + half_height, current_x + half_width, current_y + half_height - 4);
+    // --- Draw border corners ---
+    // Top-Left: (tl_x, tl_y)
+    u8g2.drawLine(tl_x, tl_y, tl_x + 4, tl_y);
+    u8g2.drawLine(tl_x, tl_y, tl_x, tl_y + 4);
+    
+    // Top-Right: (tl_x + current_w, tl_y)
+    u8g2.drawLine(tl_x + current_w, tl_y, tl_x + current_w - 4, tl_y);
+    u8g2.drawLine(tl_x + current_w, tl_y, tl_x + current_w, tl_y + 4); 
+
+    // Bottom-Left: (tl_x, tl_y + current_h)
+    u8g2.drawLine(tl_x, tl_y + current_h, tl_x + 4, tl_y + current_h);
+    u8g2.drawLine(tl_x, tl_y + current_h, tl_x, tl_y + current_h - 4);
+    
+    // Bottom-Right: (tl_x + current_w, tl_y + current_h)
+    u8g2.drawLine(tl_x + current_w, tl_y + current_h, tl_x + current_w - 4, tl_y + current_h);
+    u8g2.drawLine(tl_x + current_w, tl_y + current_h, tl_x + current_w, tl_y + current_h - 4);
 
     // Draw vertical borders
-    u8g2.drawLine(current_x - half_width, current_y - half_height, current_x - half_width, current_y + half_height);
-    u8g2.drawLine(current_x - half_width + 1, current_y - half_height, current_x - half_width + 1, current_y + half_height);
-    u8g2.drawLine(current_x + half_width, current_y - half_height, current_x + half_width, current_y + half_height);
-    u8g2.drawLine(current_x + half_width - 1, current_y - half_height, current_x + half_width - 1, current_y + half_height);
+    u8g2.drawLine(tl_x, tl_y, tl_x, tl_y + current_h);
+    u8g2.drawLine(tl_x + 1, tl_y, tl_x + 1, tl_y + current_h);
+    u8g2.drawLine(tl_x + current_w, tl_y, tl_x + current_w, tl_y + current_h);
+    u8g2.drawLine(tl_x + current_w - 1, tl_y, tl_x + current_w - 1, tl_y + current_h);
 
-    // Draw histogram bars
-    drawHistogramData(current_x, current_y, half_width, half_height, u8g2);
+    // Draw histogram bars, passing top-left coordinates, current width, and height
+    drawHistogramData(tl_x, tl_y, current_w, current_h, u8g2);
 
-    // Draw label
+    // Draw label (positioned relative to the top-right corner)
     u8g2.setFont(u8g2_font_4x6_tr);
-    u8g2.drawStr(current_x + half_width - 19, current_y - half_height + 7, "Hist");
+    u8g2.drawStr(tl_x + current_w - 19, tl_y + 7, "Hist");
 }
 
 /**
  * @brief Draw the bars representing histogram data.
- * @param center_x Widget center x coordinate.
- * @param center_y Widget center y coordinate.
- * @param half_width Half of widget width.
- * @param half_height Half of widget height.
+ * @param tl_x Widget top-left x coordinate.
+ * @param tl_y Widget top-left y coordinate.
+ * @param width Current width of the widget.
+ * @param height Current height of the widget.
  * @param u8g2 Reference to U8G2 for drawing.
  */
-void Histogram::drawHistogramData(int center_x, int center_y, int half_width, int half_height, U8G2& u8g2) {
+void Histogram::drawHistogramData(int tl_x, int tl_y, int width, int height, U8G2& u8g2) {
     if (m_data_buffer == nullptr || m_data_count == 0 || m_max_value <= 0.0f) {
         return;
     }
 
     // Determine number of points to draw based on widget width
-    int points_to_draw = std::min(static_cast<int>(anim_w), static_cast<int>(m_data_count));
+    int points_to_draw = std::min(static_cast<int>(width), static_cast<int>(m_data_count));
     if (points_to_draw <= 0) return;
 
-    // Compute scale factor for normalizing bar heights
-    float scale_factor = static_cast<float>(anim_h - 4) / m_max_value;
+    // Compute scale factor for normalizing bar heights (height - 4 to account for border/padding)
+    float scale_factor = static_cast<float>(height - 4) / m_max_value;
 
     // Draw bars from right (newest) to left (oldest)
     for (int i = 0; i < points_to_draw; ++i) {
@@ -353,10 +396,15 @@ void Histogram::drawHistogramData(int center_x, int center_y, int half_width, in
         float value = m_data_buffer[data_index];
         int bar_height = static_cast<int>(value * scale_factor);
 
-        int x_pos = center_x + half_width - 2 - i;
-        if (x_pos < center_x - half_width + 2) break;
+        // X position: Right Edge - 2 pixels of padding - i
+        int x_pos = tl_x + width - 2 - i;
+        
+        // Break if we run off the left side of the widget content area (tl_x + 2)
+        if (x_pos < tl_x + 2) break;
 
-        int y_bottom = center_y + half_height - 1;
+        // Y Bottom: Bottom Edge - 1 pixel of padding
+        int y_bottom = tl_y + height - 1;
+        // Y Top: Bottom - bar_height
         int y_top = y_bottom - bar_height;
 
         if (bar_height > 0) {

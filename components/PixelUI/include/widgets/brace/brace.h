@@ -22,7 +22,7 @@
 class Brace : public IWidget {
 
 public:
-    Brace(PixelUI& ui);
+    Brace(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t size_w, uint16_t size_h);
     ~Brace() = default;
 
     void onLoad() override;
@@ -31,14 +31,14 @@ public:
     bool onSelect() override { if (m_callback) m_callback(); return false;}
 
     void setCallback(std::function<void()> cb) { m_callback = cb; };
-    void setSize(uint16_t mar_w, uint16_t mar_h) {margin_w_ = mar_w; margin_h_ = mar_h;}
-    void setPosition(uint16_t coord_x, uint16_t coord_y) {coord_x_ = coord_x; coord_y_=coord_y;}
+    void setSize(uint16_t mar_w, uint16_t mar_h) {size_h_ = mar_w; size_h_ = mar_h;}
+    void setPosition(int16_t pos_x, int16_t pos_y) {pos_x_ = pos_x; pos_y_=pos_y;}
     void setDrawContentFunction(std::function<void()> func) { contentWithinBrace = func; }
     
 private:
-    uint16_t coord_x_ = 0, coord_y_ = 0;
-    uint16_t margin_w_ = 0, margin_h_ = 0;
     PixelUI& m_ui;
+    int16_t pos_x_ = 0, pos_y_ = 0;
+    int16_t size_w_ = 0, size_h_ = 0;
 
     std::function<void()> contentWithinBrace;
     std::function<void()> m_callback = nullptr;

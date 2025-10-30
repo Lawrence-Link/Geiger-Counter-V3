@@ -21,7 +21,15 @@
  * @brief Constructor for TextButton widget.
  * @param ui Reference to PixelUI instance for rendering and animation.
  */
-TextButton::TextButton(PixelUI& ui) : m_ui(ui) { }
+TextButton::TextButton(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h) : 
+    m_ui(ui),
+    m_x(x),
+    m_y(y),
+    m_w(w),
+    m_h(h)
+{
+
+}
 
 /**
  * @brief Initialize the widget with animation from the center.

@@ -21,18 +21,26 @@
  * @brief Constructor for IconButton widget.
  * @param ui Reference to the PixelUI instance for rendering and animation.
  */
-IconButton::IconButton(PixelUI& ui) : m_ui(ui) {}
+IconButton::IconButton(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h) : 
+    m_ui(ui),
+    pos_x(x),
+    pos_y(y),
+    m_w(w),
+    m_h(h)
+{
+    
+}
 
 /**
  * @brief Initialize the widget when loaded. Sets initial animation offsets.
  */
 void IconButton::onLoad() {
     // Set initial animated position slightly above the target y
-    anim_x = m_x;
-    anim_y = m_y - 10;
+    anim_x = pos_x;
+    anim_y = pos_y - 10;
 
     // Animate Y position to slide down into final position
-    m_ui.animate(anim_y, m_y, 100, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
+    m_ui.animate(anim_y, pos_y, 100, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
 }
 
 /**

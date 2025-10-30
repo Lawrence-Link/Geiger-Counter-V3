@@ -28,7 +28,7 @@ enum class EXPAND_BASE {
 
 class Histogram : public IWidget {
 public:
-    Histogram(PixelUI& ui, uint16_t coord_x = 0, uint16_t coord_y = 0);
+    Histogram(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t size_w, uint16_t size_h);
     ~Histogram() = default;
 
     void onLoad() override;
@@ -37,8 +37,8 @@ public:
     bool onSelect() override;
     bool handleEvent(InputEvent event) override;
 
-    void setSize(uint16_t mar_w, uint16_t mar_h) { margin_w_ = mar_w; margin_h_ = mar_h; }
-    void setPosition(uint16_t coord_x, uint16_t coord_y) { coord_x_ = coord_x; coord_y_ = coord_y; }
+    void setSize(uint16_t mar_w, uint16_t mar_h) { size_w_ = mar_w; size_h_ = mar_h; }
+    void setPosition(uint16_t pos_x, uint16_t pos_y) { pos_x_ = pos_x; pos_y_ = pos_y; }
     void setExpand(EXPAND_BASE base, uint16_t w, uint16_t h) {base_ = base; exp_w = w; exp_h = h;}
 
     bool isExpanded() const { return is_expanded; }
@@ -52,13 +52,13 @@ public:
 private:
     PixelUI& m_ui;
 
-    uint16_t coord_x_ = 0, coord_y_ = 0;
-    uint16_t margin_w_ = 0, margin_h_ = 0;
+    uint16_t pos_x_ = 0, pos_y_ = 0;
+    uint16_t size_w_ = 0, size_h_ = 0;
     uint16_t exp_w = 0, exp_h = 0;
     EXPAND_BASE base_;
 
     // Internal data buffer for real-time data streaming
-    float* m_data_buffer = nullptr;
+    std::unique_ptr<float[]> m_data_buffer;
     int m_buffer_size = 0;
     int m_write_index = 0;
     int m_data_count = 0;

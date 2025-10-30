@@ -22,7 +22,7 @@
  */
 class Clock : public IWidget {
 public:
-    Clock(PixelUI& ui);
+    Clock(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t radius);
     ~Clock() = default;
 
     void onLoad() override;

@@ -24,16 +24,17 @@ private:
     const char* src = nullptr;                 // Button text
     std::function<void()> m_callback;          // Callback when selected
 
+    PixelUI& m_ui;
+
     int32_t m_x = 0, m_y = 0;                  // Position of the button
-    int32_t m_w = 0, m_h = 0;                  // Size of the button
-    PixelUI& m_ui;                             // Reference to the UI manager
+    int32_t m_w = 0, m_h = 0;                  // Size of the button                       // Reference to the UI manager
 
     // Animation values
     int32_t anim_w = 0, anim_h = 0;           // Animated width/height
     int32_t anim_x = 0, anim_y = 0;           // Animated position
 
 public:
-    explicit TextButton(PixelUI& ui);
+    TextButton(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
     ~TextButton() override = default;
 
     // IWidget overrides

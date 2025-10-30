@@ -22,7 +22,7 @@
  */
 class NumScroll : public IWidget {
 public:
-    NumScroll(PixelUI& ui);
+    NumScroll(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
     ~NumScroll() = default;
 
     void onLoad() override;
@@ -40,7 +40,7 @@ public:
     int32_t getValue() const { return m_current_value; }
 
     void setFixedIntDigits(uint8_t digits) { m_fixed_digits = digits; }
-    void setSize(uint16_t w, uint16_t h) { m_margin_w = w; m_margin_h = h; }
+    void setSize(uint16_t w, uint16_t h) { m_w = w; m_h = h; }
 
 private:
     private:
@@ -49,8 +49,8 @@ private:
     uint16_t m_x = 0;
     uint16_t m_y = 0;
 
-    uint16_t m_margin_w = 24;
-    uint16_t m_margin_h = 16;
+    uint16_t m_w = 24;
+    uint16_t m_h = 16;
 
     int32_t m_current_value = 0;
     int32_t m_min_value = 0;
