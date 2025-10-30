@@ -71,8 +71,9 @@ public:
         m_ui.animate(anim_img_barometer_x, 0, 320, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
         CORO_END(ctx);
     })
+    {
 
-    {}
+    }
 
     void onEnter(ExitCallback cb) override {
         IApplication::onEnter(cb);
