@@ -24,6 +24,7 @@
 #include "ui/Popup/PopupInfo.h"
 #include "ui/Popup/PopupValue4Digits.h"
 #include "core/coroutine/Coroutine.h"
+#include "focus/focus.h"
 #include <cinttypes>
 
 /**
@@ -37,6 +38,7 @@ PixelUI::PixelUI(U8G2& u8g2) : u8g2_(u8g2), _currentTime(0) {
     m_animationManagerPtr = std::make_shared<AnimationManager>();
     m_popupManagerPtr = std::make_shared<PopupManager>(*this);
     m_coroutineSchedulerPtr = std::make_shared<CoroutineScheduler>(*this);
+    m_focusManagerPtr = std::make_shared<FocusManager>(*this);
 }
 
 /**
@@ -70,9 +72,7 @@ void PixelUI::begin() { }
  */
 void PixelUI::Heartbeat(uint32_t ms) {
     _currentTime += ms;
-    m_animationManagerPtr->update(_currentTime);
-    m_popupManagerPtr->updatePopups(_currentTime);
-    m_coroutineSchedulerPtr->update(_currentTime);
+    update_symbol_.store(1);
 }
 
 /**
@@ -89,6 +89,7 @@ void PixelUI::addAnimation(std::shared_ptr<Animation> animation) {
  */
 void PixelUI::animate(int32_t& value, int32_t targetValue, uint32_t duration,
                       EasingType easing, PROTECTION prot) {
+
     auto animation = std::make_shared<CallbackAnimation>(
         value, targetValue, duration, easing,
         [&value](int32_t currentValue) { value = currentValue; }
@@ -102,6 +103,7 @@ void PixelUI::animate(int32_t& value, int32_t targetValue, uint32_t duration,
  */
 void PixelUI::animate(int32_t& x, int32_t& y, int32_t targetX, int32_t targetY,
                       uint32_t duration, EasingType easing, PROTECTION prot) {
+
     auto animX = std::make_shared<CallbackAnimation>(x, targetX, duration, easing, [&x](int32_t val) { x = val; });
     auto animY = std::make_shared<CallbackAnimation>(y, targetY, duration, easing, [&y](int32_t val) { y = val; });
     addAnimation(animX);
@@ -111,6 +113,31 @@ void PixelUI::animate(int32_t& x, int32_t& y, int32_t targetX, int32_t targetY,
         m_animationManagerPtr->markProtected(animY);
     }
 }
+/**
+ * @brief Add a widget to the FocusManager
+ * @param w Pointer to the widget to add
+ */
+void PixelUI::addWidgetToFocusManager(IWidget* w) {
+    m_focusManagerPtr->addWidget(w);
+}
+/**
+ * @brief Clear all widgets from the FocusManager
+ */
+void PixelUI::clearFocusManager() {
+    m_focusManagerPtr->m_Widgets.clear();
+    m_focusManagerPtr->resetState();
+}
+/**
+ * @brief Handle input event
+ * @param event InputEvent to handle
+ *
+ * Passes the input event to the FocusManager and the registered input callback.
+ */
+
+void PixelUI::handleInput(InputEvent event) {
+    if (m_focusManagerPtr) m_focusManagerPtr->handleInput(event);
+    if (inputCallback_) inputCallback_(event);
+}
 
 /**
  * @brief Render the current drawable and active popups
@@ -119,6 +146,13 @@ void PixelUI::animate(int32_t& x, int32_t& y, int32_t targetX, int32_t targetY,
  */
 void PixelUI::renderer() {
     if (m_viewManagerPtr->isTransitioning()) return;
+
+    if (update_symbol_.load()) { // check for update before rendering context
+        update_symbol_.store(0) ;
+        m_popupManagerPtr->updatePopups(_currentTime);
+        m_coroutineSchedulerPtr->update(_currentTime);
+        m_animationManagerPtr->update(_currentTime);
+    }
 
     static uint8_t lastPopupCount = 0;
     uint8_t currentPopupCount = m_popupManagerPtr->getPopupCounts();
@@ -130,6 +164,7 @@ void PixelUI::renderer() {
         u8g2_.clearBuffer();
         if (currentDrawable_) currentDrawable_->draw();
         m_popupManagerPtr->drawPopups();
+        m_focusManagerPtr->draw();
         u8g2_.sendBuffer();
         if (m_refresh_callback) m_refresh_callback();
         isDirty_ = false;

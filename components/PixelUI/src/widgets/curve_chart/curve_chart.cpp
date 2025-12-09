@@ -26,12 +26,15 @@
  * @param pos_x X coordinate of the widget's top-left corner (new anchor).
  * @param pos_y Y coordinate of the widget's top-left corner (new anchor).
  */
-CurveChart::CurveChart(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t size_w, uint16_t size_h) : 
+CurveChart::CurveChart(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t size_w, uint16_t size_h, uint16_t size_w_exp = 0, uint16_t size_h_exp = 0, EXPAND_BASE base = EXPAND_BASE::TOP_LEFT) : 
     m_ui(ui), 
     pos_x_(pos_x), 
     pos_y_(pos_y),
     size_w_(size_w),
-    size_h_(size_h)
+    size_h_(size_h),
+    exp_w(size_w_exp),
+    exp_h(size_h_exp),
+    base_(base)
 {
     // pos_x_ and pos_y_ now represent the top-left anchor point.
     int32_t start_anim_x = (size_w_ / 2);
@@ -60,14 +63,8 @@ void CurveChart::onLoad() {
     m_ui.animate(anim_x, 0, 550, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
     m_ui.animate(anim_y, 0, 600, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
     
-    // ---------------------------------
-    FocusBox fbox;
-    fbox.x = pos_x_ + 1; // Top-Left X + 1
-    fbox.y = pos_y_ + 1; // Top-Left Y + 1
-    fbox.w = size_w_ - 1;
-    fbox.h = size_h_ - 1;
-    
-    setFocusBox(fbox);
+    // Focusbox config
+    setFocusBox(FocusBox(pos_x_ + 1, pos_y_ + 1, size_w_ - 1, size_h_ - 1));
 
     // Initialize internal data structures
     initializeDataBuffer();
@@ -75,8 +72,7 @@ void CurveChart::onLoad() {
 
 void CurveChart::initializeDataBuffer() {
     // Initialize buffer with expanded width size
-    m_buffer_size = exp_w > 0 ? exp_w : 200; // Default to 200 if exp_w not set
-
+    m_buffer_size = (exp_w > size_w_) ? exp_w : 200; // Default to 200 if exp_w not set
     m_data_buffer = std::make_unique<float[]>(m_buffer_size); // acquisition for buffer memory
     
     // Initialize buffer with zeros

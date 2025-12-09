@@ -22,7 +22,7 @@
  * @brief Construct an IconView instance and initialize slot positions.
  * @param ui Reference to the PixelUI context.
  */
-IconView::IconView(PixelUI& ui) : ui_(ui) {
+IconView::IconView(PixelUI& ui, const uint8_t * font) : ui_(ui), font_title(font) {
     initializeSlotPositions();
 }
 
@@ -50,8 +50,6 @@ void IconView::onEnter(ExitCallback exitCallback) {
 void IconView::onResume() {
     animation_scroll_bar = 0;
     scrollOffset_ -= 50;
-    animation_selector_length = 30;
-    animation_pixel_dots = 0;
     ui_.animate(animation_pixel_dots, 63, 300, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
     updateProgressBar();
     scrollToIndex(currentIndex_);
@@ -63,6 +61,8 @@ void IconView::onResume() {
  */
 void IconView::onPause() {
     ui_.markFading();
+    ui_.clearAllAnimations();
+    animation_selector_length = selector_length;
 }
 
 /**
@@ -72,10 +72,10 @@ void IconView::onPause() {
  */
 bool IconView::handleInput(InputEvent event) {
     switch (event) {
-        case InputEvent::LEFT:   navigateLeft(); return true;
-        case InputEvent::RIGHT:  navigateRight(); return true;
-        case InputEvent::SELECT: selectCurrentItem(); return true;
-        case InputEvent::BACK:   requestExit(); return true; // Trigger exit callback.
+        case ICONVIEW_NAVI_LEFT:   navigateLeft(); return true;
+        case ICONVIEW_NAVI_RIGHT:  navigateRight(); return true;
+        case ICONVIEW_NAVI_SELECT: selectCurrentItem(); return true;
+        case ICONVIEW_NAVI_BACK:   requestExit(); return true; // Trigger exit callback.
         default: return false;
     }
 }
@@ -250,7 +250,7 @@ void IconView::drawSelectedItemTitle() {
     if (items_.empty()) return;
     U8G2& display = ui_.getU8G2();
     const auto& currentItem = items_[currentIndex_];
-    display.setFont(u8g2_font_wqy12_t_gb2312);
+    display.setFont(font_title);
     int titleWidth = display.getUTF8Width(currentItem.title);
     display.drawUTF8((display.getWidth() - titleWidth) / 2, animation_item_title_Y, currentItem.title);
 }

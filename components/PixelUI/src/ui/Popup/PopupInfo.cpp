@@ -35,8 +35,8 @@
  * if content exceeds initial popup size.
  */
 PopupInfo::PopupInfo(PixelUI& ui, uint16_t width, uint16_t height, 
-                     const char* text, const char* title, uint16_t duration, uint8_t priority)
-    : PopupBase(ui, width, height, priority, duration), _title(title), _text(text), _lineCount(0)
+                     const char* text, const char* title, uint16_t duration, uint8_t priority, const uint8_t * font)
+    : PopupBase(ui, width, height, priority, duration), _title(title), _text(text), _lineCount(0), m_font(font)
 {
     if (_text) {
         // Split the text into lines based on available width
@@ -67,7 +67,7 @@ uint16_t PopupInfo::splitTextIntoLines(const char* text, uint16_t maxWidth) {
     if (!text) return 0;
 
     U8G2& u8g2 = m_ui.getU8G2();
-    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.setFont(m_font);
 
     const char* current = text;
     uint16_t lineIndex = 0;
@@ -121,7 +121,7 @@ uint16_t PopupInfo::splitTextIntoLines(const char* text, uint16_t maxWidth) {
 void PopupInfo::drawContent(int16_t centerX, int16_t centerY, int16_t currentWidth, int16_t currentHeight) {
     if (_text && _lineCount > 0) {
         U8G2& u8g2 = m_ui.getU8G2();
-        u8g2.setFont(u8g2_font_5x7_tr);
+        u8g2.setFont(m_font);
 
         int16_t textAreaHeight = _lineCount * LINE_HEIGHT;
         int16_t textStartY = centerY - textAreaHeight / 2 + LINE_HEIGHT - 2;  // vertical centering

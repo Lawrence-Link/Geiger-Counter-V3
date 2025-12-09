@@ -16,7 +16,6 @@
  */
 
 #include "focus/focus.h"
-#include <iostream>
 
 /**
  * @brief Clear the currently active widget, if any, and restore focus state.
@@ -40,6 +39,38 @@ void FocusManager::clearActiveWidget() {
             m_state = State::IDLE;
         }
     }
+}
+/**
+ * @brief Handle input events for focus management.
+ * @param event The input event to handle.
+ * @return true if the event was handled by an active widget, false otherwise.
+ */
+bool FocusManager::handleInput(InputEvent event) {
+    // Check if an interactive widget (like the expanded histogram) has taken over input control
+    IWidget* activeWidget = getActiveWidget();
+    if (activeWidget) {
+        // Pass the event to the active widget
+        if (activeWidget->handleEvent(event)) {
+            // If the widget returns true, it signifies the operation is complete (e.g., expanded view closed)
+            // and control should be returned to the FocusManager.
+            clearActiveWidget();
+        }
+        return true; // Event was handled by an active widget
+    }
+
+    // No widget has taken over input; proceed with standard focus management and app control
+    if (!m_Widgets.empty()) {
+        if (event == FOCUS_MANAGER_NAVI_NEXT) {
+            moveNext(); // Move focus to the next widget
+        } else if (event == FOCUS_MANAGER_NAVI_PREV) {
+            movePrev(); // Move focus to the previous widget
+        } else if (event == FOCUS_MANAGER_NAVI_SELECT) {
+            selectCurrent(); // Select the currently focused widget
+        } else {
+            return false; // Event was not handled
+        }
+    }
+    return true; // Event was handled  
 }
 
 /**
@@ -138,6 +169,12 @@ void FocusManager::selectCurrent() {
             m_state = State::IDLE;
         }
     }
+    
+    FocusBox target = m_Widgets[index]->getFocusBox();
+    m_ui.animate(m_current_focus_box.x, target.x, 100, EasingType::EASE_OUT_QUAD);
+    m_ui.animate(m_current_focus_box.y, target.y, 100, EasingType::EASE_OUT_QUAD);
+    m_ui.animate(m_current_focus_box.w, target.w, 100, EasingType::EASE_OUT_QUAD);
+    m_ui.animate(m_current_focus_box.h, target.h, 100, EasingType::EASE_OUT_QUAD);
 }
 
 /**

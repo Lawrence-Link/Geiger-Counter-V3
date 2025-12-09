@@ -90,7 +90,7 @@ public:
 
         u8g2.drawLine(63, 44, 63, anim_h_line);
 
-        u8g2.drawStr(6, 36, "GENERAL");
+        u8g2.drawStr(6, 36, "General");
     }
 
     bool handleInput(InputEvent event) override {

@@ -33,14 +33,20 @@ public:
     bool onSelect() override;
     uint32_t getTimeout() const override { return TIMEOUT_MS; }
 
-    void setPosition(uint16_t x, uint16_t y) { m_x = x; m_y = y; }
+    void setPosition(uint16_t x, uint16_t y) {
+        m_x = x; m_y = y; 
+        setFocusBox(FocusBox(m_x + 1, m_y + 1, m_w - 2, m_h - 2));
+    }
 
     void setRange(int32_t min_val, int32_t max_val);
     void setValue(int32_t val);
     int32_t getValue() const { return m_current_value; }
 
     void setFixedIntDigits(uint8_t digits) { m_fixed_digits = digits; }
-    void setSize(uint16_t w, uint16_t h) { m_w = w; m_h = h; }
+    void setSize(uint16_t w, uint16_t h) {
+        m_w = w; m_h = h; 
+        setFocusBox(FocusBox(m_x + 1, m_y + 1, m_w - 2, m_h - 2));
+    }
 
 private:
     private:

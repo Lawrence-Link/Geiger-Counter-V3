@@ -52,3 +52,30 @@ constexpr int MAX_ONSCREEN_WIDGET_NUM = 6;
 
 // Maximum width (number of digits) for fixed-width integer display
 constexpr int MAX_INT_FIXED_WIDTH = 6;
+
+
+/* Input Event Router */
+
+/* FocusManager */
+#define FOCUS_MANAGER_NAVI_PREV     InputEvent::LEFT
+#define FOCUS_MANAGER_NAVI_NEXT     InputEvent::RIGHT
+#define FOCUS_MANAGER_NAVI_SELECT   InputEvent::SELECT
+
+/* ListView */
+#define LISTVIEW_NAVI_UP         InputEvent::LEFT
+#define LISTVIEW_NAVI_DOWN       InputEvent::RIGHT
+#define LISTVIEW_NAVI_SELECT     InputEvent::SELECT
+#define LISTVIEW_NAVI_BACK       InputEvent::BACK
+// #define LISTVIEW_NAVI_LEFT       InputEvent::LEFT
+// #define LISTVIEW_NAVI_RIGHT      InputEvent::RIGHT
+
+/* IconView */
+#define ICONVIEW_NAVI_LEFT     InputEvent::LEFT
+#define ICONVIEW_NAVI_RIGHT    InputEvent::RIGHT
+#define ICONVIEW_NAVI_SELECT   InputEvent::SELECT
+#define ICONVIEW_NAVI_BACK     InputEvent::BACK
+
+/* NumScroll */
+#define NUMSCROLL_NAVI_UP       InputEvent::RIGHT
+#define NUMSCROLL_NAVI_DOWN     InputEvent::LEFT
+#define NUMSCROLL_NAVI_SELECT   InputEvent::SELECT

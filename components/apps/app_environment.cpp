@@ -35,7 +35,6 @@ static const uint8_t image_temperature_bits[] = {0x38,0x00,0x44,0x40,0xd4,0xa0,0
 class AppEnvironment : public IApplication {
 private:
     PixelUI& m_ui;
-    FocusManager focusMan;
     CurveChart chart_temp;
     CurveChart chart_humi;
     CurveChart chart_baro;
@@ -53,10 +52,9 @@ private:
 public:
     AppEnvironment(PixelUI& ui) : 
     m_ui(ui), 
-    focusMan(m_ui), 
-    chart_temp(m_ui, 71, 2, 56, 19), 
-    chart_humi(m_ui, 71, 23, 56, 19), 
-    chart_baro(m_ui, 71, 44, 56, 19),
+    chart_temp(m_ui, 71, 2, 56, 19, 110, 19, EXPAND_BASE::BOTTOM_RIGHT), 
+    chart_humi(m_ui, 71, 23, 56, 19, 110, 19, EXPAND_BASE::BOTTOM_RIGHT), 
+    chart_baro(m_ui, 71, 44, 56, 19, 110, 19, EXPAND_BASE::BOTTOM_RIGHT),
     coroutine_anim([this](CoroutineContext& ctx) 
     {
         CORO_BEGIN(ctx);
@@ -80,13 +78,9 @@ public:
         m_ui.setContinousDraw(true);
         timestamp_1s_now = timestamp_1s_prev = m_ui.getCurrentTime();
 
-        chart_temp.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 110, 19);
-        chart_humi.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 110, 19);
-        chart_baro.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 110, 19);
-
-        focusMan.addWidget(&chart_temp);
-        focusMan.addWidget(&chart_humi);
-        focusMan.addWidget(&chart_baro);
+        m_ui.addWidgetToFocusManager(&chart_temp);
+        m_ui.addWidgetToFocusManager(&chart_humi);
+        m_ui.addWidgetToFocusManager(&chart_baro);
 
         coroutine_anim.reset();
         coroutine_anim.start();
@@ -120,31 +114,13 @@ public:
         chart_baro.draw();
         chart_humi.draw();
         chart_temp.draw();
-        focusMan.draw();
     }
 
     bool handleInput(InputEvent event) override {
-        // Check if an active widget (e.g., expanded chartgram) is consuming input
-        IWidget* activeWidget = focusMan.getActiveWidget();
-        if (activeWidget) {
-            // Pass the event to the active widget
-            if (activeWidget->handleEvent(event)) {
-                // If the widget returns true, it signals that it has finished and control should return to FocusManager
-                focusMan.clearActiveWidget();
-            }
-            return true; // Event handled
-        }
-        
         // Handle input for focus navigation
         if (event == InputEvent::BACK) {
             requestExit();
-        } else if (event == InputEvent::RIGHT) {
-            focusMan.moveNext();
-        } else if (event == InputEvent::LEFT) {
-            focusMan.movePrev();
-        } else if (event == InputEvent::SELECT) {
-            focusMan.selectCurrent();
-        }
+        } 
         return true;
     }
     

@@ -104,7 +104,7 @@ public:
 
 private:
     etl::vector<std::shared_ptr<Animation>, MAX_ANIMATION_COUNT> _animations;
-    mutable  std::recursive_mutex _mutex; 
+    mutable std::mutex _mutex; 
 };
 
 /**

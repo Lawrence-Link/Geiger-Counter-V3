@@ -18,6 +18,7 @@
 #include "ui/ListView/ListView.h"
 #include "core/animation/animation.h"
 #include <cinttypes>
+#include <cstdio>
 
 /**
  * @brief Called when the ListView is entered.
@@ -58,7 +59,7 @@ void ListView::onEnter(ExitCallback exitCallback){
     m_ui.animate(animation_pixel_dots, 32, 400, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
     
     startLoadAnimation();
-    scrollToTarget(0);
+    scrollToTarget();
 }
 
 /**
@@ -69,7 +70,7 @@ void ListView::onEnter(ExitCallback exitCallback){
  */
 void ListView::startLoadAnimation() {
     isInitialLoad_ = true;
-    int maxVisible = std::min(visibleItemCount_ + 1, (int)(m_itemLength + 1));
+    int maxVisible = std::min(visibleItemCount_ + 1, (int32_t)(m_itemLength + 1));
 
     for (int i = 0; i < maxVisible; i++) {
         int duration = 250 + i * 60;
@@ -121,7 +122,7 @@ void ListView::updateScrollPosition() {
     else if (currentCursor >= topVisibleIndex_ + visibleItemCount_)
         newTopIndex = currentCursor - visibleItemCount_ + 1;
     
-    int maxTopIndex = std::max(0, (int)m_itemLength + 1 - visibleItemCount_);
+    int maxTopIndex = std::max((int32_t)0, m_itemLength + 1 - visibleItemCount_);
     newTopIndex = std::max(0, std::min(newTopIndex, maxTopIndex));
     
     if (newTopIndex != topVisibleIndex_) {
@@ -146,7 +147,7 @@ int32_t ListView::calculateItemY(int itemIndex) {
  * @brief Scroll UI to ensure target item is visible and animate cursor/progress bar.
  * @param target Target item index.
  */
-void ListView::scrollToTarget(size_t target){
+void ListView::scrollToTarget(){
     updateScrollPosition();
     
     U8G2& u8g2 = m_ui.getU8G2();
@@ -166,7 +167,7 @@ void ListView::navigateUp() {
     if (currentCursor != 0) clearNonInitialAnimations();
     if (currentCursor > 0) {
         currentCursor--;
-        scrollToTarget(currentCursor);
+        scrollToTarget();
     }
 }
 
@@ -177,7 +178,7 @@ void ListView::navigateDown() {
     if (currentCursor != m_itemLength) clearNonInitialAnimations();
     if (currentCursor < m_itemLength) {
         currentCursor++;
-        scrollToTarget(currentCursor);
+        scrollToTarget();
     }
 }
 
@@ -193,12 +194,15 @@ void ListView::selectCurrent(){
     if (m_itemList[currentCursor].nextList){  
         m_ui.getAnimationManPtr()->clear();
         m_history_stack.push_back(etl::make_pair(etl::make_pair(m_itemList, m_itemLength), currentCursor));
-        m_itemLength = m_itemList[currentCursor].nextListLength - 1;
+        // Guard against underflow if nextListLength is zero
+        int32_t nextLen = m_itemList[currentCursor].nextListLength;
+        if (nextLen <= 0) nextLen = 0;
+        m_itemLength = nextLen - 1;
         m_itemList = m_itemList[currentCursor].nextList;
         currentCursor = 0;
         m_ui.markFading();
         startLoadAnimation();
-        scrollToTarget(0);
+        scrollToTarget();
         // return;
     }
 
@@ -207,7 +211,7 @@ void ListView::selectCurrent(){
         bool currentState = *switchValPtr;
         int32_t endX = currentState ? 0 : 7;
 
-        size_t targetIndex = currentCursor;
+        int32_t targetIndex = currentCursor;
         switchAnimStates_[targetIndex].isAnimating = true;
 
         auto callback = [this, targetIndex](int32_t value) { switchAnimStates_[targetIndex].boxX = value; };
@@ -244,7 +248,7 @@ void ListView::returnToPreviousContext() {
 
         m_ui.markFading();
         startLoadAnimation();
-        scrollToTarget(currentCursor);
+        scrollToTarget();
         return;
     }
     else { requestExit(); }
@@ -267,10 +271,29 @@ void ListView::navigateRight() { selectCurrent(); }
  */
 bool ListView::handleInput(InputEvent event) {
     switch (event) {
-        case InputEvent::LEFT: navigateUp(); return true;
-        case InputEvent::RIGHT: navigateDown(); return true;
-        case InputEvent::SELECT: navigateRight(); return true;
-        case InputEvent::BACK: requestExit(); return true;
+        #ifdef LISTVIEW_NAVI_UP 
+        case LISTVIEW_NAVI_UP: navigateUp(); return true; 
+        #endif
+
+        #ifdef LISTVIEW_NAVI_DOWN
+        case LISTVIEW_NAVI_DOWN: navigateDown(); return true;
+        #endif
+
+        #ifdef LISTVIEW_NAVI_RIGHT
+        case LISTVIEW_NAVI_RIGHT: navigateRight(); return true;
+        #endif
+
+        #ifdef LISTVIEW_NAVI_BACK
+        case LISTVIEW_NAVI_BACK: requestExit(); return true;
+        #endif
+
+        #ifdef LISTVIEW_NAVI_LEFT
+        case LISTVIEW_NAVI_LEFT: navigateLeft(); return true;
+        #endif
+
+        #ifdef LISTVIEW_NAVI_SELECT
+        case LISTVIEW_NAVI_SELECT: selectCurrent(); return true;
+        #endif
         default: return false;
     }
 }
@@ -301,7 +324,8 @@ void ListView::onResume() {
 /**
  * @brief Called when ListView is paused.
  */
-void ListView::onPause() {}
+void ListView::onPause() {
+}
 
 /**
  * @brief Called when ListView is exited.
@@ -311,7 +335,6 @@ void ListView::onPause() {}
 void ListView::onExit() {
     onSave();
     m_ui.setContinousDraw(false);
-    m_ui.getAnimationManPtr()->clearAllProtectionMarks();
 }
 
 /**
@@ -320,8 +343,8 @@ void ListView::onExit() {
 void ListView::draw() {
     U8G2& u8g2 = m_ui.getU8G2();
     u8g2.setFont(u8g2_font_wqy12_t_gb2312b); 
-    int startIndex = std::max(0, topVisibleIndex_ - 2);
-    int endIndex = std::min((int)m_itemLength, topVisibleIndex_ + visibleItemCount_ + 2);
+    int startIndex = std::max((int32_t)0, topVisibleIndex_ - 2);
+    int endIndex = std::min(m_itemLength, topVisibleIndex_ + visibleItemCount_ + 2);
     
     for (int itemIndex = startIndex; itemIndex <= endIndex; itemIndex++) {
         int32_t itemY = calculateItemY(itemIndex);
@@ -351,15 +374,15 @@ void ListView::draw() {
 
             // Draw integer value if present
             if (m_itemList[itemIndex].extra.intValue) {
-                char buf[5] = {0};
-                snprintf(buf, 5, "%" PRIu32, *m_itemList[itemIndex].extra.intValue);
+                char buf[16] = {0};
+                snprintf(buf, sizeof(buf), "%" PRId32, *m_itemList[itemIndex].extra.intValue);
                 u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getUTF8Width(buf) - 8, itemY, buf);
             }
 
-            // Draw integer value if present
+            // Draw float value if present
             if (m_itemList[itemIndex].extra.float_dot1f_Value) {
-                char buf[5] = {0};
-                snprintf(buf, 5, "%.1f", *m_itemList[itemIndex].extra.float_dot1f_Value);
+                char buf[16] = {0};
+                snprintf(buf, sizeof(buf), "%.1f", *m_itemList[itemIndex].extra.float_dot1f_Value);
                 u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getUTF8Width(buf) - 8, itemY, buf);
             }
         }

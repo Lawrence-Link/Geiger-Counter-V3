@@ -39,7 +39,7 @@ using SelectionCallback = std::function<void(int index, const IconItem& item)>;
 // IconView is now a complete, standalone view component.
 class IconView : public IApplication {
 public:
-    IconView(PixelUI& ui);
+    IconView(PixelUI& ui, const uint8_t * font = u8g2_font_wqy12_t_gb2312);
     ~IconView() = default;
 
     // --- IApplication Interface Implementation ---
@@ -67,6 +67,7 @@ private:
     // Title-related members.
     std::string title_;
     int titleY_ = 10;
+    const uint8_t * font_title = NULL;
     
     // State.
     int currentIndex_ = 0;

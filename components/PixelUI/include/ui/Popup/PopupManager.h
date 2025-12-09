@@ -32,4 +32,5 @@ public:
     void updatePopups(uint32_t currentTime);
     bool handleTopPopupInput(InputEvent event);
     size_t getPopupCounts() const { return _popups.size(); }
+    mutable std::mutex mutex_;
 };

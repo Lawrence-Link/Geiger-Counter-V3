@@ -37,6 +37,8 @@ Brace::Brace(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t size_w, uint1
 
     anim_x = start_anim_x;
     anim_y = start_anim_y;
+
+    setFocusBox(FocusBox(pos_x_ + 1, pos_y_ + 1, size_w_ - 1, size_h_ - 1));
 }
 
 /**
@@ -57,13 +59,6 @@ void Brace::onLoad() {
     
     m_ui.animate(anim_x, 0, 550, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
     m_ui.animate(anim_y, 0, 600, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
-
-    FocusBox fbox;
-    fbox.x = pos_x_ + 1; // Top-left X + 1
-    fbox.y = pos_y_ + 1; // Top-left Y + 1
-    fbox.w = size_w_ - 1;
-    fbox.h = size_h_ - 1;
-    setFocusBox(fbox);
 }
 
 /**

@@ -25,9 +25,12 @@
  * @param content Text content of the label.
  * @param pos Label alignment position relative to (x, y).
  */
-Label::Label(PixelUI& ui, uint16_t x, uint16_t y, const char* content, POS pos)
-    : m_ui(ui), m_x(x), m_y(y), src(content), load_pos(pos) 
-{ }
+Label::Label(PixelUI& ui, uint16_t x, uint16_t y, const char* content, POS pos, const uint8_t* font)
+    : m_ui(ui), m_x(x), m_y(y), src(content), load_pos(pos), m_font(font)
+{
+    setFocusable(true);
+    setFocusBox(FocusBox(m_x + 1, m_y + 1, m_w - 2, m_h - 2));
+}
 
 /**
  * @brief Initialize the label when loaded. Calculates animated starting position
@@ -35,7 +38,7 @@ Label::Label(PixelUI& ui, uint16_t x, uint16_t y, const char* content, POS pos)
  */
 void Label::onLoad() {
     U8G2& u8g2 = m_ui.getU8G2();
-    u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+    u8g2.setFont(m_font);
 
     // Calculate font height
     int8_t font_height = u8g2.getFontAscent() + u8g2.getFontDescent();
@@ -55,17 +58,14 @@ void Label::onLoad() {
         case POS::LEFT: {
             anim_x = m_x - u8g2.getUTF8Width(src);
             anim_y = m_y; 
-            m_ui.animate(anim_y, m_y, 300, EasingType::EASE_OUT_CUBIC, PROTECTION::NOT_PROTECTED);
+            m_ui.animate(anim_x, m_x, 300, EasingType::EASE_OUT_CUBIC, PROTECTION::NOT_PROTECTED);
         } break;
         case POS::RIGHT: {
             anim_x = m_x + u8g2.getUTF8Width(src);
             anim_y = m_y; 
-            m_ui.animate(anim_y, m_y, 300, EasingType::EASE_OUT_CUBIC, PROTECTION::NOT_PROTECTED);
+            m_ui.animate(anim_x, m_x, 300, EasingType::EASE_OUT_CUBIC, PROTECTION::NOT_PROTECTED);
         } break;
     }
-
-    // Set focus box slightly inside label boundaries
-    setFocusBox(FocusBox(m_x + 1, m_y + 1, m_w - 2, m_h - 2));
 }
 
 /**

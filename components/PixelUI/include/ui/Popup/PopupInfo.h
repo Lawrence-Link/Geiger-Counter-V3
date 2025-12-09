@@ -5,6 +5,7 @@
 #pragma once
 
 #include "PopupBase.h"
+#include "PixelUI.h"
 
 /**
  * @class PopupInfo
@@ -29,10 +30,10 @@ private:
     uint16_t _lineCount;
 
     uint16_t splitTextIntoLines(const char* text, uint16_t maxWidth);
-    
+    const uint8_t * m_font = nullptr;
 public:
     PopupInfo(PixelUI& ui, uint16_t width, uint16_t height, 
-              const char* text, const char* title = "", uint16_t duration = 3000, uint8_t priority = 0);
+              const char* text, const char* title = "", uint16_t duration = 3000, uint8_t priority = 0, const uint8_t * font = u8g2_font_wqy12_t_gb2312);
     ~PopupInfo() = default;
     
     void drawContent(int16_t centerX, int16_t centerY, int16_t currentWidth, int16_t currentHeight) override;

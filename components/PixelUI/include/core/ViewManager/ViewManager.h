@@ -51,6 +51,6 @@ public:
 private:
     PixelUI &m_ui;
     std::stack<std::shared_ptr<IApplication>> m_viewStack;
-    mutable std::mutex m_stackMutex;
+    // mutable std::mutex m_stackMutex;
     std::atomic<bool> m_isTransitioning{false};
 };

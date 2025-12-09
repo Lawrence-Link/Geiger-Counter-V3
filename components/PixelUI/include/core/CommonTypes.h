@@ -29,6 +29,13 @@ enum class PopupType {
     CONFIRM
 };
 
+enum class EXPAND_BASE {
+    TOP_LEFT,
+    TOP_RIGHT,
+    BOTTOM_LEFT,
+    BOTTOM_RIGHT
+};
+
 enum class EasingType {
     LINEAR,
     EASE_IN_QUAD,

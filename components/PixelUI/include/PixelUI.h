@@ -39,6 +39,8 @@ using DelayFunction = void (*)(uint32_t);
 class ViewManager;
 class PopupManager;
 class CoroutineScheduler;
+class FocusManager;
+class IWidget;
 
 /**
  * @class PixelUI
@@ -127,10 +129,6 @@ public:
     // TBD:
     // void setDebugPrintFunction(void (*func)(const char*)) { if (func) m_func_debug_print = func; }
 
-    #ifdef USE_DEBUG_OUPUT
-        void debugPrint(const char* msg);
-    #endif
-    
     // getters
     U8G2& getU8G2() const { return u8g2_; }
     std::shared_ptr<AnimationManager> getAnimationManPtr() { return m_animationManagerPtr; }
@@ -180,6 +178,7 @@ public:
      * @param duration Display duration.
      * @param priority Popup priority.
      * @param update_cb function callback when value changed.
+     * @param use_apparent_val Don't display the "%"
      */
     void showPopupProgress(int32_t& value, 
         int32_t minValue, 
@@ -195,27 +194,30 @@ public:
      * @brief Marks the display buffer as dirty, forcing a redraw.
      */
     void markDirty() { isDirty_ = true; }
-    
     /**
      * @brief Marks the UI as fading out.
      */
     void markFading();
 
-    bool handleInput(InputEvent event) {
-        if (inputCallback_) return inputCallback_(event);
-        return false;
-    }
-    
+    void addWidgetToFocusManager(IWidget* w);
+
+    void handleInput(InputEvent event);
+
+    void clearFocusManager();
     /**
      * @brief The main rendering function.
      */
     void renderer();
+
     friend class ViewManager;
     friend class PopupManager;
-protected:
+    friend class FocusManager;
 
+protected:
     void setDrawable(std::shared_ptr<IDrawable> drawable) { currentDrawable_ = drawable; }
     bool isFading() const { return isFading_; }
+
+private:
 private:
     U8G2& u8g2_;
 
@@ -223,9 +225,11 @@ private:
     std::shared_ptr<ViewManager> m_viewManagerPtr;
     std::shared_ptr<PopupManager> m_popupManagerPtr;
     std::shared_ptr<CoroutineScheduler> m_coroutineSchedulerPtr;
+    std::shared_ptr<FocusManager> m_focusManagerPtr;
 
     uint32_t _currentTime = 0;
     std::shared_ptr<IDrawable> currentDrawable_;
+    std::atomic_bool update_symbol_ = false;
 
     bool isDirty_ = false;
     bool isFading_ = false;

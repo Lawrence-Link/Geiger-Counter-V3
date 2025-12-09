@@ -86,6 +86,7 @@ public:
 
 private:
     std::vector<Coroutine*> coroutines_; 
+    mutable std::mutex mutex_;
     PixelUI& ui_;
 };
 

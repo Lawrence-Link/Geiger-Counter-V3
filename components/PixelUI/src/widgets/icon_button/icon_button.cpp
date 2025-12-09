@@ -21,14 +21,16 @@
  * @brief Constructor for IconButton widget.
  * @param ui Reference to the PixelUI instance for rendering and animation.
  */
-IconButton::IconButton(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h) : 
+IconButton::IconButton(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h, const unsigned char* source) : 
     m_ui(ui),
     pos_x(x),
     pos_y(y),
     m_w(w),
-    m_h(h)
+    m_h(h),
+    src(source)
 {
-    
+    setFocusable(true);
+    IWidget::setFocusBox(FocusBox(pos_x - 1, pos_y - 1, m_w + 2, m_h + 2));
 }
 
 /**
@@ -36,11 +38,10 @@ IconButton::IconButton(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t
  */
 void IconButton::onLoad() {
     // Set initial animated position slightly above the target y
-    anim_x = pos_x;
-    anim_y = pos_y - 10;
+    // anim_x = pos_x;
+    // anim_y = pos_y - 10;
 
     // Animate Y position to slide down into final position
-    m_ui.animate(anim_y, pos_y, 100, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
 }
 
 /**
@@ -61,7 +62,7 @@ void IconButton::draw() {
     U8G2& u8g2 = m_ui.getU8G2();
 
     // Draw XBM bitmap at current animated position
-    u8g2.drawXBM(anim_x, anim_y, m_w, m_h, src);
+    u8g2.drawXBM(pos_x, pos_y, m_w, m_h, src);
 }
 
 /**

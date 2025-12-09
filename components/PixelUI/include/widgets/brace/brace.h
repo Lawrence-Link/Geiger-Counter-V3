@@ -31,8 +31,14 @@ public:
     bool onSelect() override { if (m_callback) m_callback(); return false;}
 
     void setCallback(std::function<void()> cb) { m_callback = cb; };
-    void setSize(uint16_t mar_w, uint16_t mar_h) {size_h_ = mar_w; size_h_ = mar_h;}
-    void setPosition(int16_t pos_x, int16_t pos_y) {pos_x_ = pos_x; pos_y_=pos_y;}
+    void setSize(uint16_t mar_w, uint16_t mar_h) {
+        size_h_ = mar_w; size_h_ = mar_h;
+        setFocusBox(FocusBox(pos_x_ + 1, pos_y_ + 1, size_w_ - 1, size_h_ - 1));
+    }
+    void setPosition(int16_t pos_x, int16_t pos_y) {
+        pos_x_ = pos_x; pos_y_=pos_y;
+        setFocusBox(FocusBox(pos_x_ + 1, pos_y_ + 1, size_w_ - 1, size_h_ - 1));
+    }
     void setDrawContentFunction(std::function<void()> func) { contentWithinBrace = func; }
     
 private:

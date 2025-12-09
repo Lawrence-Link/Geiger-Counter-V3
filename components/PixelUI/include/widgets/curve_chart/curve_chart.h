@@ -19,16 +19,9 @@
 
 #include "../IWidget.h"
 
-enum class EXPAND_BASE {
-    TOP_LEFT,
-    TOP_RIGHT,
-    BOTTOM_LEFT,
-    BOTTOM_RIGHT
-};
-
 class CurveChart : public IWidget {
 public:
-    CurveChart(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t size_w, uint16_t size_h);
+    CurveChart(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t size_w, uint16_t size_h, uint16_t size_w_exp, uint16_t size_h_exp, EXPAND_BASE base);
     ~CurveChart() = default;
 
     void onLoad() override;
@@ -37,9 +30,14 @@ public:
     bool onSelect() override;
     bool handleEvent(InputEvent event) override;
 
-    void setSize(uint16_t mar_w, uint16_t mar_h) { size_w_ = mar_w; size_h_ = mar_h; }
-    void setPosition(uint16_t pos_x, uint16_t pos_y) { pos_x_ = pos_x; pos_y_ = pos_y; }
-    void setExpand(EXPAND_BASE base, uint16_t w, uint16_t h) {base_ = base; exp_w = w; exp_h = h;}
+    void setSize(uint16_t mar_w, uint16_t mar_h) { 
+        size_w_ = mar_w; size_h_ = mar_h; 
+        setFocusBox(FocusBox(pos_x_ + 1, pos_y_ + 1, size_w_ - 1, size_h_ - 1));
+    }
+    void setPosition(uint16_t pos_x, uint16_t pos_y) { 
+        pos_x_ = pos_x; pos_y_ = pos_y; 
+        setFocusBox(FocusBox(pos_x_ + 1, pos_y_ + 1, size_w_ - 1, size_h_ - 1));
+    }
 
     bool isExpanded() const { return is_expanded; }
 

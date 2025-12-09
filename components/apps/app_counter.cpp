@@ -178,7 +178,6 @@ private:
     PixelUI& m_ui;
     Histogram histogram;
     Brace brace;
-    FocusManager m_focusMan;
     IconButton icon_battery;
     IconButton icon_sounding;
     IconButton icon_alarm;
@@ -235,9 +234,8 @@ private:
 public:
     APP_COUNTER(PixelUI& ui) : 
     m_ui(ui), 
-    histogram(ui, 69, 45, 56, 18), 
+    histogram(ui, 69, 45, 56, 18, 76, 63, EXPAND_BASE::BOTTOM_RIGHT), 
     brace(ui, 3, 45, 56, 18), 
-    m_focusMan(ui), 
     icon_battery(ui, 12, 2, 10, 6),
     icon_sounding(ui, 26, 1, 7, 7),
     icon_alarm(ui, 37, 1, 7, 7),
@@ -289,8 +287,6 @@ public:
         pcf8563_get_time(pcf8563_dev, &timeinfo, &tm_valid);
         
         // Initialize and configure widgets
-
-        histogram.setExpand(EXPAND_BASE::BOTTOM_RIGHT, 76, 63);
         
         brace.setDrawContentFunction([this]() { braceContent(); });
         brace.setCallback([this](){braceCallback(); });
@@ -311,8 +307,8 @@ public:
         else                 icon_alarm.setSource(image_BELL_OFF_bits);
         
         // Add widgets to focus manager for navigation
-        m_focusMan.addWidget(&brace);
-        m_focusMan.addWidget(&histogram);  
+        m_ui.addWidgetToFocusManager(&brace);
+        m_ui.addWidgetToFocusManager(&histogram);  
         
         timestamp_prev = timestamp_now = m_ui.getCurrentTime();
         
@@ -598,31 +594,13 @@ public:
         }
         
         histogram.draw();
-        m_focusMan.draw();
     }
     
     // Handles user input events
     bool handleInput(InputEvent event) override {
-        // Check if an active widget (e.g., expanded histogram) is consuming input
-        IWidget* activeWidget = m_focusMan.getActiveWidget();
-        if (activeWidget) {
-            // Pass the event to the active widget
-            if (activeWidget->handleEvent(event)) {
-                // If the widget returns true, it signals that it has finished and control should return to FocusManager
-                m_focusMan.clearActiveWidget();
-            }
-            return true; // Event handled
-        }
-        
         // Handle input for focus navigation
         if (event == InputEvent::BACK) {
             requestExit();
-        } else if (event == InputEvent::RIGHT) {
-            m_focusMan.moveNext();
-        } else if (event == InputEvent::LEFT) {
-            m_focusMan.movePrev();
-        } else if (event == InputEvent::SELECT) {
-            m_focusMan.selectCurrent();
         }
         return true;
     }

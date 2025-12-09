@@ -2,6 +2,7 @@
 
 #include "widgets/IWidget.h"
 #include <etl/vector.h>
+#include "config.h"
 
 /**
  * @class FocusManager
@@ -40,12 +41,20 @@ public:
 
     etl::vector<IWidget*, MAX_ONSCREEN_WIDGET_NUM> m_Widgets;
     
+    void resetState() {
+        index = -1;
+        m_state = State::IDLE;
+        m_current_focus_box = {0,64,0,0};
+    }
+
     IWidget* getActiveWidget() const { return m_activeWidget; }
     void clearActiveWidget();
     
     void moveNext();
     void movePrev();
     void draw();
+
+    bool handleInput(InputEvent event);
 
     void addWidget(IWidget* w);
     void removeWidget(IWidget* w);

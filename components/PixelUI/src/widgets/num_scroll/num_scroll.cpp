@@ -32,6 +32,7 @@ NumScroll::NumScroll(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h
     m_h(h)
  {
     setFocusable(true);
+    setFocusBox(FocusBox(m_x + 1, m_y + 1, m_w - 2, m_h - 2));
 }
 
 /**
@@ -45,12 +46,7 @@ void NumScroll::onLoad() {
     anim_h = 0;
 
     // Set focus box slightly inside widget boundaries
-    FocusBox box;
-    box.x = m_x + 1;
-    box.y = m_y + 1;
-    box.w = m_w - 2;
-    box.h = m_h - 2;
-    setFocusBox(box);
+    setFocusBox(FocusBox(m_x + 1, m_y + 1, m_w - 2, m_h - 2));
 
     // Animate size from 0 to margin size
     m_ui.animate(anim_w, anim_h,
@@ -118,17 +114,23 @@ bool NumScroll::handleEvent(InputEvent event) {
     updateInteractionTime(m_ui.getCurrentTime());
 
     switch (event) {
-        case InputEvent::LEFT:
+        #ifdef NUMSCROLL_NAVI_DOWN
+        case NUMSCROLL_NAVI_DOWN:
             decrementValue();
             return false;
+        #endif
 
-        case InputEvent::RIGHT:
+        #ifdef NUMSCROLL_NAVI_UP
+        case NUMSCROLL_NAVI_UP:
             incrementValue();
             return false;
+        #endif
 
-        case InputEvent::SELECT:
+        #ifdef NUMSCROLL_NAVI_SELECT
+        case NUMSCROLL_NAVI_SELECT:
             m_ui.markDirty();
             return true;
+        #endif
 
         default:
             return false;
