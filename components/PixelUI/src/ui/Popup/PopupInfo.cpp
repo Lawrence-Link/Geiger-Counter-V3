@@ -123,6 +123,7 @@ void PopupInfo::drawContent(int16_t centerX, int16_t centerY, int16_t currentWid
         U8G2& u8g2 = m_ui.getU8G2();
         u8g2.setFont(m_font);
 
+        LINE_HEIGHT = u8g2.getFontAscent() - u8g2.getFontDescent();
         int16_t textAreaHeight = _lineCount * LINE_HEIGHT;
         int16_t textStartY = centerY - textAreaHeight / 2 + LINE_HEIGHT - 2;  // vertical centering
 
@@ -134,11 +135,11 @@ void PopupInfo::drawContent(int16_t centerX, int16_t centerY, int16_t currentWid
                 strncpy(lineBuffer, _textLines[i].start, copyLength);
                 lineBuffer[copyLength] = '\0';
 
-                int16_t lineWidth = u8g2.getStrWidth(lineBuffer);
+                int16_t lineWidth = u8g2.getUTF8Width(lineBuffer);
                 int16_t lineX = centerX - lineWidth / 2;  // horizontal centering
                 int16_t lineY = textStartY + i * LINE_HEIGHT;
 
-                u8g2.drawStr(lineX, lineY, lineBuffer);
+                u8g2.drawUTF8(lineX, lineY, lineBuffer);
             }
         }
     }

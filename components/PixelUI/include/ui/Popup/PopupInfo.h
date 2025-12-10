@@ -18,7 +18,7 @@ private:
     const char *_text;
     
     static const uint16_t MAX_LINES = 6;
-    static const uint16_t LINE_HEIGHT = 9;
+    uint16_t LINE_HEIGHT = 12;
     static const uint16_t TEXT_MARGIN = 4;
     
     struct TextLine {

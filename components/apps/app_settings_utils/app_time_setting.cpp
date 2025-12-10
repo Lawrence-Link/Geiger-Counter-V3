@@ -119,9 +119,6 @@ public:
     }
 
     bool handleInput(InputEvent event) override {
-        if (event == InputEvent::BACK) {
-            requestExit();
-        }  
         return true;
     }
     

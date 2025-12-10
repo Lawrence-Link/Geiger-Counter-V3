@@ -43,6 +43,7 @@ public:
     
     void resetState() {
         index = -1;
+        m_activeWidget = nullptr;
         m_state = State::IDLE;
         m_current_focus_box = {0,64,0,0};
     }
