@@ -119,6 +119,10 @@ public:
     }
 
     bool handleInput(InputEvent event) override {
+        if (event == InputEvent::BACK) {
+            requestExit();
+            return true;
+        }
         return true;
     }
     
@@ -159,7 +163,6 @@ public:
             } else {
                 requestExit();
             }
-            
         });
 
         coroutine_anim.reset();
@@ -182,7 +185,6 @@ public:
     void onExit() override {
         // cleanup the coroutine
         m_ui.removeCoroutine(&coroutine_anim);
-
         m_ui.clearAllAnimations();
         m_ui.setContinousDraw(false);
         m_ui.markFading();

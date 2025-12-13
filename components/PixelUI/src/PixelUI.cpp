@@ -135,7 +135,10 @@ void PixelUI::clearFocusManager() {
  */
 
 void PixelUI::handleInput(InputEvent event) {
-    if (m_focusManagerPtr) m_focusManagerPtr->handleInput(event);
+    if (m_focusManagerPtr) 
+    {
+        if (m_focusManagerPtr->handleInput(event)) return;
+    }
     if (inputCallback_) inputCallback_(event);
 }
 

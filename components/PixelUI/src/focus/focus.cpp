@@ -62,15 +62,16 @@ bool FocusManager::handleInput(InputEvent event) {
     if (!m_Widgets.empty()) {
         if (event == FOCUS_MANAGER_NAVI_NEXT) {
             moveNext(); // Move focus to the next widget
+            return true;
         } else if (event == FOCUS_MANAGER_NAVI_PREV) {
             movePrev(); // Move focus to the previous widget
+            return true;
         } else if (event == FOCUS_MANAGER_NAVI_SELECT) {
             selectCurrent(); // Select the currently focused widget
-        } else {
-            return false; // Event was not handled
+            return true; // Always consume SELECT event to prevent it from propagating
         }
     }
-    return true; // Event was handled  
+    return false; // Event was not handled  
 }
 
 /**
