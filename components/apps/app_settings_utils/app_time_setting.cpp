@@ -59,7 +59,7 @@ public:
     num_s(ui, 53, 25, 24, 16), 
     clock(ui, 103, 32, 20),
     button_sync(ui, 1, 44, 76, 17),
-    title(ui, 3, 14, "RTC时间"),
+    title(ui, 3, 14, "RTC时间", POS::LEFT),
     coroutine_anim(
         [this] (CoroutineContext& ctx) {
             CORO_BEGIN(ctx);

@@ -1,7 +1,7 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
-  "idf.espIdfPath": "/home/lawrence/esp/v5.5.1/esp-idf",
-  "idf.pythonInstallPath": "/usr/bin/python3",
+  "idf.espIdfPath": "/Users/mac/esp/v5.5.1/esp-idf",
+  "idf.pythonInstallPath": "/opt/homebrew/bin/python3",
   "idf.openOcdConfigs": [
     "board/esp32c6-builtin.cfg"
   ],
@@ -17,8 +17,8 @@
   }
   ],
 
-  "idf.port": "/dev/ttyACM0",
-  "idf.toolsPath": "/home/lawrence/.espressif",
+  "idf.port": "/dev/tty.usbmodem101",
+  "idf.toolsPath": "/Users/mac/.espressif",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32c6"
   },
