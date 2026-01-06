@@ -48,11 +48,7 @@ VoltagePID voltage_controller(
         LEDC_CHANNEL_0,
         LEDC_TIMER_0,
         PIN_HV_DRIVE  
-    );
-
-void delay_ms(uint32_t ms) {
-    vTaskDelay(pdMS_TO_TICKS(ms));
-}
+);
 
 extern "C" void app_main(void) // mainly reserved for ui rendering
 {   
@@ -201,7 +197,6 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     ui.getViewManagerPtr()->push(boot_app.createApp(ui));
 
     // Initialize UI
-    ui.setDelayFunction(delay_ms);
     ui.begin();
 
     start_encoder_task();

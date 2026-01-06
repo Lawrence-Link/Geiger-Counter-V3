@@ -119,27 +119,23 @@ esp_err_t u8g2_port_deinit(void)
  */
 static esp_err_t spi_write_data(const uint8_t *data, size_t len)
 {
-    if (!is_initialized || spi_device == NULL) {
-        ESP_LOGE(TAG, "SPI not initialized");
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    if (len == 0) {
-        return ESP_OK;
-    }
+if (len == 0) return ESP_OK;
 
     spi_transaction_t trans = {
-        .length = len * 8,  // 以位为单位的长度
+        .length = len * 8,
         .tx_buffer = data,
-        .rx_buffer = NULL
+        .rx_buffer = NULL,
     };
 
-    esp_err_t ret = spi_device_transmit(spi_device, &trans);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "SPI transmit failed: %s", esp_err_to_name(ret));
+    // 优化策略：
+    // 1. 小数据量 (< 32 bytes)：使用轮询模式，减少 Context Switch 开销
+    if (len < 32) {
+        return spi_device_polling_transmit(spi_device, &trans);
     }
-
-    return ret;
+    
+    // 2. 大数据量 (如全屏刷新)：使用 DMA 传输
+    // 这里依然使用 transmit，但它在内部会使任务进入阻塞态，让出 CPU 给其他任务
+    return spi_device_transmit(spi_device, &trans);
 }
 
 static void set_dc_level(uint32_t level)
