@@ -217,7 +217,6 @@ private:
     uint32_t timestamp_now;
     
     Blinker blinker_description_bar;
-    Blinker blinker_calibration_icon;
     
     float current_cpm = 0;
     struct tm timeinfo;
@@ -240,7 +239,6 @@ public:
     icon_sounding(ui, 26, 1, 7, 7),
     icon_alarm(ui, 37, 1, 7, 7),
     blinker_description_bar(ui, 100),
-    blinker_calibration_icon(ui, 100),
     coroutine_anim([this](CoroutineContext& ctx) 
     {
         CORO_BEGIN(ctx);
@@ -503,22 +501,15 @@ public:
         u8g2.drawStr(3, 31, print_buffer);
         
         blinker_description_bar.update();
-        blinker_calibration_icon.update();
         
         // Update histogram data every second if not in startup mode
         if (timestamp_now - timestamp_prev >= 1000){
-            if (!is_startup_mode()){
                 timestamp_prev = timestamp_now;
                 if (!use_cpm) {
                     histogram.addData(current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient());
                 } else {
                     histogram.addData(current_cpm);
                 }
-                blinker_calibration_icon.stop();
-            } else {
-                // If in startup mode, display the calibration blinker
-                blinker_calibration_icon.start();
-            }
             
             const unsigned char* bat_source = nullptr;
             if (battery_percentage >= 75) {
@@ -540,12 +531,6 @@ public:
         // Draw status label if the blinker is visible (for blinking effect)
         if (blinker_description_bar.is_visible()) {
             drawLabel();
-        }
-        
-        // Draw "CAL" text if the calibration blinker is visible
-        if (blinker_calibration_icon.is_visible()) {
-            u8g2.setFont(u8g2_font_4x6_tr);
-            u8g2.drawStr(46, 7, "CAL");
         }
         
         // Draw voltage display

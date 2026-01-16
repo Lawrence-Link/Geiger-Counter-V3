@@ -4,10 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// 任务启动参数结构体 (如果需要传递配置)
 typedef struct {
     int gpio_num; // 脉冲输入 GPIO
-    // ... 其他配置
 } counter_task_config_t;
 
 /**
@@ -31,9 +29,5 @@ bool stop_counter_task();
  * @return float 当前的计数率 (Counts Per Minute)。
  */
 float get_current_cpm();
-/**
- *  @brief acquire startup mode status
- */
-bool is_startup_mode();
 
 #endif // COUNTER_TASK_H
