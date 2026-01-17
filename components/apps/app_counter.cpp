@@ -31,7 +31,7 @@
 #include "system_nvs_varibles.h"
 #include "blinker/Blinker.h"
 #include <fastmath.h>
-#include "i2c.h" // for the handles
+#include "i2c.h" 
 #include "core/coroutine/Coroutine.h"
 #include "led.h"
 #include "tune.h"
@@ -261,7 +261,9 @@ public:
                 CORO_YIELD(ctx, __LINE__);
             }
             ctx.localData[0] = 0;
-            if (en_dosage_alert) tune.playMelodyInterruptible(sos);
+            if (en_dosage_alert) {
+                tune.playMelodyInterruptible(sos);
+            }
             CORO_DELAY(ctx, m_ui, 3500, __LINE__);
         }
         CORO_END(ctx);
@@ -313,6 +315,7 @@ public:
         coroutine_anim.reset();
         coroutine_alarm.reset();
         coroutine_anim.start();
+        coroutine_alarm.start();
 
         m_ui.addCoroutine(&coroutine_anim);
         m_ui.addCoroutine(&coroutine_alarm); // 警报调度

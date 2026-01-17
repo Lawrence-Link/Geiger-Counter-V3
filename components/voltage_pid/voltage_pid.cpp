@@ -93,6 +93,9 @@ void VoltagePID::startTask() {
     powerSurgeFlag = false;
     lackPowerFlag = false;
 
+    _integral = 0.0f;
+    _prevError = 0.0f;
+
     if (_taskHandle == nullptr) {
         xTaskCreate(controlTask, "voltage_pid_task", 4096, this, 5, &_taskHandle);
     }
