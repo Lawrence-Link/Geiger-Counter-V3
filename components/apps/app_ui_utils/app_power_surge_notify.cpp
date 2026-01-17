@@ -18,7 +18,10 @@
 
 #include "core/app/IApplication.h"
 #include "core/app/app_system.h"
+#include "blinker/Blinker.h"
 #include "voltage_pid.hpp"
+#include "tune.h"
+#include "system_nvs_varibles.h"
 #include <memory>
 
 static const unsigned char image_ArrowUpFilled_bits[] U8X8_PROGMEM = {0xc0,0x00,0x20,0x01,0xd0,0x02,0xe8,0x05,0xf4,0x0b,0xfa,0x17,0x61,0x21,0xaf,0x3d,0x68,0x05,0xa8,0x05,0x68,0x05,0xa8,0x05,0xe8,0x05,0x08,0x04,0xf8,0x07};
@@ -33,38 +36,59 @@ class PowerSurgeNotify : public IApplication {
 private:
     PixelUI& m_ui;
     VoltagePID::vpid_error_t vpid_error;
+    Blinker blinker;
+
+    Tune::Melody tune_err = {
+        {Notes::REST, 100},
+        {Notes::B4, 100},
+        {Notes::REST, 100},
+        {Notes::C4, 100},
+    };
+
 public:
-    PowerSurgeNotify(PixelUI& ui, void* param):m_ui(ui) {
+    PowerSurgeNotify(PixelUI& ui, void* param):m_ui(ui), blinker(ui) {
         vpid_error = static_cast<VoltagePID::vpid_error_t>(param ? *((int*)param) : VoltagePID::VPID_ERR_SURGE);
+        blinker.set_interval(200);
+        blinker.start();
     };
     void draw() override {
+        blinker.update();
         U8G2& u8g2 = m_ui.getU8G2();
-        
+
         u8g2.drawXBMP(9, 2, 14, 22, image_Voltage_bits);
 
         if (vpid_error == VoltagePID::vpid_error_t::VPID_ERR_SURGE) {
             u8g2.setFont(u8g2_font_6x12_tr);
+            
+            if (blinker.is_visible()) 
+            {
+                u8g2.drawStr(21, 61, "POWER CYCLE NOW");
+                u8g2.drawXBMP(114, 49, 11, 16, image_device_reset_bits);
+            }
+            u8g2.drawXBMP(15, 56, 4, 3, image_EQ_symbol_bits);
+            u8g2.drawXBMP(3, 53, 10, 8, image_back_btn_bits); 
             u8g2.drawStr(34, 10, "POWER SURGE");
             u8g2.drawStr(42, 23, "DETECTED");
-            u8g2.drawStr(21, 61, "POWER CYCLE NOW");
             u8g2.drawLine(3, 28, 124, 28);
-            u8g2.drawXBMP(114, 49, 11, 16, image_device_reset_bits);
+            
             u8g2.drawXBMP(106, 6, 14, 15, image_ArrowUpFilled_bits);
             u8g2.drawStr(21, 39, "ADJUST PIDS OR");
             u8g2.drawXBMP(8, 36, 7, 8, image_Quest_bits);
-            u8g2.drawXBMP(3, 53, 10, 8, image_back_btn_bits);
-            u8g2.drawXBMP(15, 56, 4, 3, image_EQ_symbol_bits);
             u8g2.drawStr(21, 48, "RM SHORT CIRCUIT");
         } else if (vpid_error == VoltagePID::vpid_error_t::VPID_ERR_LACK_PWR) {
             u8g2.setFont(u8g2_font_6x12_tr);
-            u8g2.drawStr(21, 61, "POWER CYCLE NOW");
+            if (blinker.is_visible()) 
+            {
+                u8g2.drawStr(21, 61, "POWER CYCLE NOW");
+                u8g2.drawXBMP(114, 49, 11, 16, image_device_reset_bits);
+            }
+            u8g2.drawXBMP(15, 56, 4, 3, image_EQ_symbol_bits);
+            u8g2.drawXBMP(3, 53, 10, 8, image_back_btn_bits);
+
             u8g2.drawLine(3, 26, 124, 26);
-            u8g2.drawXBMP(114, 49, 11, 16, image_device_reset_bits);
             u8g2.setFont(u8g2_font_5x8_tr);
             u8g2.drawStr(18, 38, "TUBE SHORTED? OR TRY");
             u8g2.drawXBMP(5, 35, 7, 8, image_Quest_bits);
-            u8g2.drawXBMP(3, 53, 10, 8, image_back_btn_bits);
-            u8g2.drawXBMP(15, 56, 4, 3, image_EQ_symbol_bits);
             u8g2.drawXBMP(109, 5, 14, 15, image_ArrowDownFilled_bits);
             u8g2.setFont(u8g2_font_6x12_tr);
             u8g2.drawStr(48, 13, "OUTPUT");
@@ -83,7 +107,12 @@ public:
     void onEnter(ExitCallback cb) override {
         IApplication::onEnter(cb);
         m_ui.setContinousDraw(true);
-        m_ui.markDirty(); 
+        m_ui.markDirty();
+        if (SystemConf::getInstance().read_conf_enable_interaction_tone()) {
+            Tune& tune = Tune::getInstance();
+            tune.stop();
+            tune.playMelody(tune_err);
+        }
     }
 
     void onResume() override {
