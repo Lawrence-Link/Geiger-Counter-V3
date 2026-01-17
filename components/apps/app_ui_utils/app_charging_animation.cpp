@@ -23,7 +23,7 @@ private:
     Coroutine coroutine_anim;
 
 public:
-    Charge(PixelUI& ui) : m_ui(ui),
+    Charge(PixelUI& ui, void* param) : m_ui(ui),
     coroutine_anim([this](CoroutineContext& ctx) {
         CORO_BEGIN(ctx);
             m_ui.animate(lightIconSize, 7, 400, EasingType::EASE_IN_CUBIC, PROTECTION::PROTECTED);
@@ -134,7 +134,7 @@ AppItem charge_app{
     .title = nullptr,
     .bitmap = nullptr,
     
-    .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<Charge>(ui); 
+    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
+        return std::make_unique<Charge>(ui, param); 
     },
 };

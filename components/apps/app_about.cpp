@@ -42,7 +42,7 @@ private:
     Coroutine coroutine_anim;
 
 public:
-    About(PixelUI& ui):m_ui(ui), bl(ui),
+    About(PixelUI& ui, void* param):m_ui(ui), bl(ui),
     coroutine_anim([this](CoroutineContext& ctx) {
         CORO_BEGIN(ctx);
         CORO_DELAY(ctx, m_ui, 160, 100);
@@ -125,7 +125,7 @@ AppItem about_app{
     .title = "关于",
     .bitmap = image_about_bits,
     
-    .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<About>(ui); 
+    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
+        return std::make_unique<About>(ui, param); 
     },
 };

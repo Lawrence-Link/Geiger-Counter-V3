@@ -34,6 +34,7 @@ PixelUI ui(u8g2);
 extern AppItem charge_app;
 extern AppItem sillycat_app;
 extern AppItem boot_app;
+extern AppItem power_surge_app;
 
 static const char *TAG = "main";
 
@@ -190,11 +191,11 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     // Register applications
     registerApps();
 
-    ui.getViewManagerPtr()->push(sillycat_app.createApp(ui));
+    ui.getViewManagerPtr()->push(sillycat_app.createApp(ui, nullptr));
     auto appView = AppLauncher::createAppLauncherView(ui, *ui.getViewManagerPtr());
     ui.getViewManagerPtr()->push(appView);
 
-    ui.getViewManagerPtr()->push(boot_app.createApp(ui));
+    ui.getViewManagerPtr()->push(boot_app.createApp(ui, nullptr));
 
     // Initialize UI
     ui.begin();
@@ -232,12 +233,20 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
             tickNowChargingAnim = ui.getCurrentTime();
         }
 
-        if (countdown_enable_charging_anim) { // 防止冲入 avoid reenter the charging animation
+        if (countdown_enable_charging_anim) { // 防止重入
             if (tickNowChargingAnim - tickPrevChargingAnim > 1000 && gpio_get_level(PIN_USB_STATUS)) {
                 countdown_enable_charging_anim = false;
-                ui.getViewManagerPtr()->push(charge_app.createApp(ui));
+                ui.getViewManagerPtr()->push(charge_app.createApp(ui, nullptr));
             }
         }
+
+        VoltagePID::vpid_error_t err = voltage_controller.handleVPID_Err();
+
+        if (err != VoltagePID::vpid_error_t::VPID_OK) {
+            voltage_controller.stop();
+            ui.getViewManagerPtr()->push(power_surge_app.createApp(ui, (void*)&err));
+        }
+
         ui.renderer();
         vTaskDelay(pdMS_TO_TICKS(10));
     }

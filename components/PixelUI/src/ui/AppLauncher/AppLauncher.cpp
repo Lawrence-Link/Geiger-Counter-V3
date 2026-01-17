@@ -46,7 +46,7 @@ std::shared_ptr<IApplication> AppLauncher::createAppLauncherView(PixelUI& ui, Vi
         [&ui, &viewManager](int index, const IconItem& item) {
             const AppItem* appItem = static_cast<const AppItem*>(item.userData);
             if (appItem && appItem->createApp) {
-                auto appInstance = appItem->createApp(ui);
+                auto appInstance = appItem->createApp(ui, nullptr);
                 if (appInstance) {
                     viewManager.push(appInstance);
                 }

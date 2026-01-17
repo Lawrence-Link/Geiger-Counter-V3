@@ -53,7 +53,7 @@ private:
     Coroutine coroutine_anim;
 
 public:
-    TimeSetting(PixelUI& ui): m_ui(ui), 
+    TimeSetting(PixelUI& ui, void* param): m_ui(ui), 
     num_h(ui, 1, 25, 24, 16), 
     num_m(ui, 27, 25, 24, 16), 
     num_s(ui, 53, 25, 24, 16), 
@@ -195,7 +195,7 @@ AppItem time_setting_app{
     .title = nullptr,
     .bitmap = nullptr,
     
-    .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<TimeSetting>(ui); 
+    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
+        return std::make_unique<TimeSetting>(ui, param); 
     },
 };

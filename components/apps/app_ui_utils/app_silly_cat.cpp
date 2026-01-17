@@ -29,7 +29,7 @@ class SillyCat : public IApplication {
 private:
     PixelUI& m_ui;
 public:
-    SillyCat(PixelUI& ui):m_ui(ui) {};
+    SillyCat(PixelUI& ui, void* param):m_ui(ui) {};
     void draw() override {
         U8G2& u8g2 = m_ui.getU8G2();
         u8g2.setFontMode(1);
@@ -75,7 +75,7 @@ AppItem sillycat_app{
     .title = nullptr,
     .bitmap = nullptr,
     
-    .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<SillyCat>(ui); 
+    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
+        return std::make_unique<SillyCat>(ui, param); 
     },
 };

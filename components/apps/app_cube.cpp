@@ -107,7 +107,7 @@ class CubeDemo : public IApplication {
 private:
     PixelUI& m_ui;
 public:
-    CubeDemo(PixelUI& ui):m_ui(ui) {};
+    CubeDemo(PixelUI& ui, void* param):m_ui(ui) {};
     void draw() override {
         m_ui.markDirty();
         U8G2& display = m_ui.getU8G2();
@@ -144,7 +144,7 @@ AppItem cube_demo_app{
     .title = "方块Demo",
     .bitmap = image_cube_bits,
     
-    .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<CubeDemo>(ui); 
+    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
+        return std::make_unique<CubeDemo>(ui, param); 
     },
 };

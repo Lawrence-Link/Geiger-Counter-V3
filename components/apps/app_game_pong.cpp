@@ -56,7 +56,7 @@ private:
     bool gameInitialized;
 
 public:
-    GamePong(PixelUI& ui) : m_ui(ui), focusMan(ui), blocks(nullptr), gameInitialized(false) {}
+    GamePong(PixelUI& ui, void* param) : m_ui(ui), focusMan(ui), blocks(nullptr), gameInitialized(false) {}
     
     ~GamePong() {
         if (blocks) {
@@ -326,13 +326,11 @@ public:
     }
 };
 
-// 自注册机制 - 更新名称 
-
 AppItem game_pong_app{
     .title = "Pong",
     .bitmap = image_games_bits,
     
-    .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<GamePong>(ui); 
+    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
+        return std::make_unique<GamePong>(ui, param); 
     },
 };

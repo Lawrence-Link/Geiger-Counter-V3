@@ -15,14 +15,38 @@ public:
                ledc_timer_t pwm_timer,
                gpio_num_t pwm_gpio);
 
+    enum vpid_error_t {
+        VPID_OK = 0,
+        VPID_ERR_SURGE,
+        VPID_ERR_LACK_PWR
+    };
+
     void setTarget(float target_vin);        // set target in Volts
     void setPID(float kp, float ki, float kd);
     void startTask();                        // start FreeRTOS task
     void stop();                             // stop PWM, force low output
+    vpid_error_t handleVPID_Err() 
+    { 
+        if (powerSurgeFlag) 
+        {
+            powerSurgeFlag = false;
+            return VPID_ERR_SURGE;
+        } 
+
+        if (lackPowerFlag) {
+            lackPowerFlag = false;
+            return VPID_ERR_LACK_PWR;
+        }
+        return VPID_OK;
+    }
     float getVoltage() const;                // return latest Vin in Volts
     float getTargetVolt() const { return _target; }
 private:
     static void controlTask(void* arg);
+
+    bool lackPowerFlag = false;
+    bool powerSurgeFlag = false;
+    
     void updateControl();
 
     // PID parameters

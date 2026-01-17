@@ -28,9 +28,12 @@ enum class MenuItemType {
 };
 
 struct AppItem {
+    /* Name of the app */
     const char* title;
+    /* Bitmap to the app icon */
     const uint8_t* bitmap;
-    std::function<std::shared_ptr<IApplication>(PixelUI&)> createApp;
+    /* Factory function of the app */
+    std::function<std::shared_ptr<IApplication>(PixelUI&, void* parameters)> createApp;
 };
 
 class AppManager {

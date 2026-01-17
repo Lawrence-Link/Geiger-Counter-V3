@@ -100,7 +100,7 @@ private:
     uint32_t last_update_time;
 
 public:
-    RacingGame(PixelUI& ui) : m_ui(ui) {
+    RacingGame(PixelUI& ui, void* param) : m_ui(ui) {
         // Set random seed
         srand(m_ui.getCurrentTime());
     }
@@ -395,7 +395,7 @@ AppItem racing_game_app{
     .title = "除我都逆行",
     .bitmap = image_racing_bits,
     
-    .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<RacingGame>(ui); 
+    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
+        return std::make_unique<RacingGame>(ui, param); 
     },
 };

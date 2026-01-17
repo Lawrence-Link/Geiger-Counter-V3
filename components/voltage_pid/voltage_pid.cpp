@@ -12,6 +12,7 @@ static const char* TAG = "VoltagePID";
 #define PWM_RESOLUTION LEDC_TIMER_10_BIT
 #define PWM_MAX_DUTY ((1 << 10) - 1)  // 1023
 #define PWM_DUTY_LIMIT (int)(PWM_MAX_DUTY * 0.8f) // 80% PWM limit
+#define PWM_DUTY_THRES_OUTPUT_RESTRICT (int)(PWM_MAX_DUTY * 0.85f)
 
 #define CORRECTION_OFFSET 40
 
@@ -89,6 +90,9 @@ void VoltagePID::setPID(float kp, float ki, float kd) {
 }
 
 void VoltagePID::startTask() {
+    powerSurgeFlag = false;
+    lackPowerFlag = false;
+
     if (_taskHandle == nullptr) {
         xTaskCreate(controlTask, "voltage_pid_task", 4096, this, 5, &_taskHandle);
     }
@@ -129,6 +133,12 @@ void VoltagePID::updateControl() {
         float vout = mv / 1000.0f;
         _vin = vout * DIV_RATIO - CORRECTION_OFFSET;
 
+        if (_vin > _target + 10.0f) {
+            powerSurgeFlag = true;
+            ESP_LOGW(TAG, "Power surge detected! Vin=%.1fV Target=%.1fV", _vin, _target);
+            return;
+        }
+
         // PID calculation
         float error = _target - _vin;
         _integral += error * 0.02f;
@@ -138,11 +148,14 @@ void VoltagePID::updateControl() {
 
         int duty = (int)output;
         if (duty < 0) duty = 0;
-        if (duty > PWM_DUTY_LIMIT) duty = PWM_DUTY_LIMIT;
-
+        if (duty > PWM_DUTY_LIMIT) {
+            if (duty > PWM_DUTY_THRES_OUTPUT_RESTRICT) {
+                lackPowerFlag = true;
+                ESP_LOGW(TAG, "Output restriction detected! Vin=%.1fV Target=%.1fV", _vin, _target);
+            }
+            duty = PWM_DUTY_LIMIT;
+        }
         ledc_set_duty(LEDC_LOW_SPEED_MODE, _pwmChannel, duty);
         ledc_update_duty(LEDC_LOW_SPEED_MODE, _pwmChannel);
-
-        // ESP_LOGI(TAG, "Raw:%d Vout=%.3fV Vin=%.1fV Duty=%d", raw, vout, _vin, duty);
     }
 }

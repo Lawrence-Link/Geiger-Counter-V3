@@ -17,6 +17,6 @@ void registerApps() {
     app_man.registerApp(racing_game_app);
     app_man.registerApp(game_pong_app);
     // app_man.registerApp(cube_demo_app);
-    app_man.registerApp(about_app);
     app_man.registerApp(pixel_clock_app);
+    app_man.registerApp(about_app);
 }

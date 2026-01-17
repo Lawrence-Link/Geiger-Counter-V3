@@ -50,7 +50,7 @@ private:
     char print_buffer[15];
 
 public:
-    AppEnvironment(PixelUI& ui) : 
+    AppEnvironment(PixelUI& ui, void* param) : 
     m_ui(ui), 
     chart_temp(m_ui, 71, 2, 56, 19, 110, 19, EXPAND_BASE::BOTTOM_RIGHT), 
     chart_humi(m_ui, 71, 23, 56, 19, 110, 19, EXPAND_BASE::BOTTOM_RIGHT), 
@@ -139,7 +139,7 @@ AppItem app_environment{
     .title = "BME280传感器",
     .bitmap = image_environment_bits,
     
-    .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<AppEnvironment>(ui); 
+    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
+        return std::make_unique<AppEnvironment>(ui, param); 
     },
 };

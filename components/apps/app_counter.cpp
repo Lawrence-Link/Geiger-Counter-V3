@@ -231,7 +231,7 @@ private:
     Tune& tune = Tune::getInstance();
 
 public:
-    APP_COUNTER(PixelUI& ui) : 
+    APP_COUNTER(PixelUI& ui, void* param) : 
     m_ui(ui), 
     histogram(ui, 69, 45, 56, 18, 76, 63, EXPAND_BASE::BOTTOM_RIGHT), 
     brace(ui, 3, 45, 56, 18), 
@@ -610,7 +610,7 @@ AppItem counter_app{
     .bitmap = image_counter_bits,
     
     // Factory function to create an instance of APP_COUNTER
-    .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<APP_COUNTER>(ui); 
+    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
+        return std::make_unique<APP_COUNTER>(ui, param); 
     },
 };

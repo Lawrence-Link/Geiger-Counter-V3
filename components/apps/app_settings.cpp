@@ -134,7 +134,7 @@ ListItem itemList[10] = {
     },
     ListItem{
         .title = "- RTC时间",
-        .pFunc = [](){ ui.getViewManagerPtr()->push(time_setting_app.createApp(ui)); },
+        .pFunc = [](){ ui.getViewManagerPtr()->push(time_setting_app.createApp(ui, nullptr)); },
         .use_fade = true
     },
     ListItem{
@@ -203,7 +203,7 @@ AppItem settings_app{
     .title = "设置",
     .bitmap = image_settings_bits,
     
-    .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
+    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
         return std::make_unique<APP_SETTINGS>(ui, itemList, 10); 
     },
 };

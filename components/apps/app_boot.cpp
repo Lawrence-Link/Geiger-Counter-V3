@@ -31,7 +31,7 @@ private:
     int32_t line_width = 0;
 
 public:
-    App_Boot(PixelUI& ui):m_ui(ui), product_name(ui, 16, 36, "Geiger Counter N1", POS::BOTTOM),
+    App_Boot(PixelUI& ui, void* param) : m_ui(ui), product_name(ui, 16, 36, "Geiger Counter N1", POS::BOTTOM),
     coroutine_anim([this](CoroutineContext& ctx) {
         CORO_BEGIN(ctx);
         CORO_DELAY(ctx, m_ui, 160, 100);
@@ -78,7 +78,7 @@ public:
 AppItem boot_app{
     .title = nullptr,
     .bitmap = nullptr,
-    .createApp = [](PixelUI& ui) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<App_Boot>(ui); 
+    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
+        return std::make_unique<App_Boot>(ui, param); 
     },
 };
