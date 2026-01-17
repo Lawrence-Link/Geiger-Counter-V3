@@ -89,7 +89,7 @@ private:
     // Battery icon state
     uint32_t last_battery_update = 0;
     const unsigned char* current_battery_icon = image_BAT_FULL_bits;
-    
+    char print_buffer[16];
 public:
     APP_PIXEL_CLOCK(PixelUI& ui, void* param) : m_ui(ui) {
         resetDigitState(hourTens);
@@ -342,6 +342,9 @@ public:
         
         // Draw battery icon in top-left corner
         u8g2.drawXBM(2, 2, 10, 6, current_battery_icon);
+        u8g2.setFont(u8g2_font_5x7_mf);
+        sprintf(print_buffer, "%d%%", battery_percentage);
+        u8g2.drawStr(14, 8, print_buffer);
         
         // Draw hours (large font)
         drawScrollingDigit(hourX, baseY, hourTens, true, largeDigitWidth, largeDigitHeight);
