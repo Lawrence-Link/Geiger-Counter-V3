@@ -42,9 +42,17 @@ public:
     bool isExpanded() const { return is_expanded; }
 
     void addData(float value);
-    float getMaxValue() const;
-    float getAverageValue() const;
-    float getMinValue() const;
+    
+    // Statistics within the window
+    float getMaxValueInWindow() const;
+    float getAverageValueInWindow() const;
+    float getMinValueInWindow() const;
+    
+    // Statistics throughout the history
+    float getMaxValueInHistory() const;
+    float getAverageValueInHistory() const;
+    float getMinValueInHistory() const;
+    
     void clearData();
 
 private:
@@ -61,10 +69,22 @@ private:
     int m_write_index = 0;
     int m_data_count = 0;
     
-    // Statistics tracking
+    // Statistics tracking (window)
     float m_max_value = 0.0f;
     float m_min_value = 0.0f;
     float m_sum_value = 0.0f;
+
+    // Statistics tracking (history - all time)
+    float m_hist_max_value = 0.0f;
+    float m_hist_min_value = std::numeric_limits<float>::max();
+    float m_hist_sum_value = 0.0f;
+    uint32_t m_hist_count = 0;
+
+    // Cache for visible window statistics
+    float m_cached_visible_max = 0.0f;
+    float m_cached_visible_min = 0.0f;
+    int m_cached_visible_width = 0;
+    bool m_visible_cache_dirty = true;
 
     float* m_data_ptr = nullptr;     // Pointer to the external circular buffer
     uint16_t m_data_size = 0;        // Total size of the circular buffer

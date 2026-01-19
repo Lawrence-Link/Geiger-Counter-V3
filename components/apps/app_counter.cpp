@@ -21,6 +21,7 @@
 #include <memory>
 #include <etl/stack.h>
 #include "widgets/histogram/histogram.h"
+#include "widgets/curve_chart/curve_chart.h"
 #include "widgets/brace/brace.h"
 #include "widgets/icon_button/icon_button.h"
 #include "focus/focus.h"
@@ -172,7 +173,6 @@ int format_meter_style(char *buffer, size_t buffer_size, float value, const char
     return (int)strlen(buffer);
 }
 
-// --- USER DEFINED APP: A Geiger counter UI demo ---
 class APP_COUNTER: public IApplication {
 private:
     PixelUI& m_ui;
@@ -333,12 +333,12 @@ public:
     int bracePageCnt = 0;
     
     void braceCallback() {
-        if (brace_animating) return;  // 如果正在动画中，忽略输入
+        if (brace_animating) return;  // Ignore input during animation
         
-        // 计算下一个页面 (MAX -> AVG -> MAX)
+        // Calculate the next page (MAX -> AVG -> MAX)
         targetBracePage = (currentBracePage == BracePage::MAX) ? BracePage::AVG : BracePage::MAX;
         
-        // 启动向上滚动动画
+        // Start upward scrolling animation
         const int PAGE_HEIGHT = 18;
         anim_brace_y = 0;
         m_ui.animate(anim_brace_y, PAGE_HEIGHT, 300, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
@@ -359,11 +359,11 @@ public:
             switch (page) {
                 case BracePage::MAX:
                     label = "Max";
-                    value = histogram.getMaxValue();
+                    value = histogram.getMaxValueInHistory();
                     break;
                 case BracePage::AVG:
                     label = "Avg";
-                    value = histogram.getAverageValue();
+                    value = histogram.getAverageValueInHistory();
                     break;
             }
             
@@ -499,7 +499,7 @@ public:
         if (!use_cpm) {
             format_meter_style(print_buffer, sizeof(print_buffer), current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient(), UNIT_USV);
         } else {
-            snprintf(print_buffer, sizeof(print_buffer), "%dCPM", (int)current_cpm);
+            snprintf(print_buffer, sizeof(print_buffer), "%d CPM", (int)current_cpm);
         }
         u8g2.drawStr(3, 31, print_buffer);
         
@@ -566,17 +566,17 @@ public:
             u8g2.drawStr(0, 10, "<STATS>");
             u8g2.drawStr(0, 20, "Max:");
             if (!use_cpm) {
-                snprintf(print_buffer, sizeof(print_buffer), "%.3guSv/h", histogram.getMaxValue());
+                snprintf(print_buffer, sizeof(print_buffer), "%.3guSv/h", histogram.getMaxValueInHistory());
             } else {
-                snprintf(print_buffer, sizeof(print_buffer), "%dCPM", (int)histogram.getMaxValue());
+                snprintf(print_buffer, sizeof(print_buffer), "%dCPM", (int)histogram.getMaxValueInHistory());
             }
             u8g2.drawStr(0, 30, print_buffer);
             
             u8g2.drawStr(0, 40, "Avg:");
             if (!use_cpm){
-                snprintf(print_buffer, sizeof(print_buffer), "%.3guSv/h", histogram.getAverageValue());
+                snprintf(print_buffer, sizeof(print_buffer), "%.3guSv/h", histogram.getAverageValueInHistory());
             } else {
-                snprintf(print_buffer, sizeof(print_buffer), "%dCPM", (int)histogram.getAverageValue());
+                snprintf(print_buffer, sizeof(print_buffer), "%dCPM", (int)histogram.getAverageValueInHistory());
             }
             u8g2.drawStr(0, 50, print_buffer);
         }
@@ -584,7 +584,6 @@ public:
         histogram.draw();
     }
     
-    // Handles user input events
     bool handleInput(InputEvent event) override {
         // Handle input for focus navigation
         if (event == InputEvent::BACK) {

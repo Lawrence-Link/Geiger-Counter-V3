@@ -51,9 +51,17 @@ public:
     bool isExpanded() const { return is_expanded; }
 
     void addData(float value);
-    float getMaxValue() const;
-    float getAverageValue() const;
-    float getMinValue() const;
+
+    // statistics within the window
+    float getMaxValueInWindow() const;
+    float getAverageValueInWindow() const;
+    float getMinValueInWindow() const;
+
+    // statistics throughout the history
+    float getMaxValueInHistory() const;
+    float getAverageValueInHistory() const;
+    float getMinValueInHistory() const;
+
     void clearData();
 
 private:
@@ -70,27 +78,35 @@ private:
     int m_write_index = 0;
     int m_data_count = 0;
     
-    // Statistics tracking
+    // Statistics tracking (window)
     float m_max_value = 0.0f;
     float m_min_value = 0.0f;
     float m_sum_value = 0.0f;
 
-    float* m_data_ptr = nullptr;     // Pointer to the external circular buffer
-    uint16_t m_data_size = 0;        // Total size of the circular buffer
-    uint16_t m_head_index = 0;       // Current head index of the circular buffer
+    // Statistics tracking (history - all time)
+    float m_hist_max_value = 0.0f;
+    float m_hist_min_value = std::numeric_limits<float>::max();
+    float m_hist_sum_value = 0.0f;
+    uint32_t m_hist_count = 0;
 
-    // animation related variables:
+    // Cache for visible window statistics
+    float m_cached_visible_max = 0.0f;
+    float m_cached_visible_min = 0.0f;
+    int m_cached_visible_width = 0;
+    bool m_visible_cache_dirty = true;
+
     int32_t anim_w = 0;
     int32_t anim_h = 0;
     int32_t anim_x = 0;
     int32_t anim_y = 0;
+    
+    bool is_expanded = false;  // Add this line
+    
     void expandWidget();
     void contractWidget();
     void calculateExpandPosition(int32_t& target_x, int32_t& target_y);
     void initializeDataBuffer();
     void updateStatistics(float new_value, float old_value, bool replacing_data);
     void recalculateExtremes();
-    void drawHistogramData(int center_x, int center_y, int half_width, int half_height, U8G2& u8g2);
-
-    bool is_expanded = false;
+    void drawHistogramData(int tl_x, int tl_y, int width, int height, U8G2& u8g2);
 };

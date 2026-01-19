@@ -17,7 +17,7 @@
   }
   ],
 
-  "idf.port": "/dev/tty.usbmodem1101",
+  "idf.port": "/dev/tty.usbmodem1201",
   "idf.toolsPath": "/Users/mac/.espressif",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32c6"

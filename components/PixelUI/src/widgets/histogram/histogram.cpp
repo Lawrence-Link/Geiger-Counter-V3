@@ -93,11 +93,6 @@ void Histogram::onLoad() {
 void Histogram::initializeDataBuffer() {
     // Allocate buffer based on expanded width or default size
     m_buffer_size = (exp_w > size_w_) ? exp_w : 200;
-    
-    // Check if buffer already exists before allocating
-    // if (m_data_buffer != nullptr) {
-    //     delete[] m_data_buffer;
-    // }
     m_data_buffer = std::make_unique<float[]> (m_buffer_size);
 
     // Clear buffer
@@ -111,6 +106,18 @@ void Histogram::initializeDataBuffer() {
     m_max_value = 0.0f;
     m_sum_value = 0.0f;
     m_min_value = std::numeric_limits<float>::max();
+    
+    // Reset history statistics
+    m_hist_max_value = 0.0f;
+    m_hist_min_value = std::numeric_limits<float>::max();
+    m_hist_sum_value = 0.0f;
+    m_hist_count = 0;
+    
+    // Reset visible cache
+    m_cached_visible_max = 0.0f;
+    m_cached_visible_min = 0.0f;
+    m_cached_visible_width = 0;
+    m_visible_cache_dirty = true;
 }
 
 /**
@@ -128,23 +135,26 @@ void Histogram::addData(float value) {
     if (m_data_buffer == nullptr) {
         initializeDataBuffer();
     }
-
-    // Save old value for statistics update
+    
+    // Store the old value at current position for statistics update
     float old_value = m_data_buffer[m_write_index];
     bool replacing_valid_data = (m_data_count >= m_buffer_size);
-
-    // Write new value to circular buffer
+    
+    // Add new value to buffer
     m_data_buffer[m_write_index] = value;
-
-    // Update write index with wrap-around
+    
+    // Update write index (ring buffer)
     m_write_index = (m_write_index + 1) % m_buffer_size;
-
-    // Update data count if buffer not full
+    
+    // Update data count
     if (m_data_count < m_buffer_size) {
         m_data_count++;
     }
-
-    // Update running statistics
+    
+    // Mark visible cache as dirty
+    m_visible_cache_dirty = true;
+    
+    // Update statistics efficiently
     updateStatistics(value, old_value, replacing_valid_data);
 }
 
@@ -155,6 +165,15 @@ void Histogram::addData(float value) {
  * @param replacing_data True if replacing an existing value in a full buffer.
  */
 void Histogram::updateStatistics(float new_value, float old_value, bool replacing_data) {
+    // Update history statistics (all-time)
+    m_hist_max_value = std::max(m_hist_max_value, new_value);
+    if (m_hist_min_value == std::numeric_limits<float>::max() || new_value < m_hist_min_value) {
+        m_hist_min_value = new_value;
+    }
+    m_hist_sum_value += new_value;
+    m_hist_count++;
+
+    // Update window statistics
     if (!replacing_data) {
         // Buffer not full, simple update
         m_sum_value += new_value;
@@ -201,7 +220,7 @@ void Histogram::recalculateExtremes() {
  * @brief Get the maximum value in the histogram.
  * @return Maximum float value in buffer.
  */
-float Histogram::getMaxValue() const {
+float Histogram::getMaxValueInWindow() const {
     return m_max_value;
 }
 
@@ -209,7 +228,7 @@ float Histogram::getMaxValue() const {
  * @brief Get the average value of the histogram.
  * @return Average float value or 0 if buffer empty.
  */
-float Histogram::getAverageValue() const {
+float Histogram::getAverageValueInWindow() const {
     if (m_data_count == 0) {
         return 0.0f;
     }
@@ -220,9 +239,38 @@ float Histogram::getAverageValue() const {
  * @brief Get the minimum value in the histogram.
  * @return Minimum float value in buffer (or 0.0f if empty).
  */
-float Histogram::getMinValue() const {
+float Histogram::getMinValueInWindow() const {
     if (m_data_count == 0) return 0.0f;
     return m_min_value;
+}
+
+/**
+ * @brief Get the maximum value in the entire history.
+ * @return Maximum float value ever recorded.
+ */
+float Histogram::getMaxValueInHistory() const {
+    return m_hist_max_value;
+}
+
+/**
+ * @brief Get the average value of all historical data.
+ * @return Average float value across all recorded data or 0 if no data.
+ */
+float Histogram::getAverageValueInHistory() const {
+    if (m_hist_count == 0) {
+        return 0.0f;
+    }
+    return m_hist_sum_value / m_hist_count;
+}
+
+/**
+ * @brief Get the minimum value in the entire history.
+ * @return Minimum float value ever recorded (or 0.0f if no data).
+ */
+float Histogram::getMinValueInHistory() const {
+    if (m_hist_count == 0) return 0.0f;
+    if (m_hist_min_value == std::numeric_limits<float>::max()) return 0.0f;
+    return m_hist_min_value;
 }
 
 /**
@@ -239,6 +287,18 @@ void Histogram::clearData() {
     m_max_value = 0.0f;
     m_sum_value = 0.0f;
     m_min_value = std::numeric_limits<float>::max();
+    
+    // Reset history statistics
+    m_hist_max_value = 0.0f;
+    m_hist_min_value = std::numeric_limits<float>::max();
+    m_hist_sum_value = 0.0f;
+    m_hist_count = 0;
+    
+    // Reset visible cache
+    m_cached_visible_max = 0.0f;
+    m_cached_visible_min = 0.0f;
+    m_cached_visible_width = 0;
+    m_visible_cache_dirty = true;
 }
 
 /**
@@ -387,40 +447,64 @@ void Histogram::draw() {
  * @param u8g2 Reference to U8G2 for drawing.
  */
 void Histogram::drawHistogramData(int tl_x, int tl_y, int width, int height, U8G2& u8g2) {
-    if (m_data_buffer == nullptr || m_data_count == 0 || m_max_value <= 0.0f) {
+    if (m_data_buffer == nullptr || m_data_count == 0) {
         return;
     }
 
-    // Determine number of points to draw based on widget width
-    int points_to_draw = std::min(static_cast<int>(width), static_cast<int>(m_data_count));
+    // Determine number of points to draw based on current width
+    // Subtract 3 to account for 2px borders (width - 3 = drawable columns from right border to left border inclusive)
+    int points_to_draw = std::min(width - 3, static_cast<int>(m_data_count));
     if (points_to_draw <= 0) return;
 
-    // Compute scale factor for normalizing bar heights (height - 4 to account for border/padding)
-    float scale_factor = static_cast<float>(height - 4) / m_max_value;
+    // Calculate visible window min/max (with caching)
+    if (m_visible_cache_dirty || m_cached_visible_width != points_to_draw) {
+        m_cached_visible_max = -std::numeric_limits<float>::max();
+        m_cached_visible_min = std::numeric_limits<float>::max();
+        
+        for (int i = 0; i < points_to_draw; ++i) {
+            int buffer_offset = i + 1;
+            int data_index = (m_write_index - buffer_offset + m_buffer_size) % m_buffer_size;
+            if (buffer_offset <= m_data_count) {
+                float value = m_data_buffer[data_index];
+                m_cached_visible_max = std::max(m_cached_visible_max, value);
+                m_cached_visible_min = std::min(m_cached_visible_min, value);
+            }
+        }
+        
+        m_cached_visible_width = points_to_draw;
+        m_visible_cache_dirty = false;
+    }
+
+    // Use cached visible window max for scaling
+    float visible_max = m_cached_visible_max;
+    
+    // Use visible max for scaling, or fallback to buffer max
+    float scale_factor = (visible_max > 0.0f) 
+        ? static_cast<float>(height - 4) / visible_max
+        : static_cast<float>(height - 4) / m_max_value;
 
     // Draw bars from right (newest) to left (oldest)
+    // Start from right edge minus 2px border
     for (int i = 0; i < points_to_draw; ++i) {
         int buffer_offset = i + 1;
         int data_index = (m_write_index - buffer_offset + m_buffer_size) % m_buffer_size;
 
-        if (buffer_offset > m_data_count) continue;
+        if (buffer_offset <= m_data_count) {
+            float value = m_data_buffer[data_index];
+            int bar_height = static_cast<int>(value * scale_factor);
 
-        float value = m_data_buffer[data_index];
-        int bar_height = static_cast<int>(value * scale_factor);
+            // Clamp bar height to available vertical space
+            bar_height = std::min(bar_height, height - 4);
+            bar_height = std::max(bar_height, 0);
 
-        // X position: Right Edge - 2 pixels of padding - i
-        int x_pos = tl_x + width - 2 - i;
-        
-        // Break if we run off the left side of the widget content area (tl_x + 2)
-        if (x_pos < tl_x + 2) break;
+            // Calculate bar position: start from right border (tl_x + width - 2), move left
+            int bar_x = tl_x + width - 2 - i;
+            int bar_y = tl_y + height - 2 - bar_height;
 
-        // Y Bottom: Bottom Edge - 1 pixel of padding
-        int y_bottom = tl_y + height - 1;
-        // Y Top: Bottom - bar_height
-        int y_top = y_bottom - bar_height;
-
-        if (bar_height > 0) {
-            u8g2.drawLine(x_pos, y_bottom, x_pos, y_top);
+            // Draw vertical line for the bar
+            if (bar_height > 0) {
+                u8g2.drawVLine(bar_x, bar_y, bar_height);
+            }
         }
     }
 }
