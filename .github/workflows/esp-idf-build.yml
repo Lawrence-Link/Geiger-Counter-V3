@@ -1,12 +1,28 @@
-name: esp-idf build
+name: esp-idf build & manual release
 
 on:
   push:
+    branches: [ "main" ]
   pull_request:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'VERSION 标签名称'
+        required: true
+        default: 'v0.0.1'
+      release_note:
+        description: '更新说明'
+        required: false
+        default: 'Manual build from GitHub Actions'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 增加权限创建 Release
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -14,6 +30,7 @@ jobs:
         with:
           submodules: 'recursive'
 
+      # --- 缓存机制 ---
       - name: Prepare ccache timestamp
         id: ccache_cache_keys
         run: echo "date=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_OUTPUT
@@ -22,11 +39,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /home/runner/.ccache
-          key: esp-idf-ccache-${{ runner.os }}-${{ github.ref }}-${{ steps.ccache_cache_keys.outputs.date }}
+          key: esp-idf-ccache-${{ runner.os }}-${{ steps.ccache_cache_keys.outputs.date }}
           restore-keys: |
-            esp-idf-ccache-${{ runner.os }}-${{ github.ref }}-
             esp-idf-ccache-${{ runner.os }}-
 
+      # --- 构建项目 ---
       - name: Build with ESP-IDF
         uses: espressif/esp-idf-ci-action@v1
         with:
@@ -37,12 +54,22 @@ jobs:
             export CCACHE_DIR=/home/runner/.ccache
             idf.py build
 
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+      # --- 打包产物 ---
+      - name: Prepare Assets
+        run: |
+          mkdir -p release_assets
+          cp build/partition_table/partition-table.bin release_assets/
+          cp build/bootloader/bootloader.bin release_assets/
+          cp build/*.bin release_assets/
+          cp build/flasher_args.json release_assets/
+          cd release_assets && zip -r ../firmware.zip .
+
+      # --- 手动触发时执行 ---
+      - name: Create GitHub Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
         with:
-          name: firmware
-          path: |
-            build/*.bin
-            build/partition_table/*.bin
-            build/bootloader/*.bin
-            build/flasher_args.json
+          tag_name: ${{ github.event.inputs.tag_name }}
+          name: Release ${{ github.event.inputs.tag_name }}
+          body: ${{ github.event.inputs.release_note }}
+          files: firmware.zip
