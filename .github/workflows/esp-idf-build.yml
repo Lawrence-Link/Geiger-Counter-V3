@@ -12,7 +12,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive' 
+          submodules: 'recursive'
 
       - name: Prepare ccache timestamp
         id: ccache_cache_keys
@@ -23,7 +23,6 @@ jobs:
         with:
           path: /home/runner/.ccache
           key: esp-idf-ccache-${{ runner.os }}-${{ github.ref }}-${{ steps.ccache_cache_keys.outputs.date }}
-          # restore-keys 确保如果当前 key 没命中，能找到最接近的旧缓存
           restore-keys: |
             esp-idf-ccache-${{ runner.os }}-${{ github.ref }}-
             esp-idf-ccache-${{ runner.os }}-
@@ -40,3 +39,14 @@ jobs:
           CCACHE_DIR: /home/runner/.ccache
         run: |
           idf.py build
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: esp32c6-firmware
+          path: |
+            build/*.bin
+            build/partition_table/*.bin
+            build/bootloader/*.bin
+            build/flasher_args.json
+          if-no-files-found: error
