@@ -11,13 +11,32 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive' 
+
+      - name: Prepare ccache timestamp
+        id: ccache_cache_keys
+        run: echo "date=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_OUTPUT
+
+      - name: ccache cache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.ccache
+          key: esp-idf-ccache-${{ runner.os }}-${{ github.ref }}-${{ steps.ccache_cache_keys.outputs.date }}
+          # restore-keys 确保如果当前 key 没命中，能找到最接近的旧缓存
+          restore-keys: |
+            esp-idf-ccache-${{ runner.os }}-${{ github.ref }}-
+            esp-idf-ccache-${{ runner.os }}-
 
       - name: Setup ESP-IDF
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v5.5.1
-          target: esp32s3
+          target: esp32c6
 
       - name: Build project
+        env:
+          IDF_CCACHE_ENABLE: "1"
+          CCACHE_DIR: /home/runner/.ccache
         run: |
           idf.py build
