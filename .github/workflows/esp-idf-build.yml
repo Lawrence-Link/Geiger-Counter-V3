@@ -27,26 +27,22 @@ jobs:
             esp-idf-ccache-${{ runner.os }}-${{ github.ref }}-
             esp-idf-ccache-${{ runner.os }}-
 
-      - name: Setup ESP-IDF
+      - name: Build with ESP-IDF
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v5.5.1
           target: esp32c6
-
-      - name: Build project
-        env:
-          IDF_CCACHE_ENABLE: "1"
-          CCACHE_DIR: /home/runner/.ccache
-        run: |
-          idf.py build
+          command: |
+            export IDF_CCACHE_ENABLE=1
+            export CCACHE_DIR=/home/runner/.ccache
+            idf.py build
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: esp32c6-firmware
+          name: firmware
           path: |
             build/*.bin
             build/partition_table/*.bin
             build/bootloader/*.bin
             build/flasher_args.json
-          if-no-files-found: error
