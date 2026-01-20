@@ -480,8 +480,8 @@ void Histogram::drawHistogramData(int tl_x, int tl_y, int width, int height, U8G
     
     // Use visible max for scaling, or fallback to buffer max
     float scale_factor = (visible_max > 0.0f) 
-        ? static_cast<float>(height - 4) / visible_max
-        : static_cast<float>(height - 4) / m_max_value;
+        ? static_cast<float>(height - 2) / visible_max
+        : static_cast<float>(height - 2) / m_max_value;
 
     // Draw bars from right (newest) to left (oldest)
     // Start from right edge minus 2px border
@@ -499,7 +499,7 @@ void Histogram::drawHistogramData(int tl_x, int tl_y, int width, int height, U8G
 
             // Calculate bar position: start from right border (tl_x + width - 2), move left
             int bar_x = tl_x + width - 2 - i;
-            int bar_y = tl_y + height - 2 - bar_height;
+            int bar_y = tl_y + height - bar_height;
 
             // Draw vertical line for the bar
             if (bar_height > 0) {

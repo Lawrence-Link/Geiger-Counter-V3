@@ -25,6 +25,8 @@ static pcnt_channel_handle_t s_pcnt_chan = NULL;
 static SemaphoreHandle_t s_cpm_mutex = NULL;
 static uint32_t g_cpm_x100 = 0;   
 
+bool pulse_marker = false;
+
 static void counter_task(void *pvParameters) 
 {
     auto& syscfg = SystemConf::getInstance();
@@ -51,14 +53,15 @@ static void counter_task(void *pvParameters)
         ESP_ERROR_CHECK(pcnt_unit_get_count(s_pcnt_unit, &current_raw_count));
 
         int delta_pulses = current_raw_count - last_raw_count;
-        if (delta_pulses < 0) {
+        if (delta_pulses < 0) { // to deal with counter overflow
             delta_pulses += (PCNT_HIGH_LIMIT - PCNT_LOW_LIMIT + 1);
         }
         last_raw_count = current_raw_count;
 
-        if (delta_pulses > 0) 
+        if (delta_pulses > 0) // new pulse occurred
         {
             accum_pulses_500ms += delta_pulses;
+            pulse_marker = true;
             
             if (syscfg.read_conf_enable_geiger_click()) {
                 tune.geigerClick();
