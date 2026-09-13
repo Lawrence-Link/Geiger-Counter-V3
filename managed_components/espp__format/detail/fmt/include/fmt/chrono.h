@@ -38,6 +38,7 @@ FMT_BEGIN_NAMESPACE
 // Copyright Paul Dreik 2019
 namespace safe_duration_cast {
 
+// DEPRECATED!
 template <typename To, typename From,
           FMT_ENABLE_IF(!std::is_same<From, To>::value &&
                         std::numeric_limits<From>::is_signed ==
@@ -51,7 +52,7 @@ FMT_CONSTEXPR auto lossless_integral_conversion(const From from, int& ec)
   static_assert(T::is_integer, "To must be integral");
 
   // A and B are both signed, or both unsigned.
-  if (detail::const_check(F::digits <= T::digits)) {
+  if FMT_CONSTEXPR20 (F::digits <= T::digits) {
     // From fits in To without any problem.
   } else {
     // From does not always fit in To, resort to a dynamic check.
@@ -78,22 +79,21 @@ FMT_CONSTEXPR auto lossless_integral_conversion(const From from, int& ec)
   static_assert(F::is_integer, "From must be integral");
   static_assert(T::is_integer, "To must be integral");
 
-  if (detail::const_check(F::is_signed && !T::is_signed)) {
+  if FMT_CONSTEXPR20 (F::is_signed && !T::is_signed) {
     // From may be negative, not allowed!
     if (fmt::detail::is_negative(from)) {
       ec = 1;
       return {};
     }
     // From is positive. Can it always fit in To?
-    if (detail::const_check(F::digits > T::digits) &&
+    if (F::digits > T::digits &&
         from > static_cast<From>(detail::max_value<To>())) {
       ec = 1;
       return {};
     }
   }
 
-  if (detail::const_check(!F::is_signed && T::is_signed &&
-                          F::digits >= T::digits) &&
+  if (!F::is_signed && T::is_signed && F::digits >= T::digits &&
       from > static_cast<From>(detail::max_value<To>())) {
     ec = 1;
     return {};
@@ -161,17 +161,6 @@ auto safe_duration_cast(std::chrono::duration<FromRep, FromPeriod> from,
                         int& ec) -> To {
   using From = std::chrono::duration<FromRep, FromPeriod>;
   ec = 0;
-  if (std::isnan(from.count())) {
-    // nan in, gives nan out. easy.
-    return To{std::numeric_limits<typename To::rep>::quiet_NaN()};
-  }
-  // maybe we should also check if from is denormal, and decide what to do about
-  // it.
-
-  // +-inf should be preserved.
-  if (std::isinf(from.count())) {
-    return To{from.count()};
-  }
 
   // the basic idea is that we need to convert from count() in the from type
   // to count() in the To type, by multiplying it with this:
@@ -198,7 +187,7 @@ auto safe_duration_cast(std::chrono::duration<FromRep, FromPeriod> from,
   }
 
   // multiply with Factor::num without overflow or underflow
-  if (detail::const_check(Factor::num != 1)) {
+  if FMT_CONSTEXPR20 (Factor::num != 1) {
     constexpr auto max1 = detail::max_value<IntermediateRep>() /
                           static_cast<IntermediateRep>(Factor::num);
     if (count > max1) {
@@ -215,7 +204,7 @@ auto safe_duration_cast(std::chrono::duration<FromRep, FromPeriod> from,
   }
 
   // this can't go wrong, right? den>0 is checked earlier.
-  if (detail::const_check(Factor::den != 1)) {
+  if FMT_CONSTEXPR20 (Factor::den != 1) {
     using common_t = typename std::common_type<IntermediateRep, intmax_t>::type;
     count /= static_cast<common_t>(Factor::den);
   }
@@ -282,8 +271,6 @@ namespace detail {
 #define FMT_NOMACRO
 
 template <typename T = void> struct null {};
-inline auto localtime_r FMT_NOMACRO(...) -> null<> { return null<>(); }
-inline auto localtime_s(...) -> null<> { return null<>(); }
 inline auto gmtime_r(...) -> null<> { return null<>(); }
 inline auto gmtime_s(...) -> null<> { return null<>(); }
 
@@ -349,7 +336,7 @@ void write_codecvt(codecvt_result<CodeUnit>& out, string_view in,
 template <typename OutputIt>
 auto write_encoded_tm_str(OutputIt out, string_view in, const std::locale& loc)
     -> OutputIt {
-  if (const_check(detail::use_utf8) && loc != get_classic_locale()) {
+  if (detail::use_utf8 && loc != get_classic_locale()) {
     // char16_t and char32_t codecvts are broken in MSVC (linkage errors) and
     // gcc-4.
 #if FMT_MSC_VERSION != 0 ||  \
@@ -443,21 +430,18 @@ auto duration_cast(std::chrono::duration<FromRep, FromPeriod> from) -> To {
 
   using common_rep = typename std::common_type<FromRep, typename To::rep,
                                                decltype(factor::num)>::type;
-
-  int ec = 0;
-  auto count = safe_duration_cast::lossless_integral_conversion<common_rep>(
-      from.count(), ec);
-  if (ec) throw_duration_error();
+  common_rep count = from.count();  // This conversion is lossless.
 
   // Multiply from.count() by factor and check for overflow.
-  if (const_check(factor::num != 1)) {
+  if FMT_CONSTEXPR20 (factor::num != 1) {
     if (count > max_value<common_rep>() / factor::num) throw_duration_error();
     const auto min = (std::numeric_limits<common_rep>::min)() / factor::num;
-    if (const_check(!std::is_unsigned<common_rep>::value) && count < min)
+    if (!std::is_unsigned<common_rep>::value && count < min)
       throw_duration_error();
     count *= factor::num;
   }
-  if (const_check(factor::den != 1)) count /= factor::den;
+  if FMT_CONSTEXPR20 (factor::den != 1) count /= factor::den;
+  int ec = 0;
   auto to =
       To(safe_duration_cast::lossless_integral_conversion<typename To::rep>(
           count, ec));
@@ -471,6 +455,8 @@ template <typename To, typename FromRep, typename FromPeriod,
                             std::is_floating_point<typename To::rep>::value)>
 auto duration_cast(std::chrono::duration<FromRep, FromPeriod> from) -> To {
 #if FMT_SAFE_DURATION_CAST
+  // Preserve infinity and NaN.
+  if (!isfinite(from.count())) return static_cast<To>(from.count());
   // Throwing version of safe_duration_cast is only available for
   // integer to integer or float to float casts.
   int ec;
@@ -487,7 +473,7 @@ template <typename To, typename FromRep, typename FromPeriod,
           FMT_ENABLE_IF(
               !is_similar_arithmetic_type<FromRep, typename To::rep>::value)>
 auto duration_cast(std::chrono::duration<FromRep, FromPeriod> from) -> To {
-  // Mixed integer <-> float cast is not supported by safe_duration_cast.
+  // Mixed integer <-> float cast is not supported by safe duration_cast.
   return std::chrono::duration_cast<To>(from);
 }
 
@@ -501,85 +487,9 @@ auto to_time_t(sys_time<Duration> time_point) -> std::time_t {
       .count();
 }
 
-namespace tz {
-
-// DEPRECATED!
-struct time_zone {
-  template <typename Duration, typename LocalTime>
-  auto to_sys(LocalTime) -> sys_time<Duration> {
-    return {};
-  }
-};
-template <typename... T> auto current_zone(T...) -> time_zone* {
-  return nullptr;
-}
-
-template <typename... T> void _tzset(T...) {}
-}  // namespace tz
-
-// DEPRECATED!
-inline void tzset_once() {
-  static bool init = []() {
-    using namespace tz;
-    _tzset();
-    return false;
-  }();
-  ignore_unused(init);
-}
 }  // namespace detail
 
 FMT_BEGIN_EXPORT
-
-/**
- * Converts given time since epoch as `std::time_t` value into calendar time,
- * expressed in local time. Unlike `std::localtime`, this function is
- * thread-safe on most platforms.
- */
-FMT_DEPRECATED inline auto localtime(std::time_t time) -> std::tm {
-  struct dispatcher {
-    std::time_t time_;
-    std::tm tm_;
-
-    inline dispatcher(std::time_t t) : time_(t) {}
-
-    inline auto run() -> bool {
-      using namespace fmt::detail;
-      return handle(localtime_r(&time_, &tm_));
-    }
-
-    inline auto handle(std::tm* tm) -> bool { return tm != nullptr; }
-
-    inline auto handle(detail::null<>) -> bool {
-      using namespace fmt::detail;
-      return fallback(localtime_s(&tm_, &time_));
-    }
-
-    inline auto fallback(int res) -> bool { return res == 0; }
-
-#if !FMT_MSC_VERSION
-    inline auto fallback(detail::null<>) -> bool {
-      using namespace fmt::detail;
-      std::tm* tm = std::localtime(&time_);
-      if (tm) tm_ = *tm;
-      return tm != nullptr;
-    }
-#endif
-  };
-  dispatcher lt(time);
-  // Too big time values may be unsupported.
-  if (!lt.run()) FMT_THROW(format_error("time_t value out of range"));
-  return lt.tm_;
-}
-
-#if FMT_USE_LOCAL_TIME
-template <typename Duration>
-FMT_DEPRECATED auto localtime(std::chrono::local_time<Duration> time)
-    -> std::tm {
-  using namespace std::chrono;
-  using namespace detail::tz;
-  return localtime(detail::to_time_t(current_zone()->to_sys<Duration>(time)));
-}
-#endif
 
 /**
  * Converts given time since epoch as `std::time_t` value into calendar time,
@@ -633,8 +543,7 @@ namespace detail {
 // https://johnnylee-sde.github.io/Fast-unsigned-integer-to-time-string/.
 inline void write_digit2_separated(char* buf, unsigned a, unsigned b,
                                    unsigned c, char sep) {
-  unsigned long long digits =
-      a | (b << 24) | (static_cast<unsigned long long>(c) << 48);
+  ullong digits = a | (b << 24) | (static_cast<ullong>(c) << 48);
   // Convert each value to BCD.
   // We have x = a * 10 + b and we want to convert it to BCD y = a * 16 + b.
   // The difference is
@@ -648,12 +557,12 @@ inline void write_digit2_separated(char* buf, unsigned a, unsigned b,
   // Put low nibbles to high bytes and high nibbles to low bytes.
   digits = ((digits & 0x00f00000f00000f0) >> 4) |
            ((digits & 0x000f00000f00000f) << 8);
-  auto usep = static_cast<unsigned long long>(sep);
+  auto usep = static_cast<ullong>(sep);
   // Add ASCII '0' to each digit byte and insert separators.
   digits |= 0x3030003030003030 | (usep << 16) | (usep << 40);
 
   constexpr size_t len = 8;
-  if (const_check(is_big_endian())) {
+  if (is_big_endian()) {
     char tmp[len];
     std::memcpy(tmp, &digits, len);
     std::reverse_copy(tmp, tmp + len, buf);
@@ -1000,16 +909,16 @@ template <typename T>
 struct has_tm_zone<T, void_t<decltype(T::tm_zone)>> : std::true_type {};
 
 template <typename T, FMT_ENABLE_IF(has_tm_zone<T>::value)>
-bool set_tm_zone(T& time, char* tz) {
+auto set_tm_zone(T& time, char* tz) -> bool {
   time.tm_zone = tz;
   return true;
 }
 template <typename T, FMT_ENABLE_IF(!has_tm_zone<T>::value)>
-bool set_tm_zone(T&, char*) {
+auto set_tm_zone(T&, char*) -> bool {
   return false;
 }
 
-inline char* utc() {
+inline auto utc() -> char* {
   static char tz[] = "UTC";
   return tz;
 }
@@ -1665,7 +1574,7 @@ auto format_duration_unit(OutputIt out) -> OutputIt {
     return copy_unit(string_view(unit), out, Char());
   *out++ = '[';
   out = write<Char>(out, Period::num);
-  if (const_check(Period::den != 1)) {
+  if FMT_CONSTEXPR20 (Period::den != 1) {
     *out++ = '/';
     out = write<Char>(out, Period::den);
   }
@@ -1683,8 +1592,13 @@ class get_locale {
 
  public:
   inline get_locale(bool localized, locale_ref loc) : has_locale_(localized) {
-    if (localized)
-      ::new (&locale_) std::locale(loc.template get<std::locale>());
+    if (!localized) return;
+    ignore_unused(loc);
+    ::new (&locale_) std::locale(
+#if FMT_USE_LOCALE
+        loc.template get<std::locale>()
+#endif
+    );
   }
   inline ~get_locale() {
     if (has_locale_) locale_.~locale();
@@ -2230,7 +2144,7 @@ template <typename Char> struct formatter<std::tm, Char> {
     detail::handle_dynamic_spec(specs.dynamic_width(), specs.width, width_ref_,
                                 ctx);
 
-    auto loc_ref = specs.localized() ? ctx.locale() : detail::locale_ref();
+    auto loc_ref = specs.localized() ? ctx.locale() : locale_ref();
     detail::get_locale loc(static_cast<bool>(loc_ref), loc_ref);
     auto w = detail::tm_writer<basic_appender<Char>, Char, Duration>(
         loc, out, tm, subsecs);
@@ -2263,9 +2177,9 @@ struct formatter<sys_time<Duration>, Char> : private formatter<std::tm, Char> {
       -> decltype(ctx.out()) {
     std::tm tm = gmtime(val);
     using period = typename Duration::period;
-    if (detail::const_check(
-            period::num == 1 && period::den == 1 &&
-            !std::is_floating_point<typename Duration::rep>::value)) {
+    if FMT_CONSTEXPR20 (period::num == 1 && period::den == 1 &&
+                        !std::is_floating_point<
+                            typename Duration::rep>::value) {
       detail::set_tm_zone(tm, detail::utc());
       return formatter<std::tm, Char>::format(tm, ctx);
     }

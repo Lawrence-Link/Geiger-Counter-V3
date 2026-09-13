@@ -1,6 +1,7 @@
 #pragma once
 
 #include "driver/ledc.h"
+#include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include "freertos/FreeRTOS.h"

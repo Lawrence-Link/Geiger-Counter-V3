@@ -8,9 +8,10 @@ with CMake, while the [Build Systems](#build-systems) section covers the rest.
 
 ## CMake
 
-{fmt} provides two CMake targets: `fmt::fmt` for the compiled library and
-`fmt::fmt-header-only` for the header-only library. It is recommended to use
-the compiled library for improved build times.
+{fmt} provides three CMake targets: `fmt::fmt` for the standard compiled library,
+`fmt::fmt-module` for the C++ module library and `fmt::fmt-header-only` for the
+header-only library. It is recommended to use the compiled library or the module 
+library for improved build times. 
 
 There are three primary ways to use {fmt} with CMake:
 
@@ -39,6 +40,12 @@ There are three primary ways to use {fmt} with CMake:
 
         add_subdirectory(fmt)
         target_link_libraries(<your-target> fmt::fmt)
+
+### Alternative Targets
+
+In order to use the header-only target or the module target, simply substitute the
+`fmt::fmt` in the above steps with `fmt::fmt-header-only` or `fmt::fmt-module` 
+accordingly.
 
 ## Installation
 
@@ -77,6 +84,17 @@ Download and install {fmt} using the vcpkg package manager:
 community contributors. If the version is out of date, please [create an
 issue or pull request](https://github.com/Microsoft/vcpkg) on the vcpkg
 repository. -->
+
+### Conan
+
+You can download and install {fmt} using the [Conan](https://conan.io/) package manager:
+
+    conan install -r conancenter --requires="fmt/[*]" --build=missing
+
+<!-- The {fmt} package in Conan Center is maintained by
+[ConanCenterIndex](https://github.com/conan-io/conan-center-index) community.
+If the version is out of date or the package does not work,
+please create an issue or pull request on the Conan Center Index repository. -->
 
 ## Building from Source
 

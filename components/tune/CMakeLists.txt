@@ -1,5 +1,5 @@
 idf_component_register(
     SRCS "tune.cpp"
     INCLUDE_DIRS "."
-    REQUIRES "driver" "esp_common" "main" buzzer
+    REQUIRES "driver" "esp_common" "main" buzzer esp_driver_ledc
 )

@@ -176,7 +176,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
         {Notes::B5, 52}        // 8b5
     };
 
-    if (syscfg.read_conf_enable_interaction_tone()) tune.playMelody(startup);
+    if (syscfg.read_conf_enable_interaction_tone()) tune.playMelody(bluejay);
 
     startBatteryTask();
     

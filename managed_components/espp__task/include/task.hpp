@@ -43,6 +43,8 @@ namespace espp {
  * \snippet task_example.cpp Task Info example
  * \section task_ex7 Task Request Stop Example
  * \snippet task_example.cpp Task Request Stop example
+ * \section task_ex8 Task Priority and Core Affinity Example
+ * \snippet task_example.cpp Task Priority and Core example
  *
  * \section run_on_core_ex1 Run on Core Example
  * \snippet task_example.cpp run on core example
@@ -156,8 +158,27 @@ public:
   struct BaseConfig {
     std::string name;              /**< Name of the task */
     size_t stack_size_bytes{4096}; /**< Stack Size (B) allocated to the task. */
-    size_t priority{0}; /**< Priority of the task, 0 is lowest priority on ESP / FreeRTOS.  */
+    size_t priority{0}; /**< Priority of the task; 0 is the lowest, and espp uses the FreeRTOS
+                           convention that ~25 is the highest useful "real-time" priority.
+                           Platform semantics: on ESP this is the FreeRTOS task priority (clamped
+                           to configMAX_PRIORITIES - 1) and is always applied. On host platforms
+                           (Linux / macOS / Windows) the priority is stored but only applied to
+                           the OS thread when host_realtime is set - see below. */
     int core_id{-1};    /**< Core ID of the task, -1 means it is not pinned to any core.  */
+    bool host_realtime{
+        false}; /**< Opt-in to applying the priority to the OS thread on HOST platforms (ignored
+                   on ESP, where the FreeRTOS priority is always applied). When false (the
+                   default) the thread uses the OS default scheduling, matching espp's historical
+                   host behavior. When true: on Linux and macOS, priority 0 resets the thread to
+                   the default scheduler (SCHED_OTHER) while priority >= 1 is mapped linearly
+                   onto the SCHED_FIFO real-time priority range - giving true preemptive
+                   priority scheduling when permitted; on Windows the priority is mapped
+                   best-effort onto SetThreadPriority() classes (NORMAL / ABOVE_NORMAL / HIGHEST
+                   / TIME_CRITICAL).
+                   @warning A SCHED_FIFO thread that spins can starve the rest of the system.
+                   On Linux this requires CAP_SYS_NICE or an RLIMIT_RTPRIO allowance (and
+                   delivers hard preemption on PREEMPT_RT kernels); without permission the task
+                   falls back gracefully to default scheduling with a one-time warning. */
   };
 
   /**
@@ -270,6 +291,54 @@ public:
    */
   bool is_running() const;
 
+  /**
+   * @brief Set the priority of the task.
+   * @details The new priority is always stored in the task's configuration, so
+   *          it will be used the next time the task is started. If the task is
+   *          currently running, the change is also applied to the live task
+   *          immediately: via vTaskPrioritySet() on ESP, via
+   *          pthread_setschedparam() (SCHED_FIFO for priority >= 1, default
+   *          scheduling for priority 0) on Linux/macOS, and via
+   *          SetThreadPriority() on Windows. See BaseConfig::priority for the
+   *          per-platform semantics (including the unprivileged-Linux graceful
+   *          fallback).
+   * @param priority New priority (0 is lowest; see BaseConfig::priority). It is
+   *          clamped to [0, configMAX_PRIORITIES - 1] on ESP.
+   * @return true if the change was applied to the currently-running task; false
+   *          if the task is not running (the new value still takes effect the
+   *          next time the task is started) or the platform / privileges did
+   *          not allow changing the live task's scheduling.
+   */
+  bool set_priority(size_t priority);
+
+  /**
+   * @brief Get the priority stored in the task's configuration.
+   * @details This is the value set at construction or via set_priority(); it
+   *          is the priority the task will be started with (and, if the task
+   *          is running, the priority that was last requested for it).
+   * @return The configured priority (0 is lowest; see BaseConfig::priority).
+   */
+  size_t get_configured_priority() const { return priority_; }
+
+  /**
+   * @brief Set the core affinity (core ID) of the task.
+   * @details The new core ID is always stored in the task's configuration, so
+   *          it will be used the next time the task is started. On the default
+   *          ESP-IDF FreeRTOS port a running task's core affinity cannot be
+   *          changed (it is fixed when the task is created), so for an
+   *          already-started task this only takes effect after a stop()/start().
+   *          If the underlying FreeRTOS build does provide a runtime
+   *          core-affinity API (configUSE_CORE_AFFINITY on a multi-core SMP
+   *          build), the change is applied to the live task immediately.
+   * @param core_id Core to pin the task to (0 or 1), or -1 to leave the task
+   *          unpinned (able to run on any core).
+   * @return true if the change was applied to the currently-running task; false
+   *          if the task is not running or the platform cannot change a live
+   *          task's core affinity (in which case the new value still takes
+   *          effect the next time the task is started).
+   */
+  bool set_core_id(int core_id);
+
 #if defined(ESP_PLATFORM) || defined(_DOXYGEN_)
   /**
    * @brief Start the task watchdog for this task.
@@ -299,8 +368,8 @@ public:
    *       enabled in the menuconfig. Default is y (enabled).
    * @note This function will not monitor the idle tasks.
    * @note If the watchdog has not been configured, then this function will call
-   *       `esp_task_wdt_init`, otherwise it will then call
-   *       `esp_task_wdt_reconfigure`.
+   *       <tt>esp_task_wdt_init</tt>, otherwise it will then call
+   *       <tt>esp_task_wdt_reconfigure</tt>.
    */
   static bool configure_task_watchdog(uint32_t timeout_ms, bool panic_on_timeout = true);
 
@@ -314,8 +383,8 @@ public:
    *       enabled in the menuconfig. Default is y (enabled).
    * @note This function will not monitor the idle tasks.
    * @note If the watchdog has not been configured, then this function will call
-   *       `esp_task_wdt_init`, otherwise it will then call
-   *       `esp_task_wdt_reconfigure`.
+   *       <tt>esp_task_wdt_init</tt>, otherwise it will then call
+   *       <tt>esp_task_wdt_reconfigure</tt>.
    */
   static bool configure_task_watchdog(const std::chrono::milliseconds &timeout,
                                       bool panic_on_timeout = true);
@@ -352,11 +421,109 @@ public:
    * @note This function is only available on ESP
    */
   static std::string get_info(const Task &task);
+
+  /**
+   * @brief Get the FreeRTOS task handle for the task of the current context.
+   * @return TaskHandle_t FreeRTOS task handle
+   * @note This function is only available on ESP
+   * @note This function is designed to be used in conjunction with FreeRTOS
+   *       APIs which require a TaskHandle_t.
+   */
+  static TaskHandle_t get_freertos_handle() { return xTaskGetCurrentTaskHandle(); }
+
+  /**
+   * @brief Get the FreeRTOS task handle for the provided task.
+   * @param task Reference to the task for which you want the FreeRTOS handle.
+   * @return TaskHandle_t FreeRTOS task handle
+   * @warning This will only return a valid handle if the task is started.
+   * @note This function is only available on ESP
+   * @note This function is designed to be used in conjunction with FreeRTOS
+   *       APIs which require a TaskHandle_t. If you're wanting to print or use
+   *       the pointer in other ways, It's recommended to get the void* pointer
+   *       from get_id() instead, which can be directly printed without needing
+   *       fmt::ptr.
+   */
+  static TaskHandle_t get_freertos_handle(const Task &task) {
+    return static_cast<TaskHandle_t>(task.get_id());
+  }
+
+  /**
+   * @brief Get the priority for the task of the current context.
+   * @return int Priority of the task
+   * @note This function is only available on ESP
+   */
+  static int get_priority() { return uxTaskPriorityGet(nullptr); }
+
+  /**
+   * @brief Get the priority for the provided task.
+   * @param task Reference to the task for which you want the priority.
+   * @return int Priority of the task
+   * @note This function is only available on ESP
+   */
+  static int get_priority(const Task &task) { return uxTaskPriorityGet(get_freertos_handle(task)); }
+
+  /**
+   * @brief Get the stack high water mark (minimum free stack space) for the
+   *        task of the current context.
+   * @return size_t Stack high water mark (bytes). This is the minimum number of
+   *         bytes that have remained unallocated on the stack since the task
+   *         started. Higher values indicate more free stack space, lower values
+   *         indicate less free stack space.
+   * @note This function is only available on ESP
+   */
+  static size_t get_high_water_mark() {
+    return uxTaskGetStackHighWaterMark(nullptr) * sizeof(StackType_t);
+  }
+
+  /**
+   * @brief Get the stack high water mark (minimum free stack space) for the
+   *        provided task.
+   * @param task Reference to the task for which you want the high water mark.
+   * @return size_t Stack high water mark (bytes). This is the minimum number of
+   *         bytes that have remained unallocated on the stack since the task
+   *         started. Higher values indicate more free stack space, lower values
+   *         indicate less free stack space.
+   * @note This function is only available on ESP
+   */
+  static size_t get_high_water_mark(const Task &task) {
+    return uxTaskGetStackHighWaterMark(get_freertos_handle(task)) * sizeof(StackType_t);
+  }
+
+  /**
+   * @brief Get the core ID for the task of the current context.
+   * @return int Core ID of the task. -1 if the task is not pinned to any
+   *                core.
+   * @note This function is only available on ESP
+   */
+  static int get_core_id() {
+    auto core_id = xPortGetCoreID();
+    if (core_id == tskNO_AFFINITY) {
+      return -1;
+    }
+    return core_id;
+  }
+
+  /**
+   * @brief Get the core ID for the provided task.
+   * @param task Reference to the task for which you want the core ID.
+   * @return int Core ID of the task. -1 if the task is not pinned to any
+   *                core.
+   * @note This function is only available on ESP
+   */
+  static int get_core_id(const Task &task) {
+    auto core_id = xTaskGetCoreID(get_freertos_handle(task));
+    if (core_id == tskNO_AFFINITY) {
+      return -1;
+    }
+    return core_id;
+  }
+
 #endif // ESP_PLATFORM
 
   /**
    * @brief Get the ID for this Task's thread / task context.
    * @return ID for this Task's thread / task context.
+   * @warning This will only return a valid id if the task is started.
    */
   task_id_t get_id() const {
 #if defined(ESP_PLATFORM)
@@ -365,6 +532,14 @@ public:
     return thread_.get_id();
 #endif
   }
+
+  /**
+   * @brief Get the ID for the Task's thread / task context.
+   * @param task Reference to the task for which you want the ID.
+   * @return ID for this Task's thread / task context.
+   * @warning This will only return a valid id if the task is started.
+   */
+  static task_id_t get_id(const Task &task) { return task.get_id(); }
 
   /**
    * @brief Get the ID for the current thread / task context.
@@ -392,9 +567,41 @@ protected:
    */
   void notify_and_join();
 
-  std::string name_;          ///< Name of the task, used in logs and task monitoring.
+#if !defined(ESP_PLATFORM)
+  /**
+   * @brief Apply \p priority to the (running) \p thread using the host OS
+   *        scheduling API (best-effort; see BaseConfig::priority).
+   * @param thread The thread to apply the priority to; must be joinable.
+   * @param priority The espp priority to apply (0 = default scheduling).
+   * @return true if the OS accepted the scheduling change, false otherwise
+   *         (e.g. insufficient privileges - the thread keeps running with
+   *         default scheduling).
+   */
+  bool apply_thread_priority(std::thread &thread, size_t priority);
+
+  /**
+   * @brief Apply \p priority to the thread identified by the OS-native
+   *        \p handle (best-effort; see BaseConfig::priority). Called by the
+   *        worker thread itself (with its own handle) before its first
+   *        callback invocation so the scheduling policy is guaranteed to be
+   *        in place for the task's entire execution, and by
+   *        apply_thread_priority() for live set_priority() changes.
+   * @param handle Native handle of the thread to apply the priority to.
+   * @param priority The espp priority to apply (0 = default scheduling).
+   * @return true if the OS accepted the scheduling change, false otherwise.
+   */
+  bool apply_thread_priority_to_handle(std::thread::native_handle_type handle, size_t priority);
+#endif
+
   callback_variant callback_; ///< Variant of the callback function for the task.
   BaseConfig config_;         ///< Configuration for the task.
+
+  /// Configured priority. Single source of truth after construction (initialized
+  /// from config_.priority): written by set_priority() and read concurrently by
+  /// the worker thread's startup priority application, start(), and
+  /// get_configured_priority() - atomic so a live set_priority() cannot race
+  /// those reads.
+  std::atomic<size_t> priority_{0};
 
   std::atomic<bool> started_{false};
   std::condition_variable cv_;
@@ -402,9 +609,18 @@ protected:
   std::mutex cv_m_;
   std::mutex thread_mutex_;
   std::thread thread_;
+#if !defined(ESP_PLATFORM)
+  /// Serializes the OS-level priority applications (the worker's startup
+  /// self-application vs a live set_priority()), so a startup application can
+  /// never overwrite a newer concurrent request with a stale value. Separate
+  /// from thread_mutex_ because notify_and_join() holds thread_mutex_ across
+  /// join() - the worker taking thread_mutex_ at startup could deadlock a
+  /// stop() issued right after start().
+  std::mutex priority_apply_mutex_;
+#endif
 #if defined(ESP_PLATFORM)
   std::atomic<bool> watchdog_started_{false};
-  task_id_t task_handle_;
+  task_id_t task_handle_{nullptr};
 #endif
 };
 } // namespace espp

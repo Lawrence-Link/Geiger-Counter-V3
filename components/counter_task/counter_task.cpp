@@ -120,8 +120,11 @@ bool start_counter_task(const counter_task_config_t* config)
 
     pcnt_unit_config_t unit_config = 
     {
+        .group_id = 0,
+        .clk_src = PCNT_CLK_SRC_DEFAULT,
         .low_limit = PCNT_LOW_LIMIT,
         .high_limit = PCNT_HIGH_LIMIT,
+        .intr_priority = 0,
         .flags = { .accum_count = true },
     };
     ESP_ERROR_CHECK(pcnt_new_unit(&unit_config, &s_pcnt_unit));
@@ -130,6 +133,7 @@ bool start_counter_task(const counter_task_config_t* config)
     {
         .edge_gpio_num = GPIO_INPUT_PIN,
         .level_gpio_num = -1,
+        .flags = {},
     };
     ESP_ERROR_CHECK(pcnt_new_channel(s_pcnt_unit, &chan_config, &s_pcnt_chan));
 

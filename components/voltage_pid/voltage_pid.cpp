@@ -74,7 +74,8 @@ VoltagePID::VoltagePID(adc_unit_t unit,
         .duty = 0,
         .hpoint = 0,
         .sleep_mode = LEDC_SLEEP_MODE_KEEP_ALIVE,
-        .flags = {.output_invert = 0}
+        .flags = {.output_invert = 0},
+        .deconfigure = false
     };
     ESP_ERROR_CHECK(ledc_channel_config(&ch_conf));
 }

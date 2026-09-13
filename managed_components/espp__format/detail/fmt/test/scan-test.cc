@@ -7,8 +7,6 @@
 
 #include "scan.h"
 
-#include <time.h>
-
 #include <climits>
 #include <thread>
 
@@ -56,6 +54,22 @@ TEST(scan_test, read_hex) {
       fmt::scan<unsigned>(fmt::format("1{:0{}}", 0, num_digits), "{:x}")
           ->value(),
       fmt::format_error, "number is too big");
+}
+
+TEST(scan_test, read_floats) {
+  auto float_result = fmt::scan<float>("3.14", "{}");
+  EXPECT_TRUE(float_result);
+  EXPECT_FLOAT_EQ(float_result->value(), 3.14f);
+
+  auto double_result = fmt::scan<double>("3.14", "{}");
+  EXPECT_TRUE(double_result);
+  EXPECT_DOUBLE_EQ(double_result->value(), 3.14);
+}
+
+TEST(scan_test, read_double_whitespace) {
+  auto result = fmt::scan<double>("   2.5   ", "{}");
+  EXPECT_TRUE(result);
+  EXPECT_DOUBLE_EQ(result->value(), 2.5);
 }
 
 TEST(scan_test, read_string) {

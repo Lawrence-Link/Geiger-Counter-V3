@@ -3,7 +3,7 @@
 [OSHWHub上的工程点这里](https://oshwhub.com/qstorey/geiger-counter-n1/)
 
 
-> 此工程在ESP-IDF v5.5.1下进行开发构建。
+> 此工程在 ESP-IDF v6.1 下进行开发构建。
 至少使用内置4MB FLASH的ESP32-C6。
 
 ## 构造前的配置 (must read): 

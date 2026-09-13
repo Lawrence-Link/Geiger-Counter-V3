@@ -7,8 +7,12 @@
 #include <string_view>
 
 #if defined(ESP_PLATFORM)
-#include <esp_timer.h>
+// include sdkconfig before the rest
 #include <sdkconfig.h>
+
+// esp-idf includes
+#include <esp_log_timestamp.h>
+#include <esp_timer.h>
 #endif
 
 #include "format.hpp"
@@ -86,6 +90,8 @@ public:
     NONE,  /**< No verbosity - logger will not print anything. */
   };
 
+  using clock_t = std::chrono::steady_clock; /**< The clock type used for rate limiting. */
+
   /**
    * @brief Configuration struct for the logger.
    */
@@ -106,7 +112,7 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
    */
   explicit Logger(const Config &config)
       : tag_(config.tag)
-      , rate_limit_(config.rate_limit)
+      , rate_limit_(std::chrono::duration_cast<clock_t::duration>(config.rate_limit))
       , include_time_(config.include_time)
       , level_(config.level) {}
 
@@ -128,13 +134,48 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
    */
   Logger(Logger &&other) noexcept // cppcheck-suppress missingMemberCopy
       : tag_([&other] {
-        std::lock_guard<std::mutex> lock(other.tag_mutex_);
+        std::scoped_lock lock(other.tag_mutex_);
         return std::move(other.tag_);
       }())
-      , rate_limit_(std::move(other.rate_limit_))
-      , last_print_(std::move(other.last_print_))
+      , rate_limit_(other.rate_limit_)
+      , last_print_(other.last_print_.load())
       , include_time_(other.include_time_.load())
       , level_(other.level_.load()) {}
+
+  /**
+   * @brief Copy assignment operator
+   * @param other The other logger to copy from.
+   * @return Reference to this logger.
+   * @note This will NOT copy the last_print_ time, as this is not meaningful
+   *       for the new logger.
+   */
+  Logger &operator=(const Logger &other) { // cppcheck-suppress operatorEqVarError
+    if (this != &other) {
+      std::scoped_lock lock(tag_mutex_, other.tag_mutex_);
+      tag_ = other.tag_;
+      rate_limit_ = other.rate_limit_;
+      include_time_ = other.include_time_.load();
+      level_ = other.level_.load();
+    }
+    return *this;
+  }
+
+  /**
+   * @brief Move assignment operator
+   * @param other The other logger to move from.
+   * @return Reference to this logger.
+   */
+  Logger &operator=(Logger &&other) noexcept {
+    if (this != &other) {
+      std::scoped_lock lock(tag_mutex_, other.tag_mutex_);
+      tag_ = std::move(other.tag_);
+      rate_limit_ = other.rate_limit_;
+      last_print_.store(other.last_print_.load());
+      include_time_ = other.include_time_.load();
+      level_ = other.level_.load();
+    }
+    return *this;
+  }
 
   /**
    * @brief Get the current verbosity for the logger.
@@ -155,7 +196,7 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
    * @param tag The new tag.
    */
   void set_tag(const std::string_view tag) {
-    std::lock_guard<std::mutex> lock(tag_mutex_);
+    std::scoped_lock lock(tag_mutex_);
     tag_ = tag;
   }
 
@@ -178,13 +219,17 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
    * @param rate_limit The new rate limit.
    * @note Only calls that have _rate_limited suffixed will be rate limited.
    */
-  void set_rate_limit(const std::chrono::duration<float> rate_limit) { rate_limit_ = rate_limit; }
+  void set_rate_limit(const std::chrono::duration<float> rate_limit) {
+    rate_limit_ = std::chrono::duration_cast<clock_t::duration>(rate_limit);
+  }
 
   /**
    * @brief Get the current rate limit for the logger.
    * @return The current rate limit.
    */
-  std::chrono::duration<float> get_rate_limit() const { return rate_limit_; }
+  std::chrono::duration<float> get_rate_limit() const {
+    return std::chrono::duration_cast<std::chrono::duration<float>>(rate_limit_);
+  }
 
   /**
    * @brief Format args into string according to format string. From:
@@ -194,7 +239,8 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
    * @param args optional arguments passed to be formatted.
    * @return formatted std::string
    */
-  template <typename... Args> std::string format(std::string_view rt_fmt_str, Args &&...args) {
+  template <typename... Args>
+  std::string format(std::string_view rt_fmt_str, Args &&...args) const {
     return fmt::vformat(rt_fmt_str, fmt::make_format_args(args...));
   }
 
@@ -203,16 +249,16 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
    * @param rt_fmt_str format string
    * @param args optional arguments passed to be formatted.
    */
-  template <typename... Args> void debug(std::string_view rt_fmt_str, Args &&...args) {
+  template <typename... Args> void debug(std::string_view rt_fmt_str, Args &&...args) const {
 #if ESPP_LOGGER_DEBUG_ENABLED
     if (level_ > espp::Logger::Verbosity::DEBUG)
       return;
     auto msg = format(rt_fmt_str, std::forward<Args>(args)...);
     if (include_time_) {
-      std::lock_guard<std::mutex> lock(tag_mutex_);
+      std::scoped_lock lock(tag_mutex_);
       fmt::print(fg(fmt::color::gray), "[{}/D][{}]: {}\n", tag_, get_time(), msg);
     } else {
-      std::lock_guard<std::mutex> lock(tag_mutex_);
+      std::scoped_lock lock(tag_mutex_);
       fmt::print(fg(fmt::color::gray), "[{}/D]:{}\n", tag_, msg);
     }
 #endif
@@ -223,16 +269,16 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
    * @param rt_fmt_str format string
    * @param args optional arguments passed to be formatted.
    */
-  template <typename... Args> void info(std::string_view rt_fmt_str, Args &&...args) {
+  template <typename... Args> void info(std::string_view rt_fmt_str, Args &&...args) const {
 #if ESPP_LOGGER_INFO_ENABLED
     if (level_ > espp::Logger::Verbosity::INFO)
       return;
     auto msg = format(rt_fmt_str, std::forward<Args>(args)...);
     if (include_time_) {
-      std::lock_guard<std::mutex> lock(tag_mutex_);
+      std::scoped_lock lock(tag_mutex_);
       fmt::print(fg(fmt::terminal_color::green), "[{}/I][{}]: {}\n", tag_, get_time(), msg);
     } else {
-      std::lock_guard<std::mutex> lock(tag_mutex_);
+      std::scoped_lock lock(tag_mutex_);
       fmt::print(fg(fmt::terminal_color::green), "[{}/I]:{}\n", tag_, msg);
     }
 #endif
@@ -243,16 +289,16 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
    * @param rt_fmt_str format string
    * @param args optional arguments passed to be formatted.
    */
-  template <typename... Args> void warn(std::string_view rt_fmt_str, Args &&...args) {
+  template <typename... Args> void warn(std::string_view rt_fmt_str, Args &&...args) const {
 #if ESPP_LOGGER_WARN_ENABLED
     if (level_ > espp::Logger::Verbosity::WARN)
       return;
     auto msg = format(rt_fmt_str, std::forward<Args>(args)...);
     if (include_time_) {
-      std::lock_guard<std::mutex> lock(tag_mutex_);
+      std::scoped_lock lock(tag_mutex_);
       fmt::print(fg(fmt::terminal_color::yellow), "[{}/W][{}]: {}\n", tag_, get_time(), msg);
     } else {
-      std::lock_guard<std::mutex> lock(tag_mutex_);
+      std::scoped_lock lock(tag_mutex_);
       fmt::print(fg(fmt::terminal_color::yellow), "[{}/W]:{}\n", tag_, msg);
     }
 #endif
@@ -263,16 +309,16 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
    * @param rt_fmt_str format string
    * @param args optional arguments passed to be formatted.
    */
-  template <typename... Args> void error(std::string_view rt_fmt_str, Args &&...args) {
+  template <typename... Args> void error(std::string_view rt_fmt_str, Args &&...args) const {
 #if ESPP_LOGGER_ERROR_ENABLED
     if (level_ > espp::Logger::Verbosity::ERROR)
       return;
     auto msg = format(rt_fmt_str, std::forward<Args>(args)...);
     if (include_time_) {
-      std::lock_guard<std::mutex> lock(tag_mutex_);
+      std::scoped_lock lock(tag_mutex_);
       fmt::print(fg(fmt::terminal_color::red), "[{}/E][{}]: {}\n", tag_, get_time(), msg);
     } else {
-      std::lock_guard<std::mutex> lock(tag_mutex_);
+      std::scoped_lock lock(tag_mutex_);
       fmt::print(fg(fmt::terminal_color::red), "[{}/E]:{}\n", tag_, msg);
     }
 #endif
@@ -289,11 +335,13 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
 #if ESPP_LOGGER_DEBUG_ENABLED
     if (level_ > espp::Logger::Verbosity::DEBUG)
       return;
-    if (rate_limit_ > std::chrono::duration<float>::zero()) {
-      auto now = std::chrono::high_resolution_clock::now();
-      if (now - last_print_ < rate_limit_)
+    if (rate_limit_ > clock_t::duration::zero()) {
+      const auto now = clock_t::now().time_since_epoch().count();
+      // last_print_ is an atomic timestamp (clock_t rep) so the check/update is
+      // free of data races when logging from multiple threads.
+      if (clock_t::duration(now - last_print_.load()) < rate_limit_)
         return;
-      last_print_ = now;
+      last_print_.store(now);
     }
     // forward the arguments to the debug function
     debug(rt_fmt_str, std::forward<Args>(args)...);
@@ -311,11 +359,13 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
 #if ESPP_LOGGER_INFO_ENABLED
     if (level_ > espp::Logger::Verbosity::INFO)
       return;
-    if (rate_limit_ > std::chrono::duration<float>::zero()) {
-      auto now = std::chrono::high_resolution_clock::now();
-      if (now - last_print_ < rate_limit_)
+    if (rate_limit_ > clock_t::duration::zero()) {
+      const auto now = clock_t::now().time_since_epoch().count();
+      // last_print_ is an atomic timestamp (clock_t rep) so the check/update is
+      // free of data races when logging from multiple threads.
+      if (clock_t::duration(now - last_print_.load()) < rate_limit_)
         return;
-      last_print_ = now;
+      last_print_.store(now);
     }
     // forward the arguments to the info function
     info(rt_fmt_str, std::forward<Args>(args)...);
@@ -333,11 +383,13 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
 #if ESPP_LOGGER_WARN_ENABLED
     if (level_ > espp::Logger::Verbosity::WARN)
       return;
-    if (rate_limit_ > std::chrono::duration<float>::zero()) {
-      auto now = std::chrono::high_resolution_clock::now();
-      if (now - last_print_ < rate_limit_)
+    if (rate_limit_ > clock_t::duration::zero()) {
+      const auto now = clock_t::now().time_since_epoch().count();
+      // last_print_ is an atomic timestamp (clock_t rep) so the check/update is
+      // free of data races when logging from multiple threads.
+      if (clock_t::duration(now - last_print_.load()) < rate_limit_)
         return;
-      last_print_ = now;
+      last_print_.store(now);
     }
     // forward the arguments to the warn function
     warn(rt_fmt_str, std::forward<Args>(args)...);
@@ -355,11 +407,13 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
 #if ESPP_LOGGER_ERROR_ENABLED
     if (level_ > espp::Logger::Verbosity::ERROR)
       return;
-    if (rate_limit_ > std::chrono::duration<float>::zero()) {
-      auto now = std::chrono::high_resolution_clock::now();
-      if (now - last_print_ < rate_limit_)
+    if (rate_limit_ > clock_t::duration::zero()) {
+      const auto now = clock_t::now().time_since_epoch().count();
+      // last_print_ is an atomic timestamp (clock_t rep) so the check/update is
+      // free of data races when logging from multiple threads.
+      if (clock_t::duration(now - last_print_.load()) < rate_limit_)
         return;
-      last_print_ = now;
+      last_print_.store(now);
     }
     // forward the arguments to the error function
     error(rt_fmt_str, std::forward<Args>(args)...);
@@ -418,10 +472,10 @@ rate limit. @note Only calls that have _rate_limited suffixed will be rate limit
    */
   static std::string get_time() {
 #if defined(ESP_PLATFORM)
-    // use esp_timer_get_time to get the time in microseconds
-    uint64_t time = esp_timer_get_time();
-    uint64_t seconds = time / 1e6f;
-    uint64_t milliseconds = (time % 1000000) / 1e3f;
+    // use esp_log_timestamp to get the time in milliseconds
+    uint64_t time = esp_log_timestamp();
+    uint64_t seconds = time / 1'000;
+    uint64_t milliseconds = (time % 1'000);
     return fmt::format("{}.{:03}", seconds, milliseconds);
 #else
     // get the elapsed time since the start of the logging system as floating
@@ -438,12 +492,12 @@ protected:
    */
   static std::chrono::steady_clock::time_point start_time_;
 
-  std::mutex tag_mutex_; ///< Mutex for the tag.
-  std::string tag_;      ///< Name of the logger to be prepended to all logs.
-  std::chrono::duration<float> rate_limit_{
-      0.0f}; ///< Rate limit for the logger. If set to 0, no rate limiting will be performed.
-  std::chrono::high_resolution_clock::time_point
-      last_print_{};                     ///< Last time a log was printed. Used for rate limiting.
+  mutable std::mutex tag_mutex_; ///< Mutex for the tag.
+  std::string tag_;              ///< Name of the logger to be prepended to all logs.
+  clock_t::duration rate_limit_{
+      clock_t::duration::zero()}; ///< Rate limit for the logger. If zero, no rate limiting is done.
+  std::atomic<clock_t::rep> last_print_{
+      0}; ///< Epoch count (clock_t rep) of the last printed log. Used for rate limiting.
   std::atomic<bool> include_time_{true}; ///< Whether to include the time in the log.
   std::atomic<espp::Logger::Verbosity> level_ =
       espp::Logger::Verbosity::WARN; ///< Current verbosity level of the logger.

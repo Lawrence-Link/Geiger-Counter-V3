@@ -1,7 +1,7 @@
 ---
 name: encoder
 description: HW timer-based driver for incremental rotary encoders
-version: 1.0.7
+version: 1.1.0
 groups:
   - input
 code_owners:

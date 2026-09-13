@@ -15,17 +15,16 @@
 
 #include <stdint.h>  // uint32_t
 
-#include <cfenv>               // fegetexceptflag and FE_ALL_EXCEPT
-#include <climits>             // INT_MAX
-#include <cmath>               // std::signbit
-#include <condition_variable>  // std::condition_variable
-#include <cstring>             // std::strlen
-#include <iterator>            // std::back_inserter
-#include <list>                // std::list
-#include <mutex>               // std::mutex
-#include <string>              // std::string
-#include <thread>              // std::thread
-#include <type_traits>         // std::is_default_constructible
+#include <cfenv>        // fegetexceptflag and FE_ALL_EXCEPT
+#include <climits>      // INT_MAX
+#include <cmath>        // std::signbit
+#include <cstring>      // std::strlen
+#include <iterator>     // std::back_inserter
+#include <list>         // std::list
+#include <mutex>        // std::mutex
+#include <string>       // std::string
+#include <thread>       // std::thread
+#include <type_traits>  // std::is_default_constructible
 #if FMT_CPLUSPLUS > 201703L && FMT_HAS_INCLUDE(<version>)
 #  include <version>
 #endif
@@ -43,7 +42,7 @@ using fmt::memory_buffer;
 using fmt::runtime;
 using fmt::string_view;
 using fmt::detail::max_value;
-using fmt::detail::uint128_fallback;
+using fmt::detail::uint128;
 
 using testing::Return;
 using testing::StrictMock;
@@ -55,15 +54,15 @@ static_assert(std::output_iterator<fmt::appender, char>);
 enum { buffer_size = 256 };
 
 TEST(uint128_test, ctor) {
-  auto n = uint128_fallback();
+  auto n = uint128();
   EXPECT_EQ(n, 0);
-  n = uint128_fallback(42);
+  n = uint128(42);
   EXPECT_EQ(n, 42);
   EXPECT_EQ(static_cast<uint64_t>(n), 42);
 }
 
 TEST(uint128_test, shift) {
-  auto n = uint128_fallback(42);
+  auto n = uint128(42);
   n = n << 64;
   EXPECT_EQ(static_cast<uint64_t>(n), 0);
   n = n >> 64;
@@ -73,26 +72,26 @@ TEST(uint128_test, shift) {
   EXPECT_EQ(static_cast<uint64_t>(n), 0x8000000000000000);
   n = n >> 62;
   EXPECT_EQ(static_cast<uint64_t>(n), 42);
-  EXPECT_EQ(uint128_fallback(1) << 112, uint128_fallback(0x1000000000000, 0));
-  EXPECT_EQ(uint128_fallback(0x1000000000000, 0) >> 112, uint128_fallback(1));
+  EXPECT_EQ(uint128(1) << 112, uint128(0x1000000000000, 0));
+  EXPECT_EQ(uint128(0x1000000000000, 0) >> 112, uint128(1));
 }
 
 TEST(uint128_test, minus) {
-  auto n = uint128_fallback(42);
+  auto n = uint128(42);
   EXPECT_EQ(n - 2, 40);
 }
 
 TEST(uint128_test, plus_assign) {
-  auto n = uint128_fallback(32);
-  n += uint128_fallback(10);
+  auto n = uint128(32);
+  n += uint128(10);
   EXPECT_EQ(n, 42);
-  n = uint128_fallback(max_value<uint64_t>());
-  n += uint128_fallback(1);
-  EXPECT_EQ(n, uint128_fallback(1) << 64);
+  n = uint128(max_value<uint64_t>());
+  n += uint128(1);
+  EXPECT_EQ(n, uint128(1) << 64);
 }
 
 TEST(uint128_test, multiply) {
-  auto n = uint128_fallback(2251799813685247);
+  auto n = uint128(2251799813685247);
   n = n * 3611864890;
   EXPECT_EQ(static_cast<uint64_t>(n >> 64), 440901);
 }
@@ -196,6 +195,17 @@ TEST(util_test, increment) {
   EXPECT_STREQ("200", s);
 }
 
+struct minimal_container {
+  using value_type = char;
+  void push_back(char) {}
+};
+
+TEST(util_test, copy) {
+  minimal_container c;
+  static constexpr char str[] = "a";
+  fmt::detail::copy<char>(str, str + 1, std::back_inserter(c));
+}
+
 TEST(util_test, parse_nonnegative_int) {
   auto s = fmt::string_view("10000000000");
   auto begin = s.begin(), end = s.end();
@@ -204,10 +214,6 @@ TEST(util_test, parse_nonnegative_int) {
   begin = s.begin();
   end = s.end();
   EXPECT_EQ(fmt::detail::parse_nonnegative_int(begin, end, -1), -1);
-}
-
-TEST(format_impl_test, compute_width) {
-  EXPECT_EQ(fmt::detail::compute_width("вожык"), 5);
 }
 
 TEST(util_test, utf8_to_utf16) {
@@ -261,22 +267,6 @@ TEST(util_test, format_system_error) {
   fmt::format_system_error(message, EDOM, "test");
   auto ec = std::error_code(EDOM, std::generic_category());
   EXPECT_EQ(to_string(message), std::system_error(ec, "test").what());
-  message = fmt::memory_buffer();
-
-  // Check if std::allocator throws on allocating max size_t / 2 chars.
-  size_t max_size = max_value<size_t>() / 2;
-  bool throws_on_alloc = false;
-  try {
-    auto alloc = std::allocator<char>();
-    alloc.deallocate(alloc.allocate(max_size), max_size);
-  } catch (const std::bad_alloc&) {
-    throws_on_alloc = true;
-  }
-  if (!throws_on_alloc) {
-    fmt::print(stderr, "warning: std::allocator allocates {} chars\n",
-               max_size);
-    return;
-  }
 }
 
 TEST(util_test, system_error) {
@@ -319,18 +309,17 @@ TEST(memory_buffer_test, move_ctor_inline_buffer) {
         std::allocator<char>* alloc = buffer.get_allocator().get();
         basic_memory_buffer<char, 5, std_allocator> buffer2(std::move(buffer));
         // Move shouldn't destroy the inline content of the first buffer.
-        EXPECT_EQ(str, std::string(&buffer[0], buffer.size()));
-        EXPECT_EQ(str, std::string(&buffer2[0], buffer2.size()));
-        EXPECT_EQ(5u, buffer2.capacity());
+        EXPECT_EQ(std::string(buffer.data(), buffer.size()), str);
+        EXPECT_EQ(std::string(&buffer2[0], buffer2.size()), str);
+        EXPECT_EQ(buffer2.capacity(), 5u);
         // Move should transfer allocator.
-        EXPECT_EQ(nullptr, buffer.get_allocator().get());
-        EXPECT_EQ(alloc, buffer2.get_allocator().get());
+        EXPECT_EQ(buffer.get_allocator().get(), nullptr);
+        EXPECT_EQ(buffer2.get_allocator().get(), alloc);
       };
 
   auto alloc = std::allocator<char>();
   basic_memory_buffer<char, 5, std_allocator> buffer((std_allocator(&alloc)));
-  const char test[] = "test";
-  buffer.append(string_view(test, 4));
+  buffer.append(string_view("test"));
   check_move_buffer("test", buffer);
   // Adding one more character fills the inline buffer, but doesn't cause
   // dynamic allocation.
@@ -355,14 +344,63 @@ TEST(memory_buffer_test, move_ctor_dynamic_buffer) {
   EXPECT_GT(buffer2.capacity(), 4u);
 }
 
+using std_allocator_noprop = allocator_ref<std::allocator<char>, false>;
+
+TEST(memory_buffer_test, move_ctor_inline_buffer_non_propagating) {
+  auto check_move_buffer =
+      [](const char* str,
+         basic_memory_buffer<char, 5, std_allocator_noprop>& buffer) {
+        std::allocator<char>* original_alloc_ptr = buffer.get_allocator().get();
+        const char* original_data_ptr = &buffer[0];
+        basic_memory_buffer<char, 5, std_allocator_noprop> buffer2(
+            std::move(buffer));
+        const char* new_data_ptr = &buffer2[0];
+        EXPECT_NE(new_data_ptr, original_data_ptr);
+        EXPECT_EQ(std::string(buffer.data(), buffer.size()), str);
+        EXPECT_EQ(std::string(buffer2.data(), buffer2.size()), str);
+        EXPECT_EQ(buffer2.capacity(), 5u);
+        // Allocators should NOT be transferred; they remain distinct instances.
+        // The original buffer's allocator pointer should still be valid (not
+        // nullptr).
+        EXPECT_EQ(buffer.get_allocator().get(), original_alloc_ptr);
+        EXPECT_NE(buffer2.get_allocator().get(), original_alloc_ptr);
+      };
+  auto alloc = std::allocator<char>();
+  basic_memory_buffer<char, 5, std_allocator_noprop> buffer(
+      (std_allocator_noprop(&alloc)));
+  buffer.append(string_view("test", 4));
+  check_move_buffer("test", buffer);
+  buffer.push_back('a');
+  check_move_buffer("testa", buffer);
+}
+
+TEST(memory_buffer_test, move_ctor_dynamic_buffer_non_propagating) {
+  auto alloc = std::allocator<char>();
+  basic_memory_buffer<char, 4, std_allocator_noprop> buffer(
+      (std_allocator_noprop(&alloc)));
+  const char test[] = "test";
+  buffer.append(test, test + 4);
+  const char* inline_buffer_ptr = &buffer[0];
+  buffer.push_back('a');
+  EXPECT_NE(buffer.data(), inline_buffer_ptr);
+  std::allocator<char>* original_alloc_ptr = buffer.get_allocator().get();
+  basic_memory_buffer<char, 4, std_allocator_noprop> buffer2;
+  buffer2 = std::move(buffer);
+  EXPECT_EQ(std::string(buffer2.data(), buffer2.size()), "testa");
+  EXPECT_GT(buffer2.capacity(), 4u);
+  EXPECT_NE(buffer2.data(), inline_buffer_ptr);
+  EXPECT_EQ(buffer.get_allocator().get(), original_alloc_ptr);
+  EXPECT_NE(buffer2.get_allocator().get(), original_alloc_ptr);
+}
+
 void check_move_assign_buffer(const char* str,
                               basic_memory_buffer<char, 5>& buffer) {
   basic_memory_buffer<char, 5> buffer2;
   buffer2 = std::move(buffer);
   // Move shouldn't destroy the inline content of the first buffer.
-  EXPECT_EQ(str, std::string(&buffer[0], buffer.size()));
-  EXPECT_EQ(str, std::string(&buffer2[0], buffer2.size()));
-  EXPECT_EQ(5u, buffer2.capacity());
+  EXPECT_EQ(std::string(&buffer[0], buffer.size()), str);
+  EXPECT_EQ(std::string(&buffer2[0], buffer2.size()), str);
+  EXPECT_EQ(buffer2.capacity(), 5u);
 }
 
 TEST(memory_buffer_test, move_assignment) {
@@ -381,8 +419,8 @@ TEST(memory_buffer_test, move_assignment) {
   basic_memory_buffer<char, 5> buffer2;
   buffer2 = std::move(buffer);
   // Move should rip the guts of the first buffer.
-  EXPECT_EQ(inline_buffer_ptr, &buffer[0]);
-  EXPECT_EQ("testab", std::string(&buffer2[0], buffer2.size()));
+  EXPECT_EQ(buffer.data(), inline_buffer_ptr);
+  EXPECT_EQ(std::string(buffer2.data(), buffer2.size()), "testab");
   EXPECT_GT(buffer2.capacity(), 5u);
 }
 
@@ -887,11 +925,37 @@ TEST(format_test, width) {
             "    0xcafe");
   EXPECT_EQ(fmt::format("{:11}", 'x'), "x          ");
   EXPECT_EQ(fmt::format("{:12}", "str"), "str         ");
+  EXPECT_EQ(fmt::format("{:*^5}", "🤡"), "*🤡**");
   EXPECT_EQ(fmt::format("{:*^6}", "🤡"), "**🤡**");
   EXPECT_EQ(fmt::format("{:*^8}", "你好"), "**你好**");
   EXPECT_EQ(fmt::format("{:#6}", 42.0), "   42.");
   EXPECT_EQ(fmt::format("{:6c}", static_cast<int>('x')), "x     ");
   EXPECT_EQ(fmt::format("{:>06.0f}", 0.00884311), "     0");
+}
+
+TEST(format_test, debug_presentation) {
+  EXPECT_EQ(fmt::format("{:?}", ""), R"("")");
+
+  EXPECT_EQ(fmt::format("{:*<5.0?}", "\n"), R"(*****)");
+  EXPECT_EQ(fmt::format("{:*<5.1?}", "\n"), R"("****)");
+  EXPECT_EQ(fmt::format("{:*<5.2?}", "\n"), R"("\***)");
+  EXPECT_EQ(fmt::format("{:*<5.3?}", "\n"), R"("\n**)");
+  EXPECT_EQ(fmt::format("{:*<5.4?}", "\n"), R"("\n"*)");
+
+  EXPECT_EQ(fmt::format("{:*<5.1?}", "Σ"), R"("****)");
+  EXPECT_EQ(fmt::format("{:*<5.2?}", "Σ"), R"("Σ***)");
+  EXPECT_EQ(fmt::format("{:*<5.3?}", "Σ"), R"("Σ"**)");
+
+  EXPECT_EQ(fmt::format("{:*<5.1?}", "笑"), R"("****)");
+  EXPECT_EQ(fmt::format("{:*<5.2?}", "笑"), R"("****)");
+  EXPECT_EQ(fmt::format("{:*<5.3?}", "笑"), R"("笑**)");
+  EXPECT_EQ(fmt::format("{:*<5.4?}", "笑"), R"("笑"*)");
+
+  EXPECT_EQ(fmt::format("{:*<8?}", "туда"), R"("туда"**)");
+  EXPECT_EQ(fmt::format("{:*>8?}", "сюда"), R"(**"сюда")");
+  EXPECT_EQ(fmt::format("{:*^8?}", "中心"), R"(*"中心"*)");
+
+  EXPECT_EQ(fmt::format("{:*^14?}", "A\t👈🤯ы猫"), R"(*"A\t👈🤯ы猫"*)");
 }
 
 auto bad_dynamic_spec_msg = FMT_BUILTIN_TYPES
@@ -925,7 +989,7 @@ TEST(format_test, runtime_width) {
                    format_error, bad_dynamic_spec_msg);
   EXPECT_THROW_MSG((void)fmt::format(runtime("{0:{1}}"), 0, -1l), format_error,
                    bad_dynamic_spec_msg);
-  if (fmt::detail::const_check(sizeof(long) > sizeof(int))) {
+  if (sizeof(long) > sizeof(int)) {
     long value = INT_MAX;
     EXPECT_THROW_MSG((void)fmt::format(runtime("{0:{1}}"), 0, (value + 1)),
                      format_error, bad_dynamic_spec_msg);
@@ -1134,7 +1198,6 @@ TEST(format_test, large_precision) {
 
 TEST(format_test, utf8_precision) {
   auto result = fmt::format("{:.4}", "caf\u00e9s");  // cafés
-  EXPECT_EQ(fmt::detail::compute_width(result), 4);
   EXPECT_EQ(result, "caf\u00e9");
 }
 
@@ -1174,7 +1237,7 @@ TEST(format_test, runtime_precision) {
                    format_error, bad_dynamic_spec_msg);
   EXPECT_THROW_MSG((void)fmt::format(runtime("{0:.{1}}"), 0.0, -1l),
                    format_error, bad_dynamic_spec_msg);
-  if (fmt::detail::const_check(sizeof(long) > sizeof(int))) {
+  if (sizeof(long) > sizeof(int)) {
     long value = INT_MAX;
     EXPECT_THROW_MSG((void)fmt::format(runtime("{0:.{1}}"), 0.0, (value + 1)),
                      format_error, bad_dynamic_spec_msg);
@@ -1450,7 +1513,7 @@ TEST(format_test, format_double) {
   }
 #endif
 
-  if (fmt::detail::const_check(std::numeric_limits<double>::is_iec559)) {
+  if (std::numeric_limits<double>::is_iec559) {
     double d = (std::numeric_limits<double>::min)();
     EXPECT_EQ(fmt::format("{:a}", d), "0x1p-1022");
     EXPECT_EQ(fmt::format("{:#a}", d), "0x1.p-1022");
@@ -1643,14 +1706,13 @@ TEST(format_test, format_pointer) {
 }
 
 TEST(format_test, write_uintptr_fallback) {
-  // Test that formatting a pointer by converting it to uint128_fallback works.
+  // Test that formatting a pointer by converting it to uint128 works.
   // This is needed to support systems without uintptr_t.
   auto s = std::string();
-  fmt::detail::write_ptr<char>(
-      std::back_inserter(s),
-      fmt::detail::bit_cast<fmt::detail::uint128_fallback>(
-          reinterpret_cast<void*>(0xface)),
-      nullptr);
+  fmt::detail::write_ptr<char>(std::back_inserter(s),
+                               fmt::detail::bit_cast<fmt::detail::uint128>(
+                                   reinterpret_cast<void*>(0xface)),
+                               nullptr);
   EXPECT_EQ(s, "0xface");
 }
 
@@ -1788,19 +1850,15 @@ TEST(format_test, format_examples) {
   fmt::format_to(std::back_inserter(out), "The answer is {}.", 42);
   EXPECT_EQ("The answer is 42.", to_string(out));
 
-  const char* filename = "nonexistent";
-  FILE* ftest = safe_fopen(filename, "r");
-  if (ftest) fclose(ftest);
-  int error_code = errno;
-  EXPECT_TRUE(ftest == nullptr);
-  EXPECT_SYSTEM_ERROR(
+  EXPECT_THROW(
       {
-        FILE* f = safe_fopen(filename, "r");
-        if (!f)
-          throw fmt::system_error(errno, "Cannot open file '{}'", filename);
-        fclose(f);
+        const char* filename = "madeup";
+        FILE* file = fopen(filename, "r");
+        if (!file)
+          throw fmt::system_error(errno, "cannot open file '{}'", filename);
+        fclose(file);
       },
-      error_code, "Cannot open file 'nonexistent'");
+      std::system_error);
 
   EXPECT_EQ("First, thou shalt count to three",
             fmt::format("First, thou shalt count to {0}", "three"));
@@ -1877,6 +1935,8 @@ template <> struct formatter<deadlockable> {
     return format_to(ctx.out(), "{}", d.value);
   }
 };
+
+template <> struct locking<deadlockable> : std::true_type {};
 FMT_END_NAMESPACE
 
 TEST(format_test, locking_formatter) {
@@ -1971,11 +2031,6 @@ TEST(format_test, unpacked_args) {
                         6, 7, 8, 9, 'a', 'b', 'c', 'd', 'e', 'f', 'g'));
 }
 
-constexpr char with_null[3] = {'{', '}', '\0'};
-constexpr char no_null[2] = {'{', '}'};
-static constexpr char static_with_null[3] = {'{', '}', '\0'};
-static constexpr char static_no_null[2] = {'{', '}'};
-
 TEST(format_test, compile_time_string) {
   EXPECT_EQ(fmt::format(FMT_STRING("foo")), "foo");
   EXPECT_EQ(fmt::format(FMT_STRING("{}"), 42), "42");
@@ -1990,19 +2045,12 @@ TEST(format_test, compile_time_string) {
   EXPECT_EQ(fmt::format(FMT_STRING("{} {two}"), 1, "two"_a = 2), "1 2");
 #endif
 
-  (void)static_with_null;
-  (void)static_no_null;
+  static constexpr char format_str[3] = {'{', '}', '\0'};
+  (void)format_str;
 #ifndef _MSC_VER
-  EXPECT_EQ(fmt::format(FMT_STRING(static_with_null), 42), "42");
-  EXPECT_EQ(fmt::format(FMT_STRING(static_no_null), 42), "42");
+  EXPECT_EQ(fmt::format(FMT_STRING(format_str), 42), "42");
 #endif
 
-  (void)with_null;
-  (void)no_null;
-#if FMT_CPLUSPLUS >= 201703L
-  EXPECT_EQ(fmt::format(FMT_STRING(with_null), 42), "42");
-  EXPECT_EQ(fmt::format(FMT_STRING(no_null), 42), "42");
-#endif
 #if defined(FMT_USE_STRING_VIEW) && FMT_CPLUSPLUS >= 201703L
   EXPECT_EQ(fmt::format(FMT_STRING(std::string_view("{}")), 42), "42");
 #endif
@@ -2436,7 +2484,7 @@ auto format_as(const string& s) -> std::string { return s; }
 TEST(format_test, adl) {
   // Only check compilation and don't run the code to avoid polluting the output
   // and since the output is tested elsewhere.
-  if (fmt::detail::const_check(true)) return;
+  if (true) return;
   auto s = adl_test::string();
   char buf[10];
   (void)fmt::format("{}", s);
@@ -2532,49 +2580,19 @@ TEST(format_test, writer) {
   EXPECT_EQ(s.str(), "foo");
 }
 
-#if FMT_USE_BITINT
-FMT_PRAGMA_CLANG(diagnostic ignored "-Wbit-int-extension")
+#if FMT_USE_FCNTL && !defined(_WIN32)
+TEST(format_test, invalid_glibc_buffer) {
+  auto pipe = fmt::pipe();
+  auto write_end = pipe.write_end.fdopen("w");
+  auto file = write_end.get();
 
-TEST(format_test, bitint) {
-  using fmt::detail::bitint;
-  using fmt::detail::ubitint;
+  // This results in _IO_write_ptr < _IO_write_end.
+  fprintf(file, "111\n");
+  setvbuf(file, nullptr, _IOLBF, 0);
 
-  EXPECT_EQ(fmt::format("{}", ubitint<3>(7)), "7");
-  EXPECT_EQ(fmt::format("{}", bitint<7>()), "0");
-
-  EXPECT_EQ(fmt::format("{}", ubitint<15>(31000)), "31000");
-  EXPECT_EQ(fmt::format("{}", bitint<16>(INT16_MIN)), "-32768");
-  EXPECT_EQ(fmt::format("{}", bitint<16>(INT16_MAX)), "32767");
-
-  EXPECT_EQ(fmt::format("{}", ubitint<32>(4294967295)), "4294967295");
-
-  EXPECT_EQ(fmt::format("{}", ubitint<47>(140737488355327ULL)),
-            "140737488355327");
-  EXPECT_EQ(fmt::format("{}", bitint<47>(-40737488355327LL)),
-            "-40737488355327");
-
-  // Check lvalues and const
-  auto a = bitint<8>(0);
-  auto b = ubitint<32>(4294967295);
-  const auto c = bitint<7>(0);
-  const auto d = ubitint<32>(4294967295);
-  EXPECT_EQ(fmt::format("{}", a), "0");
-  EXPECT_EQ(fmt::format("{}", b), "4294967295");
-  EXPECT_EQ(fmt::format("{}", c), "0");
-  EXPECT_EQ(fmt::format("{}", d), "4294967295");
-
-  static_assert(fmt::is_formattable<bitint<64>, char>{}, "");
-  static_assert(fmt::is_formattable<ubitint<64>, char>{}, "");
+  fmt::print(file, "------\n");
 }
-#endif
-
-#ifdef __cpp_lib_byte
-TEST(base_test, format_byte) {
-  auto s = std::string();
-  fmt::format_to(std::back_inserter(s), "{}", std::byte(42));
-  EXPECT_EQ(s, "42");
-}
-#endif
+#endif  // FMT_USE_FCNTL
 
 // Only defined after the test case.
 struct incomplete_type;
