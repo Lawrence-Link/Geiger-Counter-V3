@@ -20,5 +20,4 @@ void registerApps() {
     // app_man.registerApp(cube_demo_app);
     app_man.registerApp(pixel_clock_app);
     app_man.registerApp(about_app);
-    app_man.registerApp(keyboard_test_app);
 }

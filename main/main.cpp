@@ -26,6 +26,7 @@
 #include "nvs_handle_espp.hpp"
 #include "tune.h"
 #include "boot_bmp.h"
+#include "app_settings_utils/wifi_assists/wifi_assists.h"
 
 // Global variables
 U8G2 u8g2;
@@ -67,6 +68,9 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     std::error_code ec;
     espp::Nvs nvs_driver;
     nvs_driver.init(ec);
+    if (!ec) {
+        wifi_assists_start_saved_network();
+    }
     // load setup from nvs
     auto& syscfg = SystemConf::getInstance();
     syscfg.load_conf_from_nvs();
@@ -247,6 +251,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
             ui.getViewManagerPtr()->launch(power_surge_app, (void*)&err);
         }
 
+        wifi_assists_process(ui);
         ui.renderer();
         vTaskDelay(pdMS_TO_TICKS(10));
     }

@@ -22,6 +22,7 @@ add_library(pixelui STATIC
     
     ui/Popup/PopupBase.cpp
     ui/Popup/PopupInfo.cpp
+    ui/Popup/PopupKeyboard.cpp
     ui/Popup/PopupManager.cpp
     ui/Popup/PopupProgress.cpp
     ui/Popup/PopupValueDigits.cpp

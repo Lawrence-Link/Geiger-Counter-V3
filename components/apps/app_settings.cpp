@@ -24,9 +24,11 @@
 #include "system_nvs_varibles.h"
 #include "esp_log.h"
 #include "voltage_pid.hpp"
+#include "esp_wifi.h"
 #include "core/ValueBinding.h"
 #include <cstdio>
 #include <new>
+#include "app_settings_utils/wifi_assists/wifi_assists.h"
 
 static bool en_sound_click; // geiger click
 static bool en_sound_navigate; // sound navigate
@@ -96,12 +98,48 @@ ListItem sub_Tube_cfg[4] = {
     ListItem{.title = "- 恒压调试", .nextList = sub_cvs_cfg, .nextListLength = 4}
 };
 
-ListItem itemList[10] = {
+static bool WiFi_enabled = false;
+static bool BLE_enabled = false;
+
+ListItem sub_radio_wifi_cfg[10] = {
+    ListItem(">>>>> Wi-Fi <<<<<"),
+    ListItem{
+        .title = "- 启用",
+        .pFunc = []() { wifi_assists_update_status(WiFi_enabled, sub_radio_wifi_cfg, 10); },
+        .accessory = ListItemAccessory::toggle(WiFi_enabled),
+    },
+    ListItem{.title = "", .pFunc = []() { wifi_assists_select_network(ui, sub_radio_wifi_cfg, 10, 2); }},
+    ListItem{.title = "", .pFunc = []() { wifi_assists_select_network(ui, sub_radio_wifi_cfg, 10, 3); }},
+    ListItem{.title = "", .pFunc = []() { wifi_assists_select_network(ui, sub_radio_wifi_cfg, 10, 4); }},
+    ListItem{.title = "", .pFunc = []() { wifi_assists_select_network(ui, sub_radio_wifi_cfg, 10, 5); }},
+    ListItem{.title = "", .pFunc = []() { wifi_assists_select_network(ui, sub_radio_wifi_cfg, 10, 6); }},
+    ListItem{.title = "", .pFunc = []() { wifi_assists_select_network(ui, sub_radio_wifi_cfg, 10, 7); }},
+    ListItem{.title = "", .pFunc = []() { wifi_assists_select_network(ui, sub_radio_wifi_cfg, 10, 8); }},
+    ListItem{.title = "", .pFunc = []() { wifi_assists_select_network(ui, sub_radio_wifi_cfg, 10, 9); }}
+};
+
+ListItem sub_radio_ble_cfg[10] = {
+    ListItem(">>>>> 蓝牙 <<<<<"),
+    ListItem{.title = "- 启用", .accessory = ListItemAccessory::toggle(BLE_enabled)},
+};
+
+ListItem sub_radio_cfg[3] = {
+    ListItem(">>> 无线 <<<"),
+    ListItem{.title = "- Wi-Fi", .nextList = sub_radio_wifi_cfg, .nextListLength = 10},
+    ListItem{.title = "- Bluetooth", .nextList = sub_radio_ble_cfg, .nextListLength = 10}
+};
+
+ListItem itemList[11] = {
     ListItem(">>>> 设置 <<<<"),
     ListItem{
         .title = "- 屏幕亮度",
         .pFunc = [](){ ui.showPopupProgress(brightness, 0, 5, "亮度", 100, 40, 5000, [](int32_t val){ui.getU8G2().setContrast(val * 51);}, PopupProgressMode::Editable); },
         .accessory = ListItemAccessory::value(PixelUIValue::Binding::integer(brightness))
+    },
+    ListItem{
+        .title = "- 无线",
+        .nextList = sub_radio_cfg,
+        .nextListLength = 3
     },
     ListItem{
         .title = "- 剂量警告",
@@ -147,6 +185,11 @@ public:
 
     void onLoad() override {
         auto& syscfg = SystemConf::getInstance();
+
+        WiFi_enabled = wifi_assists_is_started();
+        if (WiFi_enabled) {
+            wifi_assists_update_status(true, sub_radio_wifi_cfg, 10);
+        }
 
         syscfg.load_conf_from_nvs();
 

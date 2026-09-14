@@ -312,7 +312,7 @@ void Label::drawSelf(const WidgetRenderContext& context) {
     u8g2.setFont(m_font);
 
     const int32_t viewportWidth = m_w > 0 ? m_w : text_width_;
-    setClipWindow(context, {m_x, m_y - font_height_ , viewportWidth, font_height_ + 1});
+    setClipWindow(context, {m_x, m_y - font_height_ , viewportWidth, font_height_ + 2});
 
     // Draw text at animated position
     int32_t drawX = anim_x + TextAlignHelper::calcAlignedOffset(

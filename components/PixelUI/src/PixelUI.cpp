@@ -571,6 +571,33 @@ bool PixelUI::showPopupInfo(const char* text, const char* title,
 #endif
 }
 
+bool PixelUI::showPopupKeyboard(
+    char* output, size_t outputCapacity, uint16_t width, uint16_t height,
+    uint16_t duration, VoidCallback commitCallback) {
+#if PIXELUI_USE_POPUP_KEYBOARD
+    if (!PopupKeyboard::isValidLayout(width, height) ||
+        width > getDisplayWidth() || height > getDisplayHeight() ||
+        duration > 30000U) {
+        return false;
+    }
+    if (m_popupManager.enqueueKeyboard(
+            width, height, output, outputCapacity, duration,
+            etl::move(commitCallback))) {
+        markDirty();
+        return true;
+    }
+    return false;
+#else
+    (void)output;
+    (void)outputCapacity;
+    (void)width;
+    (void)height;
+    (void)duration;
+    (void)commitCallback;
+    return false;
+#endif
+}
+
 /**
  * @brief Show a fixed-width value editor popup
  */

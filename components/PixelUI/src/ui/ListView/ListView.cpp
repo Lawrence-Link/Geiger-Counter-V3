@@ -262,6 +262,12 @@ int32_t ListView::calculateTitleRight(
             }
             break;
 
+        case ListItemAccessory::Kind::Check:
+            if (item.accessory.checkValue() != nullptr) {
+                right = displayWidth - 18 - TITLE_ACCESSORY_GAP;
+            }
+            break;
+
         case ListItemAccessory::Kind::Text: {
             const char* text = item.accessory.textValue();
             if (text != nullptr) {
@@ -592,7 +598,7 @@ void ListView::draw() {
                 } else {
 #endif
                     canvas.setClipWindow(
-                        drawX, itemY - FontHeight, titleRight, itemY + 1);
+                        drawX, itemY - FontHeight, titleRight, itemY + 2);
                     canvas.drawUTF8(
                         drawX, itemY, m_itemList[itemIndex].title);
                     canvas.setMaxClipWindow();
@@ -628,6 +634,19 @@ void ListView::draw() {
                             m_ui.getDisplayWidth() - canvas.getUTF8Width(text) - 4,
                             itemY,
                             text);
+                    }
+                    break;
+                }
+                case ListItemAccessory::Kind::Check: {
+                    const bool* checked = accessory.checkValue();
+                    if (checked == nullptr) break;
+                    const int32_t boxX = m_ui.getDisplayWidth() - 14;
+                    canvas.drawRFrame(boxX, itemY - 10, 10, 10, 1);
+                    if (*checked) {
+                        canvas.drawLine(boxX + 2, itemY - 5,
+                                        boxX + 4, itemY - 2);
+                        canvas.drawLine(boxX + 4, itemY - 2,
+                                        boxX + 8, itemY - 8);
                     }
                     break;
                 }

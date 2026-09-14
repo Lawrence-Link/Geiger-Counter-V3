@@ -1,7 +1,24 @@
-idf_component_register(SRCS "app_pixel_clock.cpp" "app_about.cpp" "app_boot.cpp" "app_settings_utils/app_time_setting.cpp" "app_settings.cpp" "app_environment.cpp" "app_registry.cpp" "app_ui_utils/app_charging_animation.cpp" 
-"app_cube.cpp" "app_ui_utils/app_silly_cat.cpp" "racing_game.cpp" "app_game_pong.cpp" "app_about.cpp" "app_ui_utils/app_power_surge_notify.cpp" "app_counter/app_counter.cpp" "kbd_test.cpp"
-                    INCLUDE_DIRS "." "./app_counter"
-                    REQUIRES "PixelUI" "voltage_pid" "main" "time_module" "counter_task" "system_nvs_varibles" "led" "bme280" idf::app_update)
+idf_component_register(
+    SRCS
+    "app_pixel_clock.cpp"
+    "app_about.cpp"
+    "app_boot.cpp"
+    "app_settings_utils/app_time_setting.cpp"
+    "app_settings.cpp"
+    "app_environment.cpp"
+    "app_registry.cpp"
+    "app_ui_utils/app_charging_animation.cpp"
+    "app_cube.cpp"
+    "app_ui_utils/app_silly_cat.cpp"
+    "racing_game.cpp"
+    "app_game_pong.cpp"
+    "app_about.cpp"
+    "app_ui_utils/app_power_surge_notify.cpp"
+    "app_counter/app_counter.cpp"
+    "app_settings_utils/wifi_assists/wifi_assists.cpp"
+
+    INCLUDE_DIRS "." "./app_counter"
+    REQUIRES "PixelUI" "voltage_pid" "main" "time_module" "counter_task" "system_nvs_varibles" "led" "bme280" idf::app_update "esp_wifi" "esp_event" "esp_netif")
 
 # 防止静态注册被优化
 # target_compile_options(${COMPONENT_LIB} PRIVATE 

@@ -99,6 +99,23 @@ bool PopupManager::enqueueValueDigits(uint16_t width, uint16_t height,
 }
 #endif
 
+#if PIXELUI_USE_POPUP_KEYBOARD
+bool PopupManager::enqueueKeyboard(
+    uint16_t width, uint16_t height, char* output, size_t outputCapacity,
+    uint16_t duration, VoidCallback commitCallback) {
+    const RequestEnvelope envelope{width, height, duration};
+    if (!validEnvelope(envelope) ||
+        !PopupKeyboard::isValidLayout(width, height) ||
+        width > ui_.getDisplayWidth() || height > ui_.getDisplayHeight() ||
+        !PopupKeyboard::isValidBuffer(output, outputCapacity)) {
+        return false;
+    }
+    PopupRequest request{KeyboardRequest{
+        envelope, output, outputCapacity, etl::move(commitCallback)}};
+    return enqueue(etl::move(request));
+}
+#endif
+
 void PopupManager::activateNext() {
     if ((active_ != nullptr) || requests_.empty()) {
         return;
@@ -136,6 +153,15 @@ void PopupManager::activate(ValueDigitsRequest& request) {
         ui_, request.envelope.width, request.envelope.height,
         request.binding, request.digitCount, request.title,
         request.envelope.duration, etl::move(request.callback), request.policy);
+}
+#endif
+
+#if PIXELUI_USE_POPUP_KEYBOARD
+void PopupManager::activate(KeyboardRequest& request) {
+    active_ = activePool_.create<PopupKeyboard>(
+        ui_, request.envelope.width, request.envelope.height,
+        request.output, request.outputCapacity, request.envelope.duration,
+        etl::move(request.commitCallback));
 }
 #endif
 
