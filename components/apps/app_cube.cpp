@@ -17,6 +17,7 @@
 
 
 #include "core/app/IApplication.h"
+#include "PixelUI.h"
 #include "core/app/app_system.h"
 #include <memory>
 #include <cmath>
@@ -144,7 +145,5 @@ AppItem cube_demo_app{
     .title = "方块Demo",
     .bitmap = image_cube_bits,
     
-    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<CubeDemo>(ui, param); 
-    },
+    .factory = ApplicationFactory::make<CubeDemo>(),
 };

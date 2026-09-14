@@ -20,6 +20,8 @@
 
 #include "core/app/IApplication.h"
 #include "core/app/app_system.h"
+#include "PixelUI.h"
+#include "U8g2lib.h"
 #include "app_registry.h"
 #include <memory>
 #include "widgets/histogram/histogram.h"
@@ -32,11 +34,11 @@
 #include "time_module.h"
 #include "pin_definitions.h"
 #include "system_nvs_varibles.h"
-#include "blinker/Blinker.h"
+#include "blink/BlinkState.h"
 #include <fastmath.h>
 #include "i2c.h" 
 #include "core/coroutine/Coroutine.h"
-#include "calc/text_centering_calc/text_centering_calculator.h"
+#include "calc/TextAlignHelper/TextAlignHelper.h"
 #include "led.h"
 #include "tune.h"
 #include "esp_log.h"
@@ -63,6 +65,9 @@ static bool use_cpm;
 class APP_COUNTER: public IApplication {
 private:
     PixelUI& m_ui;
+    // CPM mode stores integer CPM. Dose mode stores uSv/h scaled by 10000,
+    // preserving the supported 0.0001 resolution without floating-point storage.
+    StaticChartSeries<76> histogram_series;
     Histogram histogram;
     Brace brace;
     IconButton icon_battery;
@@ -103,7 +108,7 @@ private:
     uint32_t timestamp_prev;
     uint32_t timestamp_now;
     
-    Blinker blinker_description_bar;
+    BlinkState blinker_description_bar;
     
     float current_cpm = 0.0f;
     struct tm timeinfo;
@@ -121,7 +126,7 @@ private:
 public:
     APP_COUNTER(PixelUI& ui, void* param) : 
     m_ui(ui), 
-    histogram(ui, 69, 45, 56, 18, 76, 63, EXPAND_BASE::BOTTOM_RIGHT), 
+    histogram(ui, 69, 45, 56, 18, histogram_series, ChartExpandSize<76, 63>{}, EXPAND_BASE::BOTTOM_RIGHT),
     brace(ui, 3, 45, 56, 18), 
     icon_battery(ui, 12, 2, 10, 6),
     icon_sounding(ui, 26, 1, 7, 7),

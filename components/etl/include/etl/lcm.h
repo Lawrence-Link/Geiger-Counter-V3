@@ -21,7 +21,7 @@ copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR Value1 PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -31,10 +31,11 @@ SOFTWARE.
 #ifndef ETL_LCM_INCLUDED
 #define ETL_LCM_INCLUDED
 
-#include "type_traits.h"
+#include "platform.h"
 #include "absolute.h"
-#include "static_assert.h"
 #include "gcd.h"
+#include "static_assert.h"
+#include "type_traits.h"
 
 namespace etl
 {
@@ -53,10 +54,7 @@ namespace etl
   // For unsigned types.
   //***************************************************************************
   template <typename T>
-  ETL_NODISCARD
-  ETL_CONSTEXPR14
-  typename etl::enable_if<etl::is_unsigned<T>::value, T>::type
-    lcm(T a, T b) ETL_NOEXCEPT
+  ETL_NODISCARD ETL_CONSTEXPR14 typename etl::enable_if<etl::is_unsigned<T>::value, T>::type lcm(T a, T b) ETL_NOEXCEPT
   {
     ETL_STATIC_ASSERT(etl::is_integral<T>::value, "Integral type required");
 
@@ -76,10 +74,7 @@ namespace etl
   // For signed types.
   //***************************************************************************
   template <typename T>
-  ETL_NODISCARD
-  ETL_CONSTEXPR14
-  typename etl::enable_if<etl::is_signed<T>::value, T>::type
-    lcm(T a, T b) ETL_NOEXCEPT
+  ETL_NODISCARD ETL_CONSTEXPR14 typename etl::enable_if<etl::is_signed<T>::value, T>::type lcm(T a, T b) ETL_NOEXCEPT
   {
     ETL_STATIC_ASSERT(etl::is_integral<T>::value, "Integral type required");
 
@@ -98,10 +93,8 @@ namespace etl
   // Non-recursive, using an initializer_list.
   // Top level variadic function.
   //***************************************************************************
-  template<typename T, typename... TRest>
-  ETL_NODISCARD
-  ETL_CONSTEXPR14
-  T lcm(T first, TRest... rest) ETL_NOEXCEPT
+  template <typename T, typename... TRest>
+  ETL_NODISCARD ETL_CONSTEXPR14 T lcm(T first, TRest... rest) ETL_NOEXCEPT
   {
     T result = first;
 
@@ -125,10 +118,8 @@ namespace etl
   // Recursive
   // Top level variadic function.
   //***************************************************************************
-  template<typename T, typename... TRest>
-  ETL_NODISCARD
-  ETL_CONSTEXPR14
-  T lcm(T a, T b, TRest... rest) ETL_NOEXCEPT
+  template <typename T, typename... TRest>
+  ETL_NODISCARD ETL_CONSTEXPR14 T lcm(T a, T b, TRest... rest) ETL_NOEXCEPT
   {
     T lcm_ab = lcm(a, b);
 
@@ -145,7 +136,6 @@ namespace etl
   }
   #endif
 #endif
-}
+} // namespace etl
 
 #endif
-

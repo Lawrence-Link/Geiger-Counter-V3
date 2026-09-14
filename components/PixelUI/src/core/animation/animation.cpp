@@ -1,23 +1,32 @@
 /*
  * Copyright (C) 2025 Lawrence Link
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "core/animation/animation.h"
+#include "core/TimeUtils.h"
 
-// Convert float multiplication to integer multiplication and bit shift
 #define MUL_FIXED(a, b) ((int64_t)(a) * (b) >> SHIFT_BITS)
 
 /**
@@ -72,27 +81,27 @@ int32_t EasingCalculator::easeOutBounce(int32_t t) {
     #define FIXED_DIV(a, b) ((int64_t)(a) * FIXED_POINT_ONE / (b))
     #define FIXED_MUL(a, b) ((int64_t)(a) * (b) / FIXED_POINT_ONE)
 
-    const int32_t n1 = FLOAT_TO_FIXED(7.5625f);
-    const int32_t d1 = FLOAT_TO_FIXED(2.75f);
+    constexpr int32_t n1 = FIXED_POINT_ONE * 121 / 16;
+    constexpr int32_t d1 = FIXED_POINT_ONE * 11 / 4;
     
     if (t < FIXED_DIV(FIXED_POINT_ONE, d1)) 
     {
         return FIXED_MUL(n1, FIXED_MUL(t, t));
     } 
-    else if (t < FIXED_DIV(FLOAT_TO_FIXED(2.0f), d1))
+    else if (t < FIXED_DIV(2 * FIXED_POINT_ONE, d1))
     {
-        t -= FIXED_DIV(FLOAT_TO_FIXED(1.5f), d1);
-        return FIXED_MUL(n1, FIXED_MUL(t, t)) + FLOAT_TO_FIXED(0.75f);
+        t -= FIXED_DIV(3 * FIXED_POINT_ONE / 2, d1);
+        return FIXED_MUL(n1, FIXED_MUL(t, t)) + 3 * FIXED_POINT_ONE / 4;
     }
-    else if (t < FIXED_DIV(FLOAT_TO_FIXED(2.5f), d1))
+    else if (t < FIXED_DIV(5 * FIXED_POINT_ONE / 2, d1))
     {
-        t -= FIXED_DIV(FLOAT_TO_FIXED(2.25f), d1);
-        return FIXED_MUL(n1, FIXED_MUL(t, t)) + FLOAT_TO_FIXED(0.9375f);
+        t -= FIXED_DIV(9 * FIXED_POINT_ONE / 4, d1);
+        return FIXED_MUL(n1, FIXED_MUL(t, t)) + 15 * FIXED_POINT_ONE / 16;
     }
     else 
     {
-        t -= FIXED_DIV(FLOAT_TO_FIXED(2.625f), d1);
-        return FIXED_MUL(n1, FIXED_MUL(t, t)) + FLOAT_TO_FIXED(0.984375f);
+        t -= FIXED_DIV(21 * FIXED_POINT_ONE / 8, d1);
+        return FIXED_MUL(n1, FIXED_MUL(t, t)) + 63 * FIXED_POINT_ONE / 64;
     }
 }
 
@@ -139,16 +148,64 @@ bool Animation::update(uint32_t currentTime) {
     return true;
 }
 
-/*
-@brief Add a new animation to the manager.
-@param animation Shared pointer to the Animation object to be added.
-*/
-void AnimationManager::addAnimation(std::shared_ptr<Animation> animation) {
-    // std::lock_guard<std::mutex> lock(_mutex);
-    if (!animation || _animations.full()) {
-        return;
+uint32_t Animation::nextWakeupMs(
+    uint32_t currentTime, uint32_t frameIntervalMs) const {
+    if (!_isActive) return PixelUITime::NO_WAKEUP;
+
+    const uint32_t elapsed = currentTime - _startTime;
+    if (elapsed >= _duration || (_duration > 0U && elapsed >= _duration - 1U)) {
+        return 0U;
     }
-    _animations.push_back(animation);
+
+    return PixelUITime::earlier(
+        PixelUITime::normalizeInterval(frameIntervalMs), _duration - elapsed);
+}
+
+bool AnimationManager::emplace(
+    int32_t startValue,
+    int32_t endValue,
+    uint32_t duration,
+    EasingType easing,
+    UpdateCallback callback,
+    PROTECTION protection,
+    uint32_t currentTime,
+    AnimationHandle* handle) {
+    if (handle != nullptr) *handle = INVALID_ANIMATION_HANDLE;
+    if (_animations.full() || !callback) {
+        return false;
+    }
+
+    const AnimationHandle assignedHandle = nextHandle();
+    CallbackAnimation& animation = _animations.emplace_back(
+        assignedHandle,
+        startValue,
+        endValue,
+        duration,
+        easing,
+        etl::move(callback));
+    animation.setProtected(protection == PROTECTION::PROTECTED);
+    animation.start(currentTime);
+    if (handle != nullptr) *handle = assignedHandle;
+    return true;
+}
+
+/** @brief AnimationManager::nextHandle. */
+AnimationHandle AnimationManager::nextHandle() {
+    AnimationHandle candidate = nextHandle_++;
+    if (nextHandle_ == INVALID_ANIMATION_HANDLE) ++nextHandle_;
+    if (candidate == INVALID_ANIMATION_HANDLE) candidate = nextHandle_++;
+    return candidate;
+}
+
+/** @brief AnimationManager::cancel. */
+bool AnimationManager::cancel(AnimationHandle handle) {
+    if (handle == INVALID_ANIMATION_HANDLE) return false;
+    for (auto iterator = _animations.begin(); iterator != _animations.end(); ++iterator) {
+        if (iterator->handle() != handle) continue;
+        _animations.erase(iterator);
+        return true;
+    }
+    return false;
 }
 
 /*
@@ -156,7 +213,6 @@ void AnimationManager::addAnimation(std::shared_ptr<Animation> animation) {
 @param currentTime Current time (milliseconds).
 */
 void AnimationManager::update(uint32_t currentTime) {
-    // std::lock_guard<std::mutex> lock(_mutex);
 
     if (_animations.empty()) {
         return;
@@ -164,16 +220,16 @@ void AnimationManager::update(uint32_t currentTime) {
 
     auto writePos = _animations.begin();
     for (auto readPos = _animations.begin(); readPos != _animations.end(); ++readPos) {
-        if ((*readPos)->update(currentTime)) {
+        if (readPos->update(currentTime)) {
             if (writePos != readPos) {
-                *writePos = std::move(*readPos);
+                *writePos = etl::move(*readPos);
             }
             ++writePos;
         } else {
             // If the animation is complete and not protected, remove it
-            if (!readPos->get()->isProtected()) {
+            if (!readPos->isProtected()) {
                 // Ensure the animation is unprotected after completion so it can be cleared next time
-                readPos->get()->setProtected(false);
+                readPos->setProtected(false);
             }
         }
     }
@@ -184,35 +240,22 @@ void AnimationManager::update(uint32_t currentTime) {
 @brief clear all animations in the manager.
 */
 void AnimationManager::clear(){
-    // std::lock_guard<std::mutex> lock(_mutex);
     _animations.clear();
-}
-
-/*
-@brief mark a animation as protected, preventing it from being cleared.
-@param animation the animation to be marked as protected.
-*/
-void AnimationManager::markProtected(std::shared_ptr<Animation> animation) {
-    // std::lock_guard<std::mutex> lock(_mutex);
-    if (animation) {
-        animation->setProtected(true);
-    }
 }
 
 /*
 @brief clean all unprotected animations in the manager.
 */
 void AnimationManager::clearUnprotected() {
-    // std::lock_guard<std::mutex> lock(_mutex);
     if (_animations.empty()) {
         return;
     }
     
     auto writePos = _animations.begin();
     for (auto readPos = _animations.begin(); readPos != _animations.end(); ++readPos) {
-        if (readPos->get()->isProtected()) {
+        if (readPos->isProtected()) {
             if (writePos != readPos) {
-                *writePos = std::move(*readPos);
+                *writePos = etl::move(*readPos);
             }
             ++writePos;
         }
@@ -224,9 +267,8 @@ void AnimationManager::clearUnprotected() {
 @brief clean all protection marks from all animations.
 */
 void AnimationManager::clearAllProtectionMarks() {
-    // std::lock_guard<std::mutex> lock(_mutex);
-    for (const auto& anim_ : _animations) {
-        anim_->setProtected(false);
+    for (auto& animation : _animations) {
+        animation.setProtected(false);
     }
 }
 
@@ -235,6 +277,15 @@ void AnimationManager::clearAllProtectionMarks() {
 @return (size_t) number of current active count
 */
 size_t AnimationManager::activeCount() const {
-    // std::lock_guard<std::mutex> lock(_mutex);
     return _animations.size();
+}
+
+uint32_t AnimationManager::nextWakeupMs(
+    uint32_t currentTime, uint32_t frameIntervalMs) const {
+    uint32_t next = PixelUITime::NO_WAKEUP;
+    for (const auto& animation : _animations) {
+        next = PixelUITime::earlier(
+            next, animation.nextWakeupMs(currentTime, frameIntervalMs));
+    }
+    return next;
 }

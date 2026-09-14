@@ -2,12 +2,11 @@
 # workspace.  The legacy copy in this component is intentionally left
 # untouched so the project never forks or modifies the framework itself.
 set(PIXELUI_ROOT "/Users/link/dev/PixelUI")
-file(GLOB_RECURSE SOURCES_CPPSRC CONFIGURE_DEPENDS
-     "${PIXELUI_ROOT}/src/*.cpp")
+file(GLOB_RECURSE SOURCES_CPPSRC "${PIXELUI_ROOT}/src/*.cpp")
 
 idf_component_register(SRCS ${SOURCES_CPPSRC}
                     INCLUDE_DIRS "${PIXELUI_ROOT}/include"
-                    REQUIRES "u8g2" "etl" "apps")
+                    REQUIRES "u8g2" "etl")
 
 target_compile_options(${COMPONENT_LIB} PRIVATE 
     -fno-function-sections 

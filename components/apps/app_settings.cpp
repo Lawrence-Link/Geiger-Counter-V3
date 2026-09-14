@@ -24,6 +24,9 @@
 #include "system_nvs_varibles.h"
 #include "esp_log.h"
 #include "voltage_pid.hpp"
+#include "core/ValueBinding.h"
+#include <cstdio>
+#include <new>
 
 static bool en_sound_click; // geiger click
 static bool en_sound_navigate; // sound navigate
@@ -46,6 +49,11 @@ static float vkd;
 
 static char str_coeff[12];
 
+static bool format_float_1dp(const void* object, const char*, char* buffer, size_t size) {
+    if (!object || !buffer || size == 0) return false;
+    return std::snprintf(buffer, size, "%.1f", *static_cast<const float*>(object)) > 0;
+}
+
 __attribute__((aligned(4)))
 static const unsigned char image_settings_bits[] = {0xf0,0xff,0x0f,0xfc,0xff,0x3f,0xfe,0xff,0x7f,0xfe,0xe7,0x7f,0xff,0xe7,0xff,0x9f,0x81,0xf9,0x1f,0x3c,0xf8,0x3f,0xff,0xfc,0xbf,0xc3,0xfd,0x9f,0x3d,0xf9,0xdf,0xfe,0xff,0xc7,0x7e,0xe8,0xc7,0xbe,0xeb,0xdf,0x7e,0xfb,0x9f,0xed,0xf6,0xbf,0xd5,0xf6,0x3f,0x37,0xf7,0x1f,0xf4,0xef,0x9f,0xc5,0xdf,0xff,0x3f,0xbe,0xfe,0xe7,0x7d,0xfe,0xff,0x7b,0xfc,0xff,0x37,0xf0,0xff,0x0f};
 
@@ -57,34 +65,34 @@ auto& syscfg = SystemConf::getInstance();
 
 ListItem sub_Alarm[5] = {
     ListItem(">>> 剂量警告 <<<"),
-    ListItem{.title = "- 启用", .extra = {.switchValue=&en_sos}},
+    ListItem{.title = "- 启用", .accessory = ListItemAccessory::toggle(en_sos)},
     ListItem{.title = "- 警告阈值(CPM)",
-            .pFunc = [](){ ui.showPopupValue4Digits(cpm_warn_threshold, "警告CPM", 100, 40, 3000, 1); }, 
-            .extra = ListItemExtra{.intValue = &cpm_warn_threshold}},
+            .pFunc = [](){ ui.showPopupValueDigits(cpm_warn_threshold, 4, "警告CPM", 100, 40, 3000); },
+            .accessory = ListItemAccessory::value(PixelUIValue::Binding::integer(cpm_warn_threshold))},
     ListItem{
         .title = "- 危险阈值(CPM)",
-        .pFunc = [](){ ui.showPopupValue4Digits(cpm_dngr_threshold, "危险CPM", 100, 40, 3000, 1); }, 
-        .extra = ListItemExtra{.intValue = &cpm_dngr_threshold}},
+        .pFunc = [](){ ui.showPopupValueDigits(cpm_dngr_threshold, 4, "危险CPM", 100, 40, 3000); },
+        .accessory = ListItemAccessory::value(PixelUIValue::Binding::integer(cpm_dngr_threshold))},
     ListItem{.title = "- 灾难阈值(CPM)",
-        .pFunc = [](){ ui.showPopupValue4Digits(cpm_hzdr_threshold, "灾难CPM", 100, 40, 3000, 1); }, 
-        .extra = ListItemExtra{.intValue = &cpm_hzdr_threshold}}
+        .pFunc = [](){ ui.showPopupValueDigits(cpm_hzdr_threshold, 4, "灾难CPM", 100, 40, 3000); },
+        .accessory = ListItemAccessory::value(PixelUIValue::Binding::integer(cpm_hzdr_threshold))}
 };
 
 ListItem sub_cvs_cfg[4] = {
     ListItem(">>> 恒压PID调试 <<<"),
-    ListItem{.title = "- Kp 比例", .extra = {.float_dot1f_Value = &vkp}},
-    ListItem{.title = "- Ki 积分", .extra = {.float_dot1f_Value = &vki}},
-    ListItem{.title = "- Kd 微分", .extra = {.float_dot1f_Value = &vkd}}
+    ListItem{.title = "- Kp 比例", .accessory = ListItemAccessory::value(PixelUIValue::Binding::custom(&vkp, format_float_1dp))},
+    ListItem{.title = "- Ki 积分", .accessory = ListItemAccessory::value(PixelUIValue::Binding::custom(&vki, format_float_1dp))},
+    ListItem{.title = "- Kd 微分", .accessory = ListItemAccessory::value(PixelUIValue::Binding::custom(&vkd, format_float_1dp))}
 };
 
 ListItem sub_Tube_cfg[4] = {
     ListItem(">>> 盖革管 <<<"),
     ListItem{
-        .title = "- 工作电压", 
-        .pFunc = [](){ ui.showPopupProgress(operation_voltage, 340, 400, "工作电压", 100, 40, 5000, 1, nullptr, true);}, 
-        .extra = ListItemExtra{.intValue = &operation_voltage}
+        .title = "- 工作电压",
+        .pFunc = [](){ ui.showPopupProgress(operation_voltage, 340, 400, "工作电压", 100, 40, 5000, nullptr, PopupProgressMode::Editable);},
+        .accessory = ListItemAccessory::value(PixelUIValue::Binding::integer(operation_voltage))
     },
-    ListItem{.title = "- 转换系数", .extra = {.text = str_coeff}},
+    ListItem{.title = "- 转换系数", .accessory = ListItemAccessory::text(str_coeff)},
     ListItem{.title = "- 恒压调试", .nextList = sub_cvs_cfg, .nextListLength = 4}
 };
 
@@ -92,10 +100,8 @@ ListItem itemList[10] = {
     ListItem(">>>> 设置 <<<<"),
     ListItem{
         .title = "- 屏幕亮度",
-        .pFunc = [](){ ui.showPopupProgress(brightness, 0, 5, "亮度", 100, 40, 5000, 1, [](int32_t val){ui.getU8G2().setContrast(val * 51);}); },
-        .extra = ListItemExtra{
-            .intValue = &brightness
-        }
+        .pFunc = [](){ ui.showPopupProgress(brightness, 0, 5, "亮度", 100, 40, 5000, [](int32_t val){ui.getU8G2().setContrast(val * 51);}, PopupProgressMode::Editable); },
+        .accessory = ListItemAccessory::value(PixelUIValue::Binding::integer(brightness))
     },
     ListItem{
         .title = "- 剂量警告",
@@ -109,46 +115,36 @@ ListItem itemList[10] = {
     },
     ListItem{
         .title = "- 使用CPM",
-        .extra = ListItemExtra{
-            .switchValue = &use_cpm
-        }
+        .accessory = ListItemAccessory::toggle(use_cpm)
     },
     ListItem{
         .title = "- 计数音",
-        .extra = ListItemExtra{
-            .switchValue = &en_sound_click
-        }
+        .accessory = ListItemAccessory::toggle(en_sound_click)
     },
     ListItem{
         .title = "- 交互音",
-        .extra = ListItemExtra{
-            .switchValue = &en_interaction_tone
-        }
+        .accessory = ListItemAccessory::toggle(en_interaction_tone)
     },
     ListItem{
         .title = "- 导航音",
         .pFunc = [](){syscfg.set_conf_enable_navi_tone(en_sound_navigate);},
-        .extra = ListItemExtra{
-            .switchValue = &en_sound_navigate
-        }
+        .accessory = ListItemAccessory::toggle(en_sound_navigate)
     },
     ListItem{
         .title = "- RTC时间",
-        .pFunc = [](){ ui.getViewManagerPtr()->push(time_setting_app.createApp(ui, nullptr)); },
+        .pFunc = [](){ ui.getViewManagerPtr()->launch(time_setting_app); },
         .use_fade = true
     },
     ListItem{
         .title = "- LED指示",
-        .extra = ListItemExtra{
-            .switchValue = &en_led
-        }
+        .accessory = ListItemAccessory::toggle(en_led)
     }
 };
 
 class APP_SETTINGS : public ListView {
 public:
     APP_SETTINGS(PixelUI& ui, ListItem *itemList, size_t length) : ListView(ui, itemList, length) {}
-    
+
     void onLoad() override {
         auto& syscfg = SystemConf::getInstance();
 
@@ -168,7 +164,7 @@ public:
 
         operation_voltage = syscfg.read_conf_operation_voltage();
         en_interaction_tone = syscfg.read_conf_enable_interaction_tone();
-        
+
         vkp = syscfg.read_conf_volt_pid_kp();
         vki = syscfg.read_conf_volt_pid_ki();
         vkd = syscfg.read_conf_volt_pid_kd();
@@ -202,8 +198,9 @@ public:
 AppItem settings_app{
     .title = "设置",
     .bitmap = image_settings_bits,
-    
-    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<APP_SETTINGS>(ui, itemList, 10); 
-    },
+
+    .factory = ApplicationFactory::makeCustom<APP_SETTINGS>(
+        [](void* storage, PixelUI& ui, void*) -> IApplication* {
+            return ::new (storage) APP_SETTINGS(ui, itemList, 10);
+        }),
 };

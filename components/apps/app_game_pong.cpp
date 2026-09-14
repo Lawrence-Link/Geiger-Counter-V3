@@ -1,4 +1,5 @@
 #include "core/app/IApplication.h"
+#include "PixelUI.h"
 #include "core/app/app_system.h"
 #include "focus/focus.h"
 #include "widgets/num_scroll/num_scroll.h"
@@ -330,7 +331,5 @@ AppItem game_pong_app{
     .title = "Pong",
     .bitmap = image_games_bits,
     
-    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<GamePong>(ui, param); 
-    },
+    .factory = ApplicationFactory::make<GamePong>(),
 };

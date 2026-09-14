@@ -1,24 +1,34 @@
 /*
  * Copyright (C) 2025 Lawrence Link
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "widgets/curve_chart/curve_chart.h"
-#include <cmath>
-#include <algorithm>
-#include <limits>
+#include "PixelUI.h"
+#include "calc/TextAlignHelper/TextAlignHelper.h"
+#include <etl/algorithm.h>
+#include <etl/limits.h>
 
 /**
  * @brief Constructor for CurveChart widget.
@@ -26,16 +36,30 @@
  * @param pos_x X coordinate of the widget's top-left corner (new anchor).
  * @param pos_y Y coordinate of the widget's top-left corner (new anchor).
  */
-CurveChart::CurveChart(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t size_w, uint16_t size_h, uint16_t size_w_exp = 0, uint16_t size_h_exp = 0, EXPAND_BASE base = EXPAND_BASE::TOP_LEFT) : 
-    m_ui(ui), 
+CurveChart::CurveChart(
+    PixelUI& ui,
+    uint16_t pos_x,
+    uint16_t pos_y,
+    uint16_t size_w,
+    uint16_t size_h,
+    ChartSeries& series,
+    uint16_t size_w_exp,
+    uint16_t size_h_exp,
+    EXPAND_BASE base,
+    const char* label) :
+    m_ui(ui),
+    m_series(series),
     pos_x_(pos_x), 
     pos_y_(pos_y),
     size_w_(size_w),
     size_h_(size_h),
     exp_w(size_w_exp),
     exp_h(size_h_exp),
-    base_(base)
+    base_(base),
+    m_label(label)
 {
+    setFocusInsets({1, 1, 0, 0});
+    setWidgetBounds({pos_x_, pos_y_, size_w_, size_h_});
     // pos_x_ and pos_y_ now represent the top-left anchor point.
     int32_t start_anim_x = (size_w_ / 2);
     int32_t start_anim_y = (size_h_ / 2);
@@ -47,7 +71,22 @@ CurveChart::CurveChart(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t siz
     anim_y = start_anim_y;
 }
 
+/** @brief CurveChart::onLoad. */
 void CurveChart::onLoad() {
+    onLoad(LoadTransition::Animated);
+}
+
+/** @brief CurveChart::onLoad. */
+void CurveChart::onLoad(LoadTransition transition) {
+    if (transition == LoadTransition::Immediate) {
+        anim_w = size_w_;
+        anim_h = size_h_;
+        anim_x = 0;
+        anim_y = 0;
+        m_ui.markDirty();
+        return;
+    }
+
     int32_t start_anim_x = (size_w_ / 2);
     int32_t start_anim_y = (size_h_ / 2);
 
@@ -57,224 +96,28 @@ void CurveChart::onLoad() {
     anim_x = start_anim_x;
     anim_y = start_anim_y;
 
-    m_ui.animate(anim_w, size_w_, 550, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
-    m_ui.animate(anim_h, size_h_, 600, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
-
-    m_ui.animate(anim_x, 0, 550, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
-    m_ui.animate(anim_y, 0, 600, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
-    
-    // Focusbox config
-    setFocusBox(FocusBox(pos_x_ + 1, pos_y_ + 1, size_w_ - 1, size_h_ - 1));
-
-    // Initialize internal data structures
-    initializeDataBuffer();
-}
-
-void CurveChart::initializeDataBuffer() {
-    // Initialize buffer with expanded width size
-    m_buffer_size = (exp_w > size_w_) ? exp_w : 200; // Default to 200 if exp_w not set
-    m_data_buffer = std::make_unique<float[]>(m_buffer_size); // acquisition for buffer memory
-    
-    // Initialize buffer with zeros
-    for (int i = 0; i < m_buffer_size; ++i) {
-        m_data_buffer[i] = 0.0f;
+    if (!m_ui.animate(anim_w, size_w_, 550, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED)) {
+        anim_w = size_w_;
     }
-    
-    // Reset window statistics
-    m_write_index = 0;
-    m_data_count = 0;
-    m_max_value = 0.0f;
-    m_sum_value = 0.0f;
-    m_min_value = std::numeric_limits<float>::max();
-    
-    // Reset history statistics
-    m_hist_max_value = 0.0f;
-    m_hist_min_value = std::numeric_limits<float>::max();
-    m_hist_sum_value = 0.0f;
-    m_hist_count = 0;
-    
-    // Reset visible cache
-    m_cached_visible_max = 0.0f;
-    m_cached_visible_min = 0.0f;
-    m_cached_visible_width = 0;
-    m_visible_cache_dirty = true;
+    if (!m_ui.animate(anim_h, size_h_, 600, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED)) {
+        anim_h = size_h_;
+    }
+
+    if (!m_ui.animate(anim_x, 0, 550, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED)) {
+        anim_x = 0;
+    }
+    if (!m_ui.animate(anim_y, 0, 600, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED)) {
+        anim_y = 0;
+    }
+    m_ui.markDirty();
 }
 
+/** @brief CurveChart::onOffload. */
 void CurveChart::onOffload() {
 
 }
 
-void CurveChart::addData(float value) {
-    if (m_data_buffer == nullptr) {
-        initializeDataBuffer();
-    }
-    
-    // Store the old value at current position for statistics update
-    float old_value = m_data_buffer[m_write_index];
-    bool replacing_valid_data = (m_data_count >= m_buffer_size);
-    
-    // Add new value to buffer
-    m_data_buffer[m_write_index] = value;
-    
-    // Update write index (ring buffer)
-    m_write_index = (m_write_index + 1) % m_buffer_size;
-    
-    // Update data count
-    if (m_data_count < m_buffer_size) {
-        m_data_count++;
-    }
-    
-    // Mark visible cache as dirty
-    m_visible_cache_dirty = true;
-    
-    // Update statistics efficiently
-    updateStatistics(value, old_value, replacing_valid_data);
-}
-    
-void CurveChart::updateStatistics(float new_value, float old_value, bool replacing_data) {
-    // Update history statistics (all-time)
-    m_hist_max_value = std::max(m_hist_max_value, new_value);
-    if (m_hist_min_value == std::numeric_limits<float>::max() || new_value < m_hist_min_value) {
-        m_hist_min_value = new_value;
-    }
-    m_hist_sum_value += new_value;
-    m_hist_count++;
-    
-    // Update window statistics
-    if (!replacing_data) {
-        // Adding new data (buffer not full yet)
-        m_sum_value += new_value;
-        m_max_value = std::max(m_max_value, new_value);
-        if (m_min_value == std::numeric_limits<float>::max() || new_value < m_min_value) {
-            m_min_value = new_value;
-        }
-    } else {
-        // Replacing old data (buffer is full)
-        m_sum_value = m_sum_value - old_value + new_value;
-        
-        // For max/min, we need to check if we're removing the extreme value
-        if (old_value == m_max_value || old_value == m_min_value || m_min_value == std::numeric_limits<float>::max()) {
-            recalculateExtremes();
-        } else {
-            m_max_value = std::max(m_max_value, new_value);
-            m_min_value = std::min(m_min_value, new_value);
-        }
-    }
-}
-
-void CurveChart::recalculateExtremes() {
-    if (m_data_count == 0) {
-        m_max_value = 0.0f;
-        m_min_value = std::numeric_limits<float>::max();
-        return;
-    }
-    
-    // Check if the buffer is full; if not, only scan up to m_data_count
-    int scan_limit = m_data_count; 
-    
-    // To scan only valid data points:
-    float current_max = -std::numeric_limits<float>::max();
-    float current_min = std::numeric_limits<float>::max();
-    
-    // The safest way to scan the currently valid data in a circular buffer:
-    for (int i = 0; i < scan_limit; ++i) {
-        // Calculate the index starting from the oldest data point
-        int data_index = (m_write_index - m_data_count + i + m_buffer_size) % m_buffer_size;
-        float value = m_data_buffer[data_index];
-        current_max = std::max(current_max, value);
-        current_min = std::min(current_min, value);
-    }
-    
-    m_max_value = current_max;
-    m_min_value = current_min;
-}
-
-/**
- * @brief Get the maximum value in the current window.
- * @return Maximum float value in buffer.
- */
-float CurveChart::getMaxValueInWindow() const {
-    return m_max_value;
-}
-
-/**
- * @brief Get the average value in the current window.
- * @return Average float value or 0 if buffer empty.
- */
-float CurveChart::getAverageValueInWindow() const {
-    if (m_data_count == 0) {
-        return 0.0f;
-    }
-    return m_sum_value / m_data_count;
-}
-
-/**
- * @brief Get the minimum value in the current window.
- * @return Minimum float value in buffer (or 0.0f if empty).
- */
-float CurveChart::getMinValueInWindow() const {
-    if (m_data_count == 0 || m_min_value == std::numeric_limits<float>::max()) {
-        return 0.0f;
-    }
-    return m_min_value;
-}
-
-/**
- * @brief Get the maximum value in the entire history.
- * @return Maximum float value ever recorded.
- */
-float CurveChart::getMaxValueInHistory() const {
-    return m_hist_max_value;
-}
-
-/**
- * @brief Get the average value of all historical data.
- * @return Average float value across all recorded data or 0 if no data.
- */
-float CurveChart::getAverageValueInHistory() const {
-    if (m_hist_count == 0) {
-        return 0.0f;
-    }
-    return m_hist_sum_value / m_hist_count;
-}
-
-/**
- * @brief Get the minimum value in the entire history.
- * @return Minimum float value ever recorded (or 0.0f if no data).
- */
-float CurveChart::getMinValueInHistory() const {
-    if (m_hist_count == 0) return 0.0f;
-    if (m_hist_min_value == std::numeric_limits<float>::max()) return 0.0f;
-    return m_hist_min_value;
-}
-
-void CurveChart::clearData() {
-    if (m_data_buffer != nullptr) {
-        for (int i = 0; i < m_buffer_size; ++i) {
-            m_data_buffer[i] = 0.0f;
-        }
-    }
-    
-    // Reset window statistics
-    m_write_index = 0;
-    m_data_count = 0;
-    m_max_value = 0.0f;
-    m_sum_value = 0.0f;
-    m_min_value = std::numeric_limits<float>::max();
-    
-    // Reset history statistics
-    m_hist_max_value = 0.0f;
-    m_hist_min_value = std::numeric_limits<float>::max();
-    m_hist_sum_value = 0.0f;
-    m_hist_count = 0;
-    
-    // Reset visible cache
-    m_cached_visible_max = 0.0f;
-    m_cached_visible_min = 0.0f;
-    m_cached_visible_width = 0;
-    m_visible_cache_dirty = true;
-}
-
+/** @brief CurveChart::handleEvent. */
 bool CurveChart::handleEvent(InputEvent event) {
     if (event == InputEvent::SELECT) {
         is_expanded = false;
@@ -284,6 +127,7 @@ bool CurveChart::handleEvent(InputEvent event) {
     return false;
 }
 
+/** @brief CurveChart::onSelect. */
 bool CurveChart::onSelect(){
     m_ui.clearUnprotectedAnimations();
     if (!is_expanded) {
@@ -298,6 +142,7 @@ bool CurveChart::onSelect(){
     return true;
 }
 
+/** @brief CurveChart::expandWidget. */
 void CurveChart::expandWidget() {
     int32_t target_x, target_y;
     calculateExpandPosition(target_x, target_y);
@@ -310,6 +155,7 @@ void CurveChart::expandWidget() {
     m_ui.animate(anim_y, target_y, 350, EasingType::EASE_OUT_QUAD);
 }
 
+/** @brief CurveChart::contractWidget. */
 void CurveChart::contractWidget() {
     // Animate back to original size and position
     m_ui.animate(anim_w, size_w_, 350, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
@@ -356,11 +202,15 @@ void CurveChart::calculateExpandPosition(int32_t& target_x, int32_t& target_y) {
     }
 }
 
-void CurveChart::draw() {
-    U8G2& u8g2 = m_ui.getU8G2();
+/** @brief CurveChart::display. */
+Canvas& CurveChart::display() { return m_ui.getCanvas(); }
+
+/** @brief CurveChart::drawSelf. */
+void CurveChart::drawSelf(const WidgetRenderContext& context) {
+    Canvas& u8g2 = m_ui.getCanvas();
     // tl_x and tl_y are the animated top-left corner coordinates
-    int tl_x = pos_x_ + anim_x; 
-    int tl_y = pos_y_ + anim_y; 
+    int tl_x = context.originX + pos_x_ + anim_x;
+    int tl_y = context.originY + pos_y_ + anim_y;
     int current_w = anim_w;
     int current_h = anim_h;
     
@@ -396,12 +246,32 @@ void CurveChart::draw() {
     u8g2.drawLine(tl_x + current_w - 1, tl_y, tl_x + current_w - 1, tl_y + current_h);
     
     // Draw curve data from internal buffer, passing top-left coordinates, current width, and height
-    drawCuveData(tl_x, tl_y, current_w, current_h, u8g2);
+    drawCurveData(tl_x, tl_y, current_w, current_h, u8g2);
     
-    // Draw label
-    u8g2.setFont(u8g2_font_4x6_tr);
-    // Positioned relative to the top-right corner
-    u8g2.drawStr(tl_x + current_w - 23, tl_y + 7, "Curve"); 
+    // Draw label if provided (positioned in the top-right area)
+    if (m_label != nullptr) {
+        u8g2.setFont(PIXELUI_FONT_CHART);
+        
+        // Define label area in top-right corner (matching original offset logic)
+        Rect label_area = {
+            static_cast<int16_t>(tl_x + current_w - 24 - 2),  // Right area
+            static_cast<int16_t>(tl_y + 2),               // Top margin
+            24,                                            // Width for label area
+            6                                              // Height matches font height
+        };
+        
+        // Calculate text position using TextAlignHelper
+        // Use Top alignment for Y to position near top, Right alignment for X
+        TextPos text_pos = TextAlignHelper::calcTextPos(
+            u8g2.rawDisplay().getU8g2(),
+            label_area,
+            m_label,
+            TextAlignX::Right,
+            TextAlignY::Top
+        );
+        
+        u8g2.drawStr(text_pos.x, text_pos.y, m_label);
+    }
 }
 
 /**
@@ -414,20 +284,16 @@ void CurveChart::draw() {
  * @param height Current height of the widget.
  * @param u8g2 Reference to U8G2 for drawing.
  */
-void CurveChart::drawCuveData(int tl_x, int tl_y, int width, int height, U8G2& u8g2) {
-    // Return early if there's no data or the buffer is invalid
-    if (m_data_buffer == nullptr || m_data_count == 0) {
-        return;
-    }
+void CurveChart::drawCurveData(int tl_x, int tl_y, int width, int height, Canvas& u8g2) {
+    if (m_series.empty()) return;
     
     // Determine how many horizontal steps to draw
     // Subtract 3 to account for 2px borders (width - 3 = drawable columns from right border to left border inclusive)
-    int points_to_draw = std::min(width - 3, static_cast<int>(m_data_count));
+    const int points_to_draw =
+        etl::min(width - 3, static_cast<int>(m_series.size()));
     if (points_to_draw <= 1) { 
         // Handle single point case
         if (points_to_draw == 1) {
-            int data_index = (m_write_index - 1 + m_buffer_size) % m_buffer_size;
-            
             const int chart_h = height - 4;
             const int y_bottom = tl_y + height - 2;
             int current_y = y_bottom - (chart_h / 2); // Center single point
@@ -442,37 +308,26 @@ void CurveChart::drawCuveData(int tl_x, int tl_y, int width, int height, U8G2& u
     const int chart_h = height - 4;
     
     // Calculate visible window min/max (with caching)
-    if (m_visible_cache_dirty || m_cached_visible_width != points_to_draw) {
-        m_cached_visible_max = -std::numeric_limits<float>::max();
-        m_cached_visible_min = std::numeric_limits<float>::max();
+    if (m_cached_series_revision != m_series.revision() ||
+        m_cached_visible_width != points_to_draw) {
+        m_cached_visible_max = etl::numeric_limits<ChartSample>::min();
+        m_cached_visible_min = etl::numeric_limits<ChartSample>::max();
         
         for (int i = 0; i < points_to_draw; ++i) {
-            int buffer_offset = i + 1;
-            int data_index = (m_write_index - buffer_offset + m_buffer_size) % m_buffer_size;
-            if (buffer_offset <= m_data_count) {
-                float value = m_data_buffer[data_index];
-                m_cached_visible_max = std::max(m_cached_visible_max, value);
-                m_cached_visible_min = std::min(m_cached_visible_min, value);
-            }
+            const ChartSample sample =
+                m_series.sampleFromNewest(static_cast<size_t>(i));
+            m_cached_visible_max = etl::max(m_cached_visible_max, sample);
+            m_cached_visible_min = etl::min(m_cached_visible_min, sample);
         }
         
         m_cached_visible_width = points_to_draw;
-        m_visible_cache_dirty = false;
+        m_cached_series_revision = m_series.revision();
     }
     
     // Use cached visible window range for scaling
-    float visible_min = m_cached_visible_min;
-    float visible_max = m_cached_visible_max;
-    
-    // Calculate normalization factor for auto-scaling
-    float range = visible_max - visible_min;
-    
-    if (range < 1e-6) {
-        range = 1.0f; 
-    }
-    
-    // Scale factor maps the data range to the chart height
-    float scale_factor = static_cast<float>(chart_h) / range;
+    const ChartSample visible_min = m_cached_visible_min;
+    const ChartSample visible_max = m_cached_visible_max;
+    const int64_t range = static_cast<int64_t>(visible_max) - visible_min;
     
     // Drawing area Y boundary (Bottom of the chart area)
     const int y_bottom = tl_y + height - 2;
@@ -484,30 +339,27 @@ void CurveChart::drawCuveData(int tl_x, int tl_y, int width, int height, U8G2& u
     // Loop from newest data (i=0, rightmost pixel) backwards to the oldest data (i=points_to_draw-1, leftmost pixel)
     for (int i = 0; i < points_to_draw; ++i) {
         
-        // 1. Calculate data index
-        int buffer_offset = i + 1; 
-        int data_index = (m_write_index - buffer_offset + m_buffer_size) % m_buffer_size;
-        
-        if (buffer_offset > m_data_count) {
-            continue;
-        }
-        
-        float value = m_data_buffer[data_index];
+        const ChartSample sample =
+            m_series.sampleFromNewest(static_cast<size_t>(i));
         
         // 2. Calculate coordinates
         // X position: Right Edge of chart area (tl_x + width - 2), move left by 'i' pixels
         int current_x = tl_x + width - 2 - i; 
         
         // Y position: Normalize value relative to visible_min, then scale, and position relative to y_bottom
-        float normalized_value = value - visible_min;
-        int y_offset = static_cast<int>(normalized_value * scale_factor);
+        int y_offset = chart_h / 2;
+        if (range > 0) {
+            const int64_t normalized_value =
+                static_cast<int64_t>(sample) - visible_min;
+            y_offset = static_cast<int>((normalized_value * chart_h) / range);
+        }
         
         // Y coordinate (0 is top, y_bottom is bottom)
         int current_y = y_bottom - y_offset; 
         
         // Ensure Y stays within the vertical bounds of the chart area 
-        current_y = std::max(y_top, current_y);
-        current_y = std::min(y_bottom, current_y);
+        current_y = etl::max(y_top, current_y);
+        current_y = etl::min(y_bottom, current_y);
 
         // 3. Draw line segment
         if (prev_x != -1) {

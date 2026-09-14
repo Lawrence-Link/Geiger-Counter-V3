@@ -16,6 +16,7 @@
  */
 
 #include "core/app/IApplication.h"
+#include "PixelUI.h"
 #include "core/app/app_system.h"
 #include "core/coroutine/Coroutine.h"
 
@@ -28,6 +29,11 @@
 
 #include "time_module.h"
 #include "i2c.h"
+
+namespace {
+// NumericFormatter keeps a non-owning pointer to its format description.
+constexpr IntegerFormat kTwoDigitFormat{2U, nullptr};
+}
 
 class TimeSetting : public IApplication {
 private:
@@ -133,15 +139,15 @@ public:
 
         num_h.setRange(0,23);
         num_h.setValue(0);
-        num_h.setFixedIntDigits(2);
+        num_h.setFormatter(NumericFormatter::integer(kTwoDigitFormat));
 
         num_m.setRange(0,59);
         num_m.setValue(0);
-        num_m.setFixedIntDigits(2);
+        num_m.setFormatter(NumericFormatter::integer(kTwoDigitFormat));
 
         num_s.setRange(0,59);
         num_s.setValue(0);
-        num_s.setFixedIntDigits(2);
+        num_s.setFormatter(NumericFormatter::integer(kTwoDigitFormat));
 
         pcf8563_get_time(pcf8563_dev, &timeinfo_adjust, &tm_valid);
         pcf8563_get_time(pcf8563_dev, &timeinfo_realtime, &tm_valid);
@@ -195,7 +201,5 @@ AppItem time_setting_app{
     .title = nullptr,
     .bitmap = nullptr,
     
-    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<TimeSetting>(ui, param); 
-    },
+    .factory = ApplicationFactory::make<TimeSetting>(),
 };

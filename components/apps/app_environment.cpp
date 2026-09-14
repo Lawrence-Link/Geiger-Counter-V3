@@ -16,6 +16,7 @@
  */
 
 #include "core/app/IApplication.h"
+#include "PixelUI.h"
 #include "core/app/app_system.h"
 
 #include "focus/focus.h"
@@ -35,6 +36,9 @@ static const uint8_t image_temperature_bits[] = {0x38,0x00,0x44,0x40,0xd4,0xa0,0
 class AppEnvironment : public IApplication {
 private:
     PixelUI& m_ui;
+    StaticChartSeries<110> temp_series;
+    StaticChartSeries<110> humi_series;
+    StaticChartSeries<110> baro_series;
     CurveChart chart_temp;
     CurveChart chart_humi;
     CurveChart chart_baro;
@@ -52,9 +56,9 @@ private:
 public:
     AppEnvironment(PixelUI& ui, void* param) : 
     m_ui(ui), 
-    chart_temp(m_ui, 71, 2, 56, 19, 110, 19, EXPAND_BASE::BOTTOM_RIGHT), 
-    chart_humi(m_ui, 71, 23, 56, 19, 110, 19, EXPAND_BASE::BOTTOM_RIGHT), 
-    chart_baro(m_ui, 71, 44, 56, 19, 110, 19, EXPAND_BASE::BOTTOM_RIGHT),
+    chart_temp(m_ui, 71, 2, 56, 19, temp_series, ChartExpandSize<110, 19>{}, EXPAND_BASE::BOTTOM_RIGHT),
+    chart_humi(m_ui, 71, 23, 56, 19, humi_series, ChartExpandSize<110, 19>{}, EXPAND_BASE::BOTTOM_RIGHT),
+    chart_baro(m_ui, 71, 44, 56, 19, baro_series, ChartExpandSize<110, 19>{}, EXPAND_BASE::BOTTOM_RIGHT),
     coroutine_anim([this](CoroutineContext& ctx) 
     {
         CORO_BEGIN(ctx);
@@ -94,9 +98,9 @@ public:
 
         if (timestamp_1s_now - timestamp_1s_prev > 500) {
             timestamp_1s_prev = timestamp_1s_now;
-            chart_temp.addData(bme280_read_temperature_celsius());
-            chart_humi.addData(bme280_read_humidity_percentage());
-            chart_baro.addData(bme280_read_barometer());
+            temp_series.add(static_cast<ChartSample>(bme280_read_temperature_celsius()));
+            humi_series.add(static_cast<ChartSample>(bme280_read_humidity_percentage()));
+            baro_series.add(static_cast<ChartSample>(bme280_read_barometer()));
         }
 
         u8g2.setFont(u8g2_font_missingplanet_tr);
@@ -139,7 +143,5 @@ AppItem app_environment{
     .title = "BME280传感器",
     .bitmap = image_environment_bits,
     
-    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<AppEnvironment>(ui, param); 
-    },
+    .factory = ApplicationFactory::make<AppEnvironment>(),
 };

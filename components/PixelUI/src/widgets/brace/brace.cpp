@@ -1,52 +1,90 @@
 /*
  * Copyright (C) 2025 Lawrence Link
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "widgets/brace/brace.h"
+#include "PixelUI.h"
 
 /**
  * @brief Construct a new Brace object
  * * @param ui Reference to the PixelUI instance
- * * Note: pos_x_ and pos_y_ now represent the top-left corner.
+ * * Note: pos_x and pos_y represent the top-left corner.
  */
 Brace::Brace(PixelUI& ui, uint16_t pos_x, uint16_t pos_y, uint16_t size_w, uint16_t size_h) : 
-    m_ui(ui), 
-    pos_x_(pos_x),
-    pos_y_(pos_y),
-    size_w_(size_w),
-    size_h_(size_h) 
+    m_ui(ui)
 {
-    int32_t start_anim_x = (size_w_ / 2);
-    int32_t start_anim_y = (size_h_ / 2);
+    setFocusInsets({1, 1, 0, 0});
+    updateBounds({pos_x, pos_y, size_w, size_h});
+    const int32_t start_anim_x = size_w / 2;
+    const int32_t start_anim_y = size_h / 2;
     
     anim_w = 0; 
     anim_h = 0;
 
     anim_x = start_anim_x;
     anim_y = start_anim_y;
+}
 
-    setFocusBox(FocusBox(pos_x_ + 1, pos_y_ + 1, size_w_ - 1, size_h_ - 1));
+/** @brief Brace::updateBounds. */
+void Brace::updateBounds(const FocusBox& bounds) {
+    setWidgetBounds(bounds);
+}
+
+/** @brief Brace::setSize. */
+void Brace::setSize(uint16_t width, uint16_t height) {
+    const FocusBox bounds = getLocalBounds();
+    updateBounds({bounds.x, bounds.y, width, height});
+}
+
+/** @brief Brace::setPosition. */
+void Brace::setPosition(int16_t pos_x, int16_t pos_y) {
+    const FocusBox bounds = getLocalBounds();
+    updateBounds({pos_x, pos_y, bounds.w, bounds.h});
 }
 
 /**
  * @brief Initialize animations for brace expansion and set the focus box
  */
 void Brace::onLoad() {
-    int32_t start_anim_x = (size_w_ / 2);
-    int32_t start_anim_y = (size_h_ / 2);
+    onLoad(LoadTransition::Animated);
+}
+
+/** @brief Brace::onLoad. */
+void Brace::onLoad(LoadTransition transition) {
+    const FocusBox bounds = getLocalBounds();
+    if (transition == LoadTransition::Immediate) {
+        anim_w = bounds.w;
+        anim_h = bounds.h;
+        anim_x = 0;
+        anim_y = 0;
+        m_ui.markDirty();
+        return;
+    }
+
+    const int32_t start_anim_x = bounds.w / 2;
+    const int32_t start_anim_y = bounds.h / 2;
     
     anim_w = 0; 
     anim_h = 0;
@@ -54,11 +92,20 @@ void Brace::onLoad() {
     anim_x = start_anim_x;
     anim_y = start_anim_y;
 
-    m_ui.animate(anim_w, size_w_, 550, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
-    m_ui.animate(anim_h, size_h_, 600, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
+    if (!m_ui.animate(anim_w, bounds.w, 550, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED)) {
+        anim_w = bounds.w;
+    }
+    if (!m_ui.animate(anim_h, bounds.h, 600, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED)) {
+        anim_h = bounds.h;
+    }
     
-    m_ui.animate(anim_x, 0, 550, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
-    m_ui.animate(anim_y, 0, 600, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
+    if (!m_ui.animate(anim_x, 0, 550, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED)) {
+        anim_x = 0;
+    }
+    if (!m_ui.animate(anim_y, 0, 600, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED)) {
+        anim_y = 0;
+    }
+    m_ui.markDirty();
 }
 
 /**
@@ -69,47 +116,46 @@ void Brace::onOffload() {
 }
 
 /**
- * @brief Draw the brace with corners and optional content inside
+ * @brief Draw the brace and its child content.
  */
-void Brace::draw() {
-    U8G2& u8g2 = m_ui.getU8G2();
+Canvas& Brace::display() { return m_ui.getCanvas(); }
 
-    int tl_x = pos_x_ + anim_x;
-    int tl_y = pos_y_ + anim_y;
-    int current_w = anim_w;
-    int current_h = anim_h;
+/** @brief Brace::drawSelf. */
+void Brace::drawSelf(const WidgetRenderContext&) {}
 
-    /**< Set the clipping window to restrict drawing inside the brace, based on top-left */
-    u8g2.setClipWindow(
-        tl_x, 
-        tl_y, 
-        tl_x + current_w,   /**< bottom-right X */
-        tl_y + current_h    /**< bottom-right Y */
-    );
+/** @brief Brace::getChildrenClipBounds. */
+FocusBox Brace::getChildrenClipBounds() const {
+    const FocusBox bounds = getLocalBounds();
+    return {bounds.x + anim_x, bounds.y + anim_y, anim_w, anim_h};
+}
 
-    /**< Draw the user-provided content inside the brace, if any */
-    if (contentWithinBrace) {
-        contentWithinBrace();
-    }
+/** @brief Brace::drawOverlay. */
+void Brace::drawOverlay(const WidgetRenderContext& context) {
+    Canvas& u8g2 = m_ui.getCanvas();
+    const FocusBox bounds = getLocalBounds();
 
-    /**< Reset clipping to full screen */
-    u8g2.setMaxClipWindow();
+    const int32_t tl_x = context.originX + bounds.x + anim_x;
+    const int32_t tl_y = context.originY + bounds.y + anim_y;
+    const int32_t current_w = anim_w;
+    const int32_t current_h = anim_h;
+    if (current_w <= 0 || current_h <= 0) return;
 
-    /**< Draw corner lines for the brace */
+    const int32_t corner_w = current_w < 4 ? current_w : 4;
+    const int32_t corner_h = current_h < 4 ? current_h : 4;
     
     // Top-left corner: (tl_x, tl_y)
-    u8g2.drawLine(tl_x, tl_y, tl_x + 4, tl_y);
-    u8g2.drawLine(tl_x, tl_y, tl_x, tl_y + 4);
+    u8g2.drawLine(tl_x, tl_y, tl_x + corner_w, tl_y);
+    u8g2.drawLine(tl_x, tl_y, tl_x, tl_y + corner_h);
 
     // Top-right corner: (tl_x + current_w, tl_y)
-    u8g2.drawLine(tl_x + current_w, tl_y, tl_x + current_w - 4, tl_y);
-    u8g2.drawLine(tl_x + current_w, tl_y, tl_x + current_w, tl_y + 4);
+    u8g2.drawLine(tl_x + current_w, tl_y, tl_x + current_w - corner_w, tl_y);
+    u8g2.drawLine(tl_x + current_w, tl_y, tl_x + current_w, tl_y + corner_h);
 
     // Bottom-left corner: (tl_x, tl_y + current_h)
-    u8g2.drawLine(tl_x, tl_y + current_h, tl_x + 4, tl_y + current_h);
-    u8g2.drawLine(tl_x, tl_y + current_h, tl_x, tl_y + current_h - 4);
+    u8g2.drawLine(tl_x, tl_y + current_h, tl_x + corner_w, tl_y + current_h);
+    u8g2.drawLine(tl_x, tl_y + current_h, tl_x, tl_y + current_h - corner_h);
 
     // Bottom-right corner: (tl_x + current_w, tl_y + current_h)
-    u8g2.drawLine(tl_x + current_w, tl_y + current_h, tl_x + current_w - 4, tl_y + current_h);
-    u8g2.drawLine(tl_x + current_w, tl_y + current_h, tl_x + current_w, tl_y + current_h - 4);
+    u8g2.drawLine(tl_x + current_w, tl_y + current_h, tl_x + current_w - corner_w, tl_y + current_h);
+    u8g2.drawLine(tl_x + current_w, tl_y + current_h, tl_x + current_w, tl_y + current_h - corner_h);
 }

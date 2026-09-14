@@ -77,9 +77,9 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     Tune& tune = Tune::getInstance();
 
     Tune::Melody startup = {
-        {Notes::B5, 80},
+        // {Notes::B5, 80},
         {Notes::REST, 80},
-        {Notes::B5, 80},
+        // {Notes::B5, 80},
     };
 
 // Tune::Melody badapple = {
@@ -176,7 +176,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
         {Notes::B5, 52}        // 8b5
     };
 
-    if (syscfg.read_conf_enable_interaction_tone()) tune.playMelody(bluejay);
+    if (syscfg.read_conf_enable_interaction_tone()) tune.playMelody(startup);
 
     startBatteryTask();
     
@@ -188,17 +188,17 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
 
     // vTaskDelay(pdMS_TO_TICKS(1000));
 
+    // Complete display-dependent PixelUI initialization before constructing
+    // views, since their layouts are calculated in their constructors.
+    ui.begin();
+
     // Register applications
     registerApps();
 
-    ui.getViewManagerPtr()->push(sillycat_app.createApp(ui, nullptr));
-    auto appView = AppLauncher::createAppLauncherView(ui, *ui.getViewManagerPtr());
-    ui.getViewManagerPtr()->push(appView);
+    ui.getViewManagerPtr()->launch(sillycat_app);
+    AppLauncher::launch(ui, *ui.getViewManagerPtr());
 
-    ui.getViewManagerPtr()->push(boot_app.createApp(ui, nullptr));
-
-    // Initialize UI
-    ui.begin();
+    ui.getViewManagerPtr()->launch(boot_app);
 
     start_encoder_task();
     start_ui_heartbeat_task();
@@ -212,7 +212,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     // CONFIG_voltage_controller
     voltage_controller.setTarget(vtar);
     voltage_controller.setPID(v_kp, v_ki, v_kd);
-    
+
     static uint32_t tickPrevChargingAnim = ui.getCurrentTime();
     static uint32_t tickNowChargingAnim = ui.getCurrentTime();
     bool countdown_enable_charging_anim = false;
@@ -236,7 +236,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
         if (countdown_enable_charging_anim) { // 防止重入
             if (tickNowChargingAnim - tickPrevChargingAnim > 1000 && gpio_get_level(PIN_USB_STATUS)) {
                 countdown_enable_charging_anim = false;
-                ui.getViewManagerPtr()->push(charge_app.createApp(ui, nullptr));
+                ui.getViewManagerPtr()->launch(charge_app);
             }
         }
 
@@ -244,7 +244,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
 
         if (err != VoltagePID::vpid_error_t::VPID_OK) {
             voltage_controller.stop();
-            ui.getViewManagerPtr()->push(power_surge_app.createApp(ui, (void*)&err));
+            ui.getViewManagerPtr()->launch(power_surge_app, (void*)&err);
         }
 
         ui.renderer();

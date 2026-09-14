@@ -1,76 +1,208 @@
 /*
  * Copyright (C) 2025 Lawrence Link
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "core/ViewManager/ViewManager.h"
-/*
-@brief Pushes a new application onto the view stack and makes it the current view.
-@param app A shared pointer to the application to be pushed onto the stack.
-*/
-void ViewManager::push(std::shared_ptr<IApplication> app) {
-    if (!app) return;
-        m_isTransitioning = true;
+#include "PixelUI.h"
 
-        if (!m_viewStack.empty()) {
-            m_ui.clearAllCoroutines();
-            m_ui.clearAllAnimations();
-            m_viewStack.top()->onPause(); // Pause the current top application
+namespace {
+constexpr int32_t ENTER_TRANSITION_START_X = -5;
+constexpr uint32_t ENTER_TRANSITION_DURATION_MS = 150U;
+}
+
+ViewManager::ViewManager(PixelUI& ui) : m_ui(ui) {}
+
+void ViewManager::attachInputRouter() {
+    m_ui.setInputCallback([this](InputEvent event) -> bool {
+        if (isTransitioning()) {
+            return false;
         }
 
-        m_viewStack.push(app);    // Push the new application onto the stack
-        m_ui.setDrawable(app);    // Grant app with drawable control
-        
-        m_ui.clearFocusManager();
-        app->onEnter([this]() {this->pop();}); // Handle app with exit callback
-        m_ui.markDirty();
+#if PIXELUI_USE_POPUP
+        if (m_ui.popupCount() > 0U) {
+            return m_ui.m_popupManager.handleTopPopupInput(event);
+        }
+#endif
 
-        m_isTransitioning = false;
+        IApplication* current = m_applicationStack.top();
+        if (current == nullptr) return false;
+        if (current->handleInput(event)) return true;
+        if (current->useVerticalScroll && m_ui.getCanvas().camera().handleInput(event)) {
+            m_ui.markDirty();
+            return true;
+        }
+        return false;
+    });
 }
 
-/*
-@brief Pops the current application from the view stack and resumes the previous application if available.
-*/
-void ViewManager::pop() {
-    // std::lock_guard<std::mutex> lock(m_stackMutex);
-
-    if (m_viewStack.empty()) return;
-
+ViewManager::~ViewManager() {
     m_isTransitioning = true;
-    m_ui.setDrawable(nullptr); 
-    
-    m_viewStack.top()->onExit();  
+    m_ui.setDrawable(nullptr);
+    m_ui.clearInputCallback();
+    clearNonOwningReferences();
+
+    while (!m_applicationStack.empty()) {
+        m_applicationStack.top()->clearExitCallback();
+        m_applicationStack.pop();
+    }
+}
+
+ViewManager::LaunchResult ViewManager::launch(const AppItem& item, void* parameters) {
+    TransitionGuard transition(*this);
+    if (!transition.acquired()) {
+        return LaunchResult::TransitionInProgress;
+    }
+
+    IApplication* application = nullptr;
+    const ApplicationStackResult result =
+        m_applicationStack.emplace(item.factory, m_ui, parameters, application);
+    if (result != ApplicationStackResult::Ok) {
+        return toLaunchResult(result);
+    }
+
+    activatePushedApplication(application);
+    return LaunchResult::Ok;
+}
+
+bool ViewManager::pop() {
+    TransitionGuard transition(*this);
+    if (!transition.acquired() || m_applicationStack.empty()) {
+        return false;
+    }
+
+    IApplication* application = m_applicationStack.top();
+    m_ui.setDrawable(nullptr);
+    application->onExit();
+    application->clearExitCallback();
 
     m_ui.markFading();
+    clearNonOwningReferences();
+    m_applicationStack.pop();
 
-    m_viewStack.pop(); 
-
-    m_ui.clearFocusManager();
-    m_ui.clearAllCoroutines();
-    m_ui.clearAllAnimations();
-    if (!m_viewStack.empty()) {
-        auto& previousApp = m_viewStack.top();
-        m_ui.setDrawable( previousApp ); // setting up new drawable
-        previousApp->onResume(); // resume the previous application
+    IApplication* previousApplication = m_applicationStack.top();
+    if (previousApplication != nullptr) {
+        restoreCurrentCameraState();
+        m_ui.setDrawable(previousApplication);
+        previousApplication->onResume();
+    } else {
+        m_ui.getCanvas().camera().setEnabled(false);
+        m_ui.getCanvas().camera().setX(0);
+        m_ui.getCanvas().camera().setY(0);
     }
-    
+
     m_ui.markDirty();
-    m_isTransitioning = false; // mark the end of the transition
+    return true;
 }
 
-std::shared_ptr<IApplication> ViewManager::getCurrentApp() const {
-    if (m_viewStack.empty()) return nullptr;
-    return m_viewStack.top();
+IApplication* ViewManager::getCurrentApp() const {
+    return m_applicationStack.top();
+}
+
+ViewManager::LaunchResult ViewManager::toLaunchResult(ApplicationStackResult result) {
+    switch (result) {
+        case ApplicationStackResult::Ok: return LaunchResult::Ok;
+        case ApplicationStackResult::StackFull: return LaunchResult::StackFull;
+        case ApplicationStackResult::ArenaFull: return LaunchResult::ArenaFull;
+        case ApplicationStackResult::ConstructionFailed: return LaunchResult::ConstructionFailed;
+        default: return LaunchResult::ConstructionFailed;
+    }
+}
+
+void ViewManager::activatePushedApplication(IApplication* application) {
+    IApplication* previousApplication = m_applicationStack.previous();
+    if (previousApplication != nullptr) {
+        const size_t currentDepth = m_applicationStack.depth();
+        if (currentDepth >= 2U) {
+            m_cameraStates[currentDepth - 2U].y = m_ui.getCanvas().camera().storedY();
+            m_cameraStates[currentDepth - 2U].contentHeight =
+                m_ui.getCanvas().camera().contentHeight();
+        }
+        clearNonOwningReferences();
+        previousApplication->onPause();
+    }
+
+    m_ui.setDrawable(application);
+    m_cameraStates[m_applicationStack.depth() - 1U] = CameraState{};
+    m_ui.getCanvas().camera().setEnabled(application->useVerticalScroll);
+    m_ui.getCanvas().camera().setX(0);
+    m_ui.getCanvas().camera().setContentHeight(0);
+    m_ui.getCanvas().camera().setY(0);
+    m_ui.clearFocusManager();
+    if (previousApplication != nullptr && m_ui.isFading()) {
+        m_pendingEnter = application;
+    } else {
+        enterApplication(application);
+    }
+    m_ui.markDirty();
+}
+
+void ViewManager::completePendingEnter() {
+    if (m_pendingEnter == nullptr) {
+        return;
+    }
+
+    IApplication* application = m_pendingEnter;
+    enterApplication(application);
+    m_pendingEnter = nullptr;
+    m_ui.markDirty();
+}
+
+void ViewManager::enterApplication(IApplication* application) {
+    CanvasCamera& camera = m_ui.getCanvas().camera();
+    const int32_t startX = application->m_enterTransitionEnabled
+        ? ENTER_TRANSITION_START_X
+        : 0;
+    camera.setX(startX);
+    if (application->m_enterTransitionEnabled &&
+        !m_ui.animateCallback(
+            startX, 0, ENTER_TRANSITION_DURATION_MS,
+            EasingType::EASE_OUT_CUBIC,
+            [this](int32_t value) {
+                m_ui.getCanvas().camera().setX(value);
+            })) {
+        camera.setX(0);
+    }
+
+    application->onEnter([this]() { pop(); });
+    m_ui.getCanvas().camera().setEnabled(application->useVerticalScroll);
+}
+
+void ViewManager::clearNonOwningReferences() {
+    m_ui.clearAllAnimations();
+    m_ui.clearAllCoroutines();
+    m_ui.clearFocusManager();
+    m_ui.clearPopups();
+    m_ui.getCanvas().camera().setX(0);
+}
+
+void ViewManager::restoreCurrentCameraState() {
+    IApplication* application = m_applicationStack.top();
+    if (application == nullptr) return;
+    const CameraState& state = m_cameraStates[m_applicationStack.depth() - 1U];
+    m_ui.getCanvas().camera().setEnabled(application->useVerticalScroll);
+    m_ui.getCanvas().camera().setX(0);
+    m_ui.getCanvas().camera().setContentHeight(state.contentHeight);
+    m_ui.getCanvas().camera().setY(state.y);
 }

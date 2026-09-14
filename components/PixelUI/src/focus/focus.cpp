@@ -1,266 +1,347 @@
 /*
  * Copyright (C) 2025 Lawrence Link
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "focus/focus.h"
+#include "PixelUI.h"
 
-/**
- * @brief Clear the currently active widget, if any, and restore focus state.
- *
- * Called when a widget times out or loses activation.
- */
-void FocusManager::clearActiveWidget() {
-    if (m_activeWidget) {
+void FocusManager::enterIdle(bool clearSelection) {
+    m_state = State::IDLE;
+    if (clearSelection) m_currentWidget = nullptr;
+}
+
+void FocusManager::beginFocusAnimation(IWidget* widget) {
+    if (!widget) return;
+    cancelOwnAnimations();
+    m_currentWidget = widget;
+    m_state = State::ANIMATING;
+    last_focus_change_time = m_ui.getCurrentTime();
+    m_target_focus_box = widget->getFocusBox();
+    const bool xStarted = m_ui.animate(
+        m_current_focus_box.x, m_target_focus_box.x, 100,
+        EasingType::EASE_OUT_QUAD, PROTECTION::NOT_PROTECTED,
+        &animationHandles_[0]);
+    const bool yStarted = m_ui.animate(
+        m_current_focus_box.y, m_target_focus_box.y, 100,
+        EasingType::EASE_OUT_QUAD, PROTECTION::NOT_PROTECTED,
+        &animationHandles_[1]);
+    const bool wStarted = m_ui.animate(
+        m_current_focus_box.w, m_target_focus_box.w, 100,
+        EasingType::EASE_OUT_QUAD, PROTECTION::NOT_PROTECTED,
+        &animationHandles_[2]);
+    const bool hStarted = m_ui.animate(
+        m_current_focus_box.h, m_target_focus_box.h, 100,
+        EasingType::EASE_OUT_QUAD, PROTECTION::NOT_PROTECTED,
+        &animationHandles_[3]);
+    if (!xStarted || !yStarted || !wStarted || !hStarted) {
+        cancelOwnAnimations();
+        m_current_focus_box = m_target_focus_box;
+        enterFocused(false);
+    }
+}
+
+void FocusManager::enterFocused(bool synchronizeBox) {
+    if (!isNavigable(m_currentWidget)) {
+        enterIdle(true);
+        return;
+    }
+    m_state = State::FOCUSED;
+    if (synchronizeBox) {
+        last_focus_change_time = m_ui.getCurrentTime();
+        m_current_focus_box = m_currentWidget->getFocusBox();
+        m_target_focus_box = m_current_focus_box;
+    }
+}
+
+void FocusManager::beginShrinkAnimation() {
+    cancelOwnAnimations();
+    m_state = State::ANIMATING_SHRINK;
+    const int32_t centerX = m_current_focus_box.x + m_current_focus_box.w / 2;
+    const int32_t centerY = m_current_focus_box.y + m_current_focus_box.h / 2;
+    const bool wStarted = m_ui.animate(
+        m_current_focus_box.w, 0, 100, EasingType::EASE_IN_QUAD,
+        PROTECTION::NOT_PROTECTED, &animationHandles_[0]);
+    const bool hStarted = m_ui.animate(
+        m_current_focus_box.h, 0, 100, EasingType::EASE_IN_QUAD,
+        PROTECTION::NOT_PROTECTED, &animationHandles_[1]);
+    const bool xStarted = m_ui.animate(
+        m_current_focus_box.x, centerX, 100, EasingType::EASE_IN_QUAD,
+        PROTECTION::NOT_PROTECTED, &animationHandles_[2]);
+    const bool yStarted = m_ui.animate(
+        m_current_focus_box.y, centerY, 100, EasingType::EASE_IN_QUAD,
+        PROTECTION::NOT_PROTECTED, &animationHandles_[3]);
+    if (!wStarted || !hStarted || !xStarted || !yStarted) {
+        cancelOwnAnimations();
+        m_current_focus_box = {centerX, centerY, 0, 0};
+        enterIdle(true);
+    }
+}
+
+bool FocusManager::isRegisteredRoot(const IWidget* widget) const {
+    for (IWidget* root : roots_) if (root == widget) return true;
+    return false;
+}
+
+bool FocusManager::hasRegisteredAncestor(const IWidget* widget) const {
+    for (const IWidget* parent = widget ? widget->parent() : nullptr; parent; parent = parent->parent()) {
+        if (isRegisteredRoot(parent)) return true;
+    }
+    return false;
+}
+
+bool FocusManager::isNavigable(const IWidget* widget) const {
+    if (!widget || !widget->isFocusable() || !widget->isVisible() || !widget->isEnabled()) return false;
+    for (const IWidget* parent = widget->parent(); parent; parent = parent->parent()) {
+        if (!parent->isVisible() || !parent->isEnabled()) return false;
+    }
+    return isRegisteredRoot(widget) || hasRegisteredAncestor(widget);
+}
+
+IWidget* FocusManager::firstTreeNode() const {
+    for (IWidget* root : roots_) if (root && !hasRegisteredAncestor(root)) return root;
+    return nullptr;
+}
+
+IWidget* FocusManager::lastTreeNode() const {
+    for (size_t i = roots_.size(); i > 0; --i) {
+        IWidget* node = roots_[i - 1];
+        if (!node || hasRegisteredAncestor(node)) continue;
+        while (node->lastChild()) node = node->lastChild();
+        return node;
+    }
+    return nullptr;
+}
+
+IWidget* FocusManager::nextTreeNode(IWidget* widget) const {
+    if (!widget) return firstTreeNode();
+    if (widget->firstChild()) return widget->firstChild();
+    while (widget) {
+        if (widget->nextSibling()) return widget->nextSibling();
+        IWidget* parent = widget->parent();
+        if (!parent) {
+            for (size_t i = 0; i < roots_.size(); ++i) {
+                if (roots_[i] != widget) continue;
+                for (++i; i < roots_.size(); ++i) {
+                    if (roots_[i] && !hasRegisteredAncestor(roots_[i])) return roots_[i];
+                }
+                return nullptr;
+            }
+        }
+        widget = parent;
+    }
+    return nullptr;
+}
+
+IWidget* FocusManager::previousTreeNode(IWidget* widget) const {
+    if (!widget) return lastTreeNode();
+    if (widget->previousSibling()) {
+        widget = widget->previousSibling();
+        while (widget->lastChild()) widget = widget->lastChild();
+        return widget;
+    }
+    if (widget->parent()) return widget->parent();
+    for (size_t i = 0; i < roots_.size(); ++i) {
+        if (roots_[i] != widget) continue;
+        while (i > 0) {
+            IWidget* root = roots_[--i];
+            if (!root || hasRegisteredAncestor(root)) continue;
+            while (root->lastChild()) root = root->lastChild();
+            return root;
+        }
+    }
+    return nullptr;
+}
+
+IWidget* FocusManager::nextFocusable(IWidget* widget) const {
+    IWidget* candidate = nextTreeNode(widget);
+    if (!candidate) candidate = firstTreeNode();
+    IWidget* firstCandidate = candidate;
+    do {
+        if (isNavigable(candidate)) return candidate;
+        candidate = nextTreeNode(candidate);
+        if (!candidate) candidate = firstTreeNode();
+    } while (candidate && candidate != firstCandidate);
+    return nullptr;
+}
+
+IWidget* FocusManager::previousFocusable(IWidget* widget) const {
+    IWidget* candidate = previousTreeNode(widget);
+    if (!candidate) candidate = lastTreeNode();
+    IWidget* firstCandidate = candidate;
+    do {
+        if (isNavigable(candidate)) return candidate;
+        candidate = previousTreeNode(candidate);
+        if (!candidate) candidate = lastTreeNode();
+    } while (candidate && candidate != firstCandidate);
+    return nullptr;
+}
+
+size_t FocusManager::focusableCount() const {
+    size_t count = 0;
+    for (IWidget* node = firstTreeNode(); node; node = nextTreeNode(node)) {
+        if (isNavigable(node)) ++count;
+    }
+    return count;
+}
+
+void FocusManager::onWidgetSubtreeDetaching(IWidget& subtree) {
+    if (subtree.contains(m_activeWidget)) {
         m_activeWidget->onDeactivate();
         m_activeWidget = nullptr;
-        
-        // Restore focus display state
-        if (index >= 0 && index < (int)m_Widgets.size()) {
-            m_state = State::FOCUSED;
-            last_focus_change_time = m_ui.getCurrentTime();
-            
-            // Sync focus box to current widget
-            m_current_focus_box = m_Widgets[index]->getFocusBox();
-            m_target_focus_box = m_current_focus_box;
-        } else {
-            m_state = State::IDLE;
-        }
+    }
+    if (subtree.contains(m_currentWidget)) enterIdle(true);
+    for (auto it = roots_.begin(); it != roots_.end();) {
+        if (subtree.contains(*it)) it = roots_.erase(it);
+        else ++it;
     }
 }
-/**
- * @brief Handle input events for focus management.
- * @param event The input event to handle.
- * @return true if the event was handled by an active widget, false otherwise.
- */
+
+void FocusManager::onWidgetDestroyed(IWidget& widget) {
+    onWidgetSubtreeDetaching(widget);
+}
+
+void FocusManager::resetState() {
+    cancelOwnAnimations();
+    if (m_activeWidget) m_activeWidget->onDeactivate();
+    m_activeWidget = nullptr;
+    m_current_focus_box = {0, 64, 0, 0};
+    m_target_focus_box = m_current_focus_box;
+    enterIdle(true);
+}
+
+void FocusManager::clear() {
+    resetState();
+    for (IWidget* root : roots_) {
+        if (root) root->setTreeObserver(nullptr);
+    }
+    roots_.clear();
+}
+
+void FocusManager::cancelOwnAnimations() {
+    for (AnimationHandle& handle : animationHandles_) {
+        m_ui.cancelAnimation(handle);
+        handle = INVALID_ANIMATION_HANDLE;
+    }
+}
+
+void FocusManager::clearActiveWidget() {
+    if (!m_activeWidget) return;
+    m_activeWidget->onDeactivate();
+    m_activeWidget = nullptr;
+    enterFocused(true);
+}
+
 bool FocusManager::handleInput(InputEvent event) {
-    // Check if an interactive widget (like the expanded histogram) has taken over input control
-    IWidget* activeWidget = getActiveWidget();
-    if (activeWidget) {
-        // Pass the event to the active widget
-        if (activeWidget->handleEvent(event)) {
-            // If the widget returns true, it signifies the operation is complete (e.g., expanded view closed)
-            // and control should be returned to the FocusManager.
-            clearActiveWidget();
-        }
-        return true; // Event was handled by an active widget
+    if (m_activeWidget) {
+        if (m_activeWidget->handleEvent(event)) clearActiveWidget();
+        return true;
     }
-
-    // No widget has taken over input; proceed with standard focus management and app control
-    if (!m_Widgets.empty()) {
-        if (event == FOCUS_MANAGER_NAVI_NEXT) {
-            moveNext(); // Move focus to the next widget
-            return true;
-        } else if (event == FOCUS_MANAGER_NAVI_PREV) {
-            movePrev(); // Move focus to the previous widget
-            return true;
-        } else if (event == FOCUS_MANAGER_NAVI_SELECT) {
-            selectCurrent(); // Select the currently focused widget
-            return true; // Always consume SELECT event to prevent it from propagating
-        }
-    }
-    return false; // Event was not handled  
+    if (focusableCount() == 0U) return false;
+    if (event == FOCUS_MANAGER_NAVI_NEXT) { moveNext(); return true; }
+    if (event == FOCUS_MANAGER_NAVI_PREV) { movePrev(); return true; }
+    if (event == FOCUS_MANAGER_NAVI_SELECT) { selectCurrent(); return true; }
+    return false;
 }
 
-/**
- * @brief Check if the active widget has timed out.
- *
- * If the widget's timeout has expired, clear the active widget and mark the UI dirty.
- */
 void FocusManager::checkActiveWidgetTimeout() {
     if (!m_activeWidget) return;
-
-    uint32_t timeout = m_activeWidget->getTimeout();
-    if (timeout == 0) return;
-
-    uint32_t currentTime = m_ui.getCurrentTime();
-    uint32_t lastInteractionTime = m_activeWidget->getLastInteractionTime();
-
-    if (currentTime - lastInteractionTime >= timeout) {
+    const uint32_t timeout = m_activeWidget->getTimeout();
+    if (timeout == 0U) return;
+    if (m_ui.getCurrentTime() - m_activeWidget->getLastInteractionTime() >= timeout) {
         clearActiveWidget();
         m_ui.markDirty();
     }
 }
 
-/**
- * @brief Move focus to the next widget in the list.
- *
- * Animates the focus box to the new widget's position and size.
- */
 void FocusManager::moveNext() {
-    if (m_Widgets.empty()) {
-        index = -1;
-        m_state = State::IDLE;
-        return;
-    }
-
-    m_ui.getAnimationManPtr()->clearUnprotected();
-    int old_index = index;
-    index = (index == -1) ? 0 : (index + 1) % m_Widgets.size();
-
-    if (index != old_index) {
-        m_state = State::ANIMATING;
-        last_focus_change_time = m_ui.getCurrentTime();
-
-        FocusBox target = m_Widgets[index]->getFocusBox();
-
-        // Animate focus box from current to target
-        m_ui.animate(m_current_focus_box.x, target.x, 100, EasingType::EASE_OUT_QUAD);
-        m_ui.animate(m_current_focus_box.y, target.y, 100, EasingType::EASE_OUT_QUAD);
-        m_ui.animate(m_current_focus_box.w, target.w, 100, EasingType::EASE_OUT_QUAD);
-        m_ui.animate(m_current_focus_box.h, target.h, 100, EasingType::EASE_OUT_QUAD);
-    }
+    IWidget* next = nextFocusable(m_currentWidget);
+    if (!next || next == m_currentWidget) return;
+    beginFocusAnimation(next);
 }
 
-/**
- * @brief Move focus to the previous widget in the list.
- *
- * Animates the focus box to the new widget's position and size.
- */
 void FocusManager::movePrev() {
-    if (m_Widgets.empty()) {
-        index = -1;
-        m_state = State::IDLE;
-        return;
-    }
-
-    m_ui.getAnimationManPtr()->clearUnprotected();
-    int old_index = index;
-    index = (index == -1) ? m_Widgets.size() - 1 : (index - 1 + m_Widgets.size()) % m_Widgets.size();
-
-    if (index != old_index) {
-        m_state = State::ANIMATING;
-        last_focus_change_time = m_ui.getCurrentTime();
-
-        FocusBox target = m_Widgets[index]->getFocusBox();
-
-        // Animate focus box from current to target
-        m_ui.animate(m_current_focus_box.x, target.x, 100, EasingType::EASE_OUT_QUAD);
-        m_ui.animate(m_current_focus_box.y, target.y, 100, EasingType::EASE_OUT_QUAD);
-        m_ui.animate(m_current_focus_box.w, target.w, 100, EasingType::EASE_OUT_QUAD);
-        m_ui.animate(m_current_focus_box.h, target.h, 100, EasingType::EASE_OUT_QUAD);
-    }
+    IWidget* previous = previousFocusable(m_currentWidget);
+    if (!previous || previous == m_currentWidget) return;
+    beginFocusAnimation(previous);
 }
 
-/**
- * @brief Select the currently focused widget.
- *
- * If the widget returns true on selection, it becomes active.
- */
 void FocusManager::selectCurrent() {
     last_focus_change_time = m_ui.getCurrentTime();
-
-    if (index >= 0 && index < (int)m_Widgets.size()) {
-        IWidget* selectedWidget = m_Widgets[index];
-        if (selectedWidget->onSelect()) {
-            m_activeWidget = selectedWidget;
-            m_activeWidget->onActivate(m_ui.getCurrentTime());
-            m_state = State::IDLE;
-        }
+    if (!isNavigable(m_currentWidget)) return;
+    if (m_currentWidget->onSelect()) {
+        m_activeWidget = m_currentWidget;
+        m_activeWidget->onActivate(m_ui.getCurrentTime());
+        enterIdle(false);
+        return;
     }
-    
-    FocusBox target = m_Widgets[index]->getFocusBox();
-    m_ui.animate(m_current_focus_box.x, target.x, 100, EasingType::EASE_OUT_QUAD);
-    m_ui.animate(m_current_focus_box.y, target.y, 100, EasingType::EASE_OUT_QUAD);
-    m_ui.animate(m_current_focus_box.w, target.w, 100, EasingType::EASE_OUT_QUAD);
-    m_ui.animate(m_current_focus_box.h, target.h, 100, EasingType::EASE_OUT_QUAD);
+    beginFocusAnimation(m_currentWidget);
 }
 
-/**
- * @brief Draw the focus manager and handle animations.
- *
- * Handles active widget timeout, focus box expansion/contraction animations,
- * and draws the focus box on the U8G2 display.
- */
 void FocusManager::draw() {
-    // Update active widget timeout
     checkActiveWidgetTimeout();
+    if (m_currentWidget && !isNavigable(m_currentWidget)) enterIdle(true);
+    if (m_state != State::IDLE && m_ui.getCurrentTime() - last_focus_change_time > 2500U &&
+        m_state != State::ANIMATING_SHRINK) beginShrinkAnimation();
 
-    // Handle focus box shrink animation after inactivity
-    if (m_state != State::IDLE && m_ui.getCurrentTime() - last_focus_change_time > 2500) {
-        if (m_state != State::ANIMATING_SHRINK) {
-            m_state = State::ANIMATING_SHRINK;
-
-            int32_t center_x = m_current_focus_box.x + m_current_focus_box.w / 2;
-            int32_t center_y = m_current_focus_box.y + m_current_focus_box.h / 2;
-
-            // Animate shrink to center
-            m_ui.animate(m_current_focus_box.w, 0, 100, EasingType::EASE_IN_QUAD);
-            m_ui.animate(m_current_focus_box.h, 0, 100, EasingType::EASE_IN_QUAD);
-            m_ui.animate(m_current_focus_box.x, center_x, 100, EasingType::EASE_IN_QUAD);
-            m_ui.animate(m_current_focus_box.y, center_y, 100, EasingType::EASE_IN_QUAD);
-        }
+    if (m_state == State::IDLE) return;
+    if (m_state == State::ANIMATING_SHRINK && m_current_focus_box.w <= 1 && m_current_focus_box.h <= 1) {
+        enterIdle(true);
+        return;
     }
+    if (isNavigable(m_currentWidget)) m_target_focus_box = m_currentWidget->getFocusBox();
+    if (m_state == State::ANIMATING && m_current_focus_box == m_target_focus_box) enterFocused(false);
 
-    if (m_state != State::IDLE) {
-        if (m_state == State::ANIMATING_SHRINK && m_current_focus_box.w <= 1 && m_current_focus_box.h <= 1) {
-            // Shrink complete
-            m_state = State::IDLE;
-            index = -1;
+    U8G2& u8g2 = m_ui.getU8G2();
+    u8g2.setDrawColor(2);
+    u8g2.drawBox(m_current_focus_box.x, m_current_focus_box.y,
+                 m_current_focus_box.w, m_current_focus_box.h);
+    u8g2.setDrawColor(1);
+}
+
+bool FocusManager::addWidget(IWidget* widget) {
+    if (!widget || isRegisteredRoot(widget)) return widget != nullptr;
+    if (widget->treeObserver_ && widget->treeObserver_ != this) return false;
+    if (hasRegisteredAncestor(widget)) return true;
+
+    for (auto it = roots_.begin(); it != roots_.end();) {
+        if (widget->contains(*it)) it = roots_.erase(it);
+        else ++it;
+    }
+    if (roots_.full()) return false;
+    roots_.push_back(widget);
+    widget->setTreeObserver(this);
+    return true;
+}
+
+void FocusManager::removeWidget(IWidget* widget) {
+    if (!widget) return;
+    for (auto it = roots_.begin(); it != roots_.end(); ++it) {
+        if (*it == widget) {
+            onWidgetSubtreeDetaching(*widget);
+            widget->setTreeObserver(nullptr);
             return;
         }
-
-        U8G2& u8g2 = m_ui.getU8G2();
-        u8g2.setDrawColor(2); // Draw focus box with color 2
-
-        if (index >= 0 && index < (int)m_Widgets.size()) {
-            m_target_focus_box = m_Widgets[index]->getFocusBox();
-        }
-
-        if (m_state == State::ANIMATING && m_current_focus_box == m_target_focus_box) {
-            m_state = State::FOCUSED;
-        }
-
-        switch (m_state) {
-            case State::ANIMATING:
-            case State::FOCUSED:
-            case State::ANIMATING_SHRINK:
-                u8g2.drawBox(m_current_focus_box.x, m_current_focus_box.y,
-                             m_current_focus_box.w, m_current_focus_box.h);
-                break;
-            default:
-                break;
-        }
-
-        u8g2.setDrawColor(1); // Restore draw color
-    }
-}
-
-/**
- * @brief Add a widget to the focus manager.
- * @param w Pointer to the widget to add
- */
-void FocusManager::addWidget(IWidget* w) {
-    m_Widgets.push_back(w);
-}
-
-/**
- * @brief Remove a widget from the focus manager.
- * @param w Pointer to the widget to remove
- */
-void FocusManager::removeWidget(IWidget* w) {
-    auto it = etl::find(m_Widgets.begin(), m_Widgets.end(), w);
-    if (it != m_Widgets.end()) {
-        m_Widgets.erase(it);
-    }
-
-    if (m_Widgets.empty()) {
-        index = -1;
-        m_state = State::IDLE;
-    } else if (index >= (int)m_Widgets.size()) {
-        index = m_Widgets.size() - 1;
-        m_state = State::FOCUSED;
     }
 }

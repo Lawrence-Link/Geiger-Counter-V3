@@ -18,6 +18,24 @@
 
 #include "app_counter.h"
 
+namespace {
+
+constexpr int32_t kDoseFixedScale = 10000;
+constexpr float kMinimumDisplayDose = 0.0001f;
+constexpr float kMaximumDisplayDose = 10000.0f;
+
+ChartSample doseToChartSample(float dose) {
+    if (dose < kMinimumDisplayDose) return 0;
+    const float clamped = etl::max(0.0f, etl::min(dose, kMaximumDisplayDose));
+    return static_cast<ChartSample>(lroundf(clamped * kDoseFixedScale));
+}
+
+float chartSampleToDose(ChartSample sample) {
+    return static_cast<float>(sample) / kDoseFixedScale;
+}
+
+} // namespace
+
  /**
  * @brief Formats a floating-point number into a string in a meter-style format (up to 4 significant digits).
  *
@@ -32,8 +50,8 @@ int format_meter_style(char *buffer, size_t buffer_size, float value, const char
     
     bool withUnit = (unit != NULL && unit[0] != '\0');
     
-    // 1) Zero/near-zero value displays a placeholder
-    if (fabsf(value) < 1e-7f) {
+    // Values below the supported 0.0001 resolution display a placeholder.
+    if (fabsf(value) < kMinimumDisplayDose) {
         const char *placeholder;
         if (withUnit) {
             if (strcmp(unit, UNIT_CPM) == 0)
@@ -51,9 +69,9 @@ int format_meter_style(char *buffer, size_t buffer_size, float value, const char
     double absd = fabs(d);
     char tmp[64];
     
-    // 2) Normal range: fixed-point with up to 3 decimal places
-    if (absd >= 0.001 && absd < 10000.0) {
-        snprintf(tmp, sizeof(tmp), "%.3f", d);
+    // 2) Supported range: fixed-point with up to 4 decimal places.
+    if (absd <= kMaximumDisplayDose) {
+        snprintf(tmp, sizeof(tmp), "%.4f", d);
         // Strip trailing zeros and possible trailing dot
         char *pdot = strchr(tmp, '.');
         if (pdot) {
@@ -93,9 +111,8 @@ void APP_COUNTER::onEnter(ExitCallback cb) {
     
     // Initialize and configure widgets
     
-    brace.setDrawContentFunction([this]() { braceContent(); });
     brace.setCallback([this](){braceCallback(); });
-            currentBracePage = BracePage::MAX;
+    currentBracePage = BracePage::MAX;
     targetBracePage = BracePage::MAX;
     anim_brace_y = 0;
     brace_animating = false;
@@ -111,6 +128,9 @@ void APP_COUNTER::onEnter(ExitCallback cb) {
     if (en_dosage_alert) icon_alarm.setSource(image_BELL_bits);
     else                 icon_alarm.setSource(image_BELL_OFF_bits);
     
+    brace.setFocusable(true);
+    histogram.setFocusable(true);
+
     // Add widgets to focus manager for navigation
     m_ui.addWidgetToFocusManager(&brace);
     m_ui.addWidgetToFocusManager(&histogram);  
@@ -164,11 +184,15 @@ void APP_COUNTER::braceContent()
         switch (page) {
             case BracePage::MAX:
                 label = "Max";
-                value = histogram.getMaxValueInHistory();
+                value = use_cpm
+                    ? static_cast<float>(histogram_series.historyMaximum())
+                    : chartSampleToDose(histogram_series.historyMaximum());
                 break;
             case BracePage::AVG:
                 label = "Avg";
-                value = histogram.getAverageValueInHistory();
+                value = use_cpm
+                    ? static_cast<float>(histogram_series.historyAverage())
+                    : chartSampleToDose(histogram_series.historyAverage());
                 break;
         }
         
@@ -226,29 +250,29 @@ void APP_COUNTER::drawLabel(int state) {
         // Determine status text based on radiation thresholds
         if (current_cpm < cpm_warn_threshold) {
             u8g2.drawStr(5, 42, "SAFE");
-            blinker_description_bar.stopOnVisible();
+            blinker_description_bar.stopWhenVisible();
         }
         else if (current_cpm < cpm_dngr_threshold) {
             u8g2.drawStr(5, 42, "WARN");
-            blinker_description_bar.set_interval(500);
+            blinker_description_bar.setInterval(500);
             blinker_description_bar.start();
         }
         else if (current_cpm < cpm_hzdr_threshold) {
             coroutine_alarm.getContext().localData[0] = 1;
 
             u8g2.drawStr(5, 42, "DNGR");
-            blinker_description_bar.set_interval(300);
+            blinker_description_bar.setInterval(300);
             blinker_description_bar.start();
         }
         else {
             coroutine_alarm.getContext().localData[0] = 1;
             u8g2.drawStr(5, 42, "HZDR");
-            blinker_description_bar.set_interval(100);
+            blinker_description_bar.setInterval(100);
             blinker_description_bar.start();
         }
     } else {
         u8g2.drawStr(5, 42, "WAIT");
-        blinker_description_bar.stopOnVisible();
+        blinker_description_bar.stopWhenVisible();
         u8g2.setDrawColor(1);    
         u8g2.drawStr(anim_status_x, 42, "Getting Ready"); 
     }
@@ -267,7 +291,7 @@ void APP_COUNTER::draw()
         m_ui.animate(anim_bg, 128, 500, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
         m_ui.animate(anim_clock_y, 8, 200, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
         
-        blinker_description_bar.stopOnVisible();
+        blinker_description_bar.stopWhenVisible();
         // Start the loading animation state machine
         state_timestamp = m_ui.getCurrentTime();
         first_time = true;
@@ -295,27 +319,24 @@ void APP_COUNTER::draw()
     
     // Format and draw the value (CPM * conversion coefficient)
     
+    const float current_dose = current_cpm *
+        SystemConf::getInstance().read_conf_tube_convertion_coefficient();
     if (!use_cpm) {
-        if (current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient() < 1000.0f) {
-            format_meter_style(print_buffer, sizeof(print_buffer), current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient(), UNIT_USV);
-        } else {
-            snprintf(print_buffer, sizeof(print_buffer), "%d CPM", (int)(current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient()));
-        }
+        format_meter_style(print_buffer, sizeof(print_buffer), current_dose, UNIT_USV);
     } else {
         snprintf(print_buffer, sizeof(print_buffer), "%d CPM", (int)current_cpm);
     }
     u8g2.drawStr(3, 31, print_buffer);
     
-    blinker_description_bar.update();
     
     // Update histogram data every second if not in startup mode
     if (timestamp_now - timestamp_prev >= 1000)
     {
             timestamp_prev = timestamp_now;
             if (!use_cpm) {
-                histogram.addData(current_cpm * SystemConf::getInstance().read_conf_tube_convertion_coefficient());
+                histogram_series.add(doseToChartSample(current_dose));
             } else {
-                histogram.addData(current_cpm);
+                histogram_series.add(static_cast<ChartSample>(current_cpm));
             }
         
         const unsigned char* bat_source = nullptr;
@@ -362,7 +383,7 @@ void APP_COUNTER::draw()
         }
     } 
 
-    drawLabel(blinker_description_bar.is_visible());
+    drawLabel(blinker_description_bar.isVisible());
 
     // Draw voltage display
     u8g2.setFont(u8g2_font_5x7_tr);
@@ -386,6 +407,7 @@ void APP_COUNTER::draw()
     icon_alarm.draw();
     icon_battery.draw();
     brace.draw();
+    braceContent();
 
     if (pulse_marker) 
     {
@@ -408,17 +430,12 @@ void APP_COUNTER::draw()
 
         u8g2.setFont(u8g2_font_profont11_tr);
 
-        float history_val_max = histogram.getMaxValueInHistory();
+        float history_val_max = use_cpm
+            ? static_cast<float>(histogram_series.historyMaximum())
+            : chartSampleToDose(histogram_series.historyMaximum());
 
         if (!use_cpm) {
-            if (history_val_max < 1000.0f) 
-            {
-                snprintf(print_buffer, sizeof(print_buffer), "%.3g", history_val_max);
-            } 
-            else 
-            {
-                snprintf(print_buffer, sizeof(print_buffer), "%d", (int)history_val_max);
-            }
+            format_meter_style(print_buffer, sizeof(print_buffer), history_val_max, nullptr);
             u8g2.drawStr(12, 28, "uSv/h");
             u8g2.drawStr(12, 60, "uSv/h");
         } else {
@@ -430,13 +447,11 @@ void APP_COUNTER::draw()
         int16_t x_max = TextAlignHelper::calcCenteredX(u8g2.getU8g2(), 0, 52, print_buffer);
         u8g2.drawStr(x_max, 18, print_buffer); // Maximum value
 
-        float history_val_avg = histogram.getAverageValueInHistory();
+        float history_val_avg = use_cpm
+            ? static_cast<float>(histogram_series.historyAverage())
+            : chartSampleToDose(histogram_series.historyAverage());
         if (!use_cpm){
-            if (history_val_avg < 1000.0f) {
-                snprintf(print_buffer, sizeof(print_buffer), "%.3g", history_val_avg);
-            } else {
-                snprintf(print_buffer, sizeof(print_buffer), "%d", (int)history_val_avg);
-            }
+            format_meter_style(print_buffer, sizeof(print_buffer), history_val_avg, nullptr);
         } else {
             snprintf(print_buffer, sizeof(print_buffer), "%d", (int)history_val_avg);
         }
@@ -483,9 +498,5 @@ AppItem counter_app
     .title = "盖革计数器",
     .bitmap = image_counter_bits,
     
-    // Factory function to create an instance of APP_COUNTER
-    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> 
-    { 
-        return std::make_unique<APP_COUNTER>(ui, param); 
-    },
+    .factory = ApplicationFactory::make<APP_COUNTER>(),
 };

@@ -11,7 +11,7 @@ static void ui_heartbeat_task(void* p) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     while (1) {
-        ui.Heartbeat(10);
+        ui.heartbeat(10);
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }

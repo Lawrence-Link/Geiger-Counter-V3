@@ -18,7 +18,9 @@
 
 #include "core/app/IApplication.h"
 #include "core/app/app_system.h"
-#include "blinker/Blinker.h"
+#include "PixelUI.h"
+#include "U8g2lib.h"
+#include "blink/BlinkState.h"
 #include "voltage_pid.hpp"
 #include "tune.h"
 #include "system_nvs_varibles.h"
@@ -36,7 +38,7 @@ class PowerSurgeNotify : public IApplication {
 private:
     PixelUI& m_ui;
     VoltagePID::vpid_error_t vpid_error;
-    Blinker blinker;
+    BlinkState blinker;
 
     Tune::Melody tune_err = {
         {Notes::REST, 100},
@@ -48,36 +50,35 @@ private:
 public:
     PowerSurgeNotify(PixelUI& ui, void* param):m_ui(ui), blinker(ui) {
         vpid_error = static_cast<VoltagePID::vpid_error_t>(param ? *((int*)param) : VoltagePID::VPID_ERR_SURGE);
-        blinker.set_interval(200);
+        blinker.setInterval(200);
         blinker.start();
     };
     void draw() override {
-        blinker.update();
         U8G2& u8g2 = m_ui.getU8G2();
 
         u8g2.drawXBMP(9, 2, 14, 22, image_Voltage_bits);
 
         if (vpid_error == VoltagePID::vpid_error_t::VPID_ERR_SURGE) {
             u8g2.setFont(u8g2_font_6x12_tr);
-            
-            if (blinker.is_visible()) 
+
+            if (blinker.isVisible())
             {
                 u8g2.drawStr(21, 61, "POWER CYCLE NOW");
                 u8g2.drawXBMP(114, 49, 11, 16, image_device_reset_bits);
             }
             u8g2.drawXBMP(15, 56, 4, 3, image_EQ_symbol_bits);
-            u8g2.drawXBMP(3, 53, 10, 8, image_back_btn_bits); 
+            u8g2.drawXBMP(3, 53, 10, 8, image_back_btn_bits);
             u8g2.drawStr(34, 10, "POWER SURGE");
             u8g2.drawStr(42, 23, "DETECTED");
             u8g2.drawLine(3, 28, 124, 28);
-            
+
             u8g2.drawXBMP(106, 6, 14, 15, image_ArrowUpFilled_bits);
             u8g2.drawStr(21, 39, "ADJUST PIDS OR");
             u8g2.drawXBMP(8, 36, 7, 8, image_Quest_bits);
             u8g2.drawStr(21, 48, "RM SHORT CIRCUIT");
         } else if (vpid_error == VoltagePID::vpid_error_t::VPID_ERR_LACK_PWR) {
             u8g2.setFont(u8g2_font_6x12_tr);
-            if (blinker.is_visible()) 
+            if (blinker.isVisible())
             {
                 u8g2.drawStr(21, 61, "POWER CYCLE NOW");
                 u8g2.drawXBMP(114, 49, 11, 16, image_device_reset_bits);
@@ -103,7 +104,7 @@ public:
         }
         return false;
     }
-    
+
     void onEnter(ExitCallback cb) override {
         IApplication::onEnter(cb);
         m_ui.setContinousDraw(true);
@@ -130,8 +131,6 @@ AppItem power_surge_app
 {
     .title = nullptr,
     .bitmap = nullptr,
-    
-    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<PowerSurgeNotify>(ui, param); 
-    },
+
+    .factory = ApplicationFactory::make<PowerSurgeNotify>(),
 };

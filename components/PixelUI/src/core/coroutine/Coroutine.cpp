@@ -1,23 +1,32 @@
 /*
  * Copyright (C) 2025 Lawrence Link
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * This program is distributed in the hope that it is useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "core/coroutine/Coroutine.h"
 #include "PixelUI.h"
-#include <algorithm>
+#include "core/TimeUtils.h"
 
 /**
  * @brief Constructor of the coroutine class
@@ -38,11 +47,12 @@ void Coroutine::start() {
 }
 
 /**
- * @brief Rusume a coroutine
+ * @brief Resumes a coroutine
  * @param currentTime uint32_t, current timestamp of the system
  */
-void Coroutine::resume(uint32_t currentTime) {
-    if (context_.state == CoroutineState::SUSPENDED && currentTime >= context_.waitUntil) {
+void Coroutine::resume(uint32_t currentTime, bool animationActive) {
+    if (context_.state == CoroutineState::SUSPENDED &&
+        shouldRun(currentTime, animationActive)) {
         context_.state = CoroutineState::RUNNING;
     }
     
@@ -58,26 +68,48 @@ void Coroutine::reset() {
     context_.state = CoroutineState::CREATED;
     context_.pc = 0;
     context_.waitUntil = 0;
+    context_.waitReason = CoroutineWaitReason::NONE;
 }
 
 
 /**
  * @brief check whether a coroutine should run or not
  */
-bool Coroutine::shouldRun(uint32_t currentTime) const {
+bool Coroutine::shouldRun(uint32_t currentTime, bool animationActive) const {
     if (context_.state == CoroutineState::FINISHED) {
         return false;
     }
     
     if (context_.state == CoroutineState::SUSPENDED) {
-        if (currentTime >= context_.waitUntil) {
-            // The coroutine should resume once the delay period has elapsed
-            return true;
+        switch (context_.waitReason) {
+            case CoroutineWaitReason::DELAY:
+                return PixelUITime::deadlineReached(currentTime, context_.waitUntil);
+            case CoroutineWaitReason::ANIMATION:
+                return !animationActive;
+            case CoroutineWaitReason::NONE:
+                return true;
         }
-        return false;
     }
     
     return context_.state == CoroutineState::RUNNING;
+}
+
+uint32_t Coroutine::nextWakeupMs(
+    uint32_t currentTime, bool animationActive) const {
+    if (context_.state == CoroutineState::RUNNING) return 0U;
+    if (context_.state != CoroutineState::SUSPENDED) {
+        return PixelUITime::NO_WAKEUP;
+    }
+
+    switch (context_.waitReason) {
+        case CoroutineWaitReason::DELAY:
+            return PixelUITime::untilDeadline(currentTime, context_.waitUntil);
+        case CoroutineWaitReason::ANIMATION:
+            return animationActive ? PixelUITime::NO_WAKEUP : 0U;
+        case CoroutineWaitReason::NONE:
+            return 0U;
+    }
+    return PixelUITime::NO_WAKEUP;
 }
 /**
  * @brief Coroutine Scheduler Constructor
@@ -89,11 +121,10 @@ CoroutineScheduler::CoroutineScheduler(PixelUI& ui) : ui_(ui) {}
 /**
  * @brief Add a coroutine to the scheduler
  * * Adds a new coroutine to the list of scheduled items and immediately starts its execution.
- * @param coroutine A shared pointer to the Coroutine object to be added.
+ * @param coroutine A non-owning pointer to the Coroutine object to be added.
  */
-void CoroutineScheduler::addCoroutine(Coroutine* coroutine) { // <-- 改为 Coroutine*
+void CoroutineScheduler::addCoroutine(Coroutine* coroutine) { 
     // Check if the pointer is null
-    // std::lock_guard<std::mutex> lock (mutex_);
     if (!coroutine) return; 
     
     // Add the coroutine to the internal list
@@ -102,14 +133,13 @@ void CoroutineScheduler::addCoroutine(Coroutine* coroutine) { // <-- 改为 Coro
 
 /**
  * @brief Remove a coroutine from the scheduler
- * * Removes the specified coroutine by comparing the shared pointers.
- * @param coroutine A shared pointer to the Coroutine object to be removed.
+ * * Removes the specified coroutine by comparing pointers.
+ * @param coroutine A non-owning pointer to the Coroutine object to be removed.
  */
-void CoroutineScheduler::removeCoroutine(Coroutine* coroutine) { // <-- 改为 Coroutine*
-    // std::lock_guard<std::mutex> lock(mutex_);
+void CoroutineScheduler::removeCoroutine(Coroutine* coroutine) { 
     // Use the erase-remove idiom to safely remove the matching element from the vector.
     coroutines_.erase(
-        std::remove(coroutines_.begin(), coroutines_.end(), coroutine),
+        etl::remove(coroutines_.begin(), coroutines_.end(), coroutine),
         coroutines_.end()
     );
 }
@@ -122,11 +152,10 @@ void CoroutineScheduler::removeCoroutine(Coroutine* coroutine) { // <-- 改为 C
  * used to determine if a coroutine's resume condition has been met.
  */
 void CoroutineScheduler::update(uint32_t currentTime) {
-    // std::lock_guard<std::mutex> lock(mutex_);
     // Remove finished coroutines
     // Use the erase-remove_if idiom to remove all coroutines for which isFinished() returns true.
     coroutines_.erase(
-        std::remove_if(coroutines_.begin(), coroutines_.end(),
+        etl::remove_if(coroutines_.begin(), coroutines_.end(),
             [](const Coroutine* coro) { 
                 return coro->isFinished(); // Check if the coroutine has completed its work
             }),
@@ -135,12 +164,30 @@ void CoroutineScheduler::update(uint32_t currentTime) {
     
     // Execute coroutines that should run
     for (auto& coroutine : coroutines_) {
+        const bool animationActive = ui_.activeAnimationCount() != 0U;
         // shouldRun checks if the coroutine meets its run condition (e.g., a delay time has elapsed)
-        if (coroutine->shouldRun(currentTime)) {
+        if (coroutine->shouldRun(currentTime, animationActive)) {
             // Resume the coroutine's execution
-            coroutine->resume(currentTime);
+            coroutine->resume(currentTime, animationActive);
         }
     }
+
+    coroutines_.erase(
+        etl::remove_if(coroutines_.begin(), coroutines_.end(),
+            [](const Coroutine* coro) { return coro->isFinished(); }),
+        coroutines_.end());
+}
+
+uint32_t CoroutineScheduler::nextWakeupMs(uint32_t currentTime) const {
+    const bool animationActive = ui_.activeAnimationCount() != 0U;
+    uint32_t next = PixelUITime::NO_WAKEUP;
+    for (const Coroutine* coroutine : coroutines_) {
+        if (coroutine != nullptr) {
+            next = PixelUITime::earlier(
+                next, coroutine->nextWakeupMs(currentTime, animationActive));
+        }
+    }
+    return next;
 }
 
 /**
@@ -148,7 +195,6 @@ void CoroutineScheduler::update(uint32_t currentTime) {
  * * Stops and clears all coroutines currently being scheduled or waiting for execution.
  */
 void CoroutineScheduler::clear() {
-    // std::lock_guard<std::mutex> lock(mutex_);
     // Empty the internal vector storing the coroutines
     coroutines_.clear();
 }
@@ -158,6 +204,5 @@ void CoroutineScheduler::clear() {
  * * @return The total number of coroutines currently in the scheduler, either running or suspended.
  */
 size_t CoroutineScheduler::getActiveCount() const {
-    // std::lock_guard<std::mutex> lock(mutex_);
     return coroutines_.size();
 }

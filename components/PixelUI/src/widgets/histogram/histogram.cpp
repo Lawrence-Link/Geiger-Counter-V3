@@ -1,24 +1,34 @@
 /*
  * Copyright (C) 2025 Lawrence Link
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "widgets/histogram/histogram.h"
-#include <cmath>
-#include <algorithm>
-#include <limits> // Added for std::numeric_limits
+#include "PixelUI.h"
+#include "calc/TextAlignHelper/TextAlignHelper.h"
+#include <etl/algorithm.h>
+#include <etl/limits.h>
 
 /**
  * @brief Constructor for Histogram widget.
@@ -32,24 +42,30 @@
  * @param base Expansion anchor base.
  */
 Histogram::Histogram(
-    PixelUI& ui, 
-    uint16_t pos_x, 
-    uint16_t pos_y, 
-    uint16_t size_w, 
-    uint16_t size_h, 
-    uint16_t size_w_exp = 0, 
-    uint16_t size_h_exp = 0, 
-    EXPAND_BASE base = EXPAND_BASE::TOP_LEFT) : 
-
-    m_ui(ui), 
+    PixelUI& ui,
+    uint16_t pos_x,
+    uint16_t pos_y,
+    uint16_t size_w,
+    uint16_t size_h,
+    ChartSeries& series,
+    uint16_t size_w_exp,
+    uint16_t size_h_exp,
+    EXPAND_BASE base,
+    const char* label
+) : 
+    m_ui(ui),
+    m_series(series),
     pos_x_(pos_x), 
     pos_y_(pos_y),
     size_w_(size_w),
     size_h_(size_h),
     exp_w(size_w_exp),
     exp_h(size_h_exp),
-    base_(base)
+    base_(base),
+    m_label(label)
 {
+    setFocusInsets({1, 1, 0, 0});
+    setWidgetBounds({pos_x_, pos_y_, size_w_, size_h_});
     // pos_x_ and pos_y_ now represent the top-left anchor point.
     int32_t start_anim_x = (size_w_ / 2);
     int32_t start_anim_y = (size_h_ / 2);
@@ -60,13 +76,26 @@ Histogram::Histogram(
     anim_x = start_anim_x;
     anim_y = start_anim_y;
 
-    setFocusBox(FocusBox(pos_x_ + 1, pos_y_ + 1, size_w_ - 1, size_h_ - 1));
 }
 
 /**
- * @brief Initialize widget when loaded. Sets up animations, focus, and internal buffer.
+ * @brief Initialize widget animations when loaded.
  */
 void Histogram::onLoad() {
+    onLoad(LoadTransition::Animated);
+}
+
+/** @brief Histogram::onLoad. */
+void Histogram::onLoad(LoadTransition transition) {
+    if (transition == LoadTransition::Immediate) {
+        anim_w = size_w_;
+        anim_h = size_h_;
+        anim_x = 0;
+        anim_y = 0;
+        m_ui.markDirty();
+        return;
+    }
+
     int32_t start_anim_x = (size_w_ / 2);
     int32_t start_anim_y = (size_h_ / 2);
 
@@ -76,48 +105,20 @@ void Histogram::onLoad() {
     anim_x = start_anim_x;
     anim_y = start_anim_y;
 
-    m_ui.animate(anim_w, size_w_, 550, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
-    m_ui.animate(anim_h, size_h_, 600, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
-
-    m_ui.animate(anim_x, 0, 550, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
-    m_ui.animate(anim_y, 0, 600, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED);
-    
-
-    // Initialize the internal data buffer
-    initializeDataBuffer();
-}
-
-/**
- * @brief Initialize the circular data buffer and statistics.
- */
-void Histogram::initializeDataBuffer() {
-    // Allocate buffer based on expanded width or default size
-    m_buffer_size = (exp_w > size_w_) ? exp_w : 200;
-    m_data_buffer = std::make_unique<float[]> (m_buffer_size);
-
-    // Clear buffer
-    for (int i = 0; i < m_buffer_size; ++i) {
-        m_data_buffer[i] = 0.0f;
+    if (!m_ui.animate(anim_w, size_w_, 550, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED)) {
+        anim_w = size_w_;
+    }
+    if (!m_ui.animate(anim_h, size_h_, 600, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED)) {
+        anim_h = size_h_;
     }
 
-    // Reset statistics
-    m_write_index = 0;
-    m_data_count = 0;
-    m_max_value = 0.0f;
-    m_sum_value = 0.0f;
-    m_min_value = std::numeric_limits<float>::max();
-    
-    // Reset history statistics
-    m_hist_max_value = 0.0f;
-    m_hist_min_value = std::numeric_limits<float>::max();
-    m_hist_sum_value = 0.0f;
-    m_hist_count = 0;
-    
-    // Reset visible cache
-    m_cached_visible_max = 0.0f;
-    m_cached_visible_min = 0.0f;
-    m_cached_visible_width = 0;
-    m_visible_cache_dirty = true;
+    if (!m_ui.animate(anim_x, 0, 550, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED)) {
+        anim_x = 0;
+    }
+    if (!m_ui.animate(anim_y, 0, 600, EasingType::EASE_OUT_QUAD, PROTECTION::PROTECTED)) {
+        anim_y = 0;
+    }
+    m_ui.markDirty();
 }
 
 /**
@@ -125,180 +126,6 @@ void Histogram::initializeDataBuffer() {
  */
 void Histogram::onOffload() {
     
-}
-
-/**
- * @brief Add a new data point to the histogram buffer.
- * @param value The new float value to add.
- */
-void Histogram::addData(float value) {
-    if (m_data_buffer == nullptr) {
-        initializeDataBuffer();
-    }
-    
-    // Store the old value at current position for statistics update
-    float old_value = m_data_buffer[m_write_index];
-    bool replacing_valid_data = (m_data_count >= m_buffer_size);
-    
-    // Add new value to buffer
-    m_data_buffer[m_write_index] = value;
-    
-    // Update write index (ring buffer)
-    m_write_index = (m_write_index + 1) % m_buffer_size;
-    
-    // Update data count
-    if (m_data_count < m_buffer_size) {
-        m_data_count++;
-    }
-    
-    // Mark visible cache as dirty
-    m_visible_cache_dirty = true;
-    
-    // Update statistics efficiently
-    updateStatistics(value, old_value, replacing_valid_data);
-}
-
-/**
- * @brief Update max, min, and sum statistics efficiently.
- * @param new_value The new value being added.
- * @param old_value The old value being replaced (if any).
- * @param replacing_data True if replacing an existing value in a full buffer.
- */
-void Histogram::updateStatistics(float new_value, float old_value, bool replacing_data) {
-    // Update history statistics (all-time)
-    m_hist_max_value = std::max(m_hist_max_value, new_value);
-    if (m_hist_min_value == std::numeric_limits<float>::max() || new_value < m_hist_min_value) {
-        m_hist_min_value = new_value;
-    }
-    m_hist_sum_value += new_value;
-    m_hist_count++;
-
-    // Update window statistics
-    if (!replacing_data) {
-        // Buffer not full, simple update
-        m_sum_value += new_value;
-        m_max_value = std::max(m_max_value, new_value);
-        // Only update min if a valid (non-max) value is added or if min is still at its maximum possible value
-        if (m_min_value == std::numeric_limits<float>::max() || new_value < m_min_value) {
-            m_min_value = new_value;
-        }
-    } else {
-        // Replace existing value
-        m_sum_value = m_sum_value - old_value + new_value;
-
-        // Recalculate extremes if old value was max or min (recalculating min if old_value was the placeholder max is safer)
-        if (old_value == m_max_value || old_value == m_min_value || m_min_value == std::numeric_limits<float>::max()) {
-            recalculateExtremes();
-        } else {
-            m_max_value = std::max(m_max_value, new_value);
-            m_min_value = std::min(m_min_value, new_value);
-        }
-    }
-}
-
-/**
- * @brief Recalculate the max and min values by scanning the buffer.
- */
-void Histogram::recalculateExtremes() {
-    if (m_data_count == 0) {
-        m_max_value = 0.0f;
-        m_min_value = std::numeric_limits<float>::max(); // Reset min to max
-        m_sum_value = 0.0f;
-        return;
-    }
-
-    m_max_value = m_data_buffer[0];
-    m_min_value = m_data_buffer[0];
-
-    for (int i = 1; i < m_data_count; ++i) {
-        m_max_value = std::max(m_max_value, m_data_buffer[i]);
-        m_min_value = std::min(m_min_value, m_data_buffer[i]);
-    }
-}
-
-/**
- * @brief Get the maximum value in the histogram.
- * @return Maximum float value in buffer.
- */
-float Histogram::getMaxValueInWindow() const {
-    return m_max_value;
-}
-
-/**
- * @brief Get the average value of the histogram.
- * @return Average float value or 0 if buffer empty.
- */
-float Histogram::getAverageValueInWindow() const {
-    if (m_data_count == 0) {
-        return 0.0f;
-    }
-    return m_sum_value / m_data_count;
-}
-
-/**
- * @brief Get the minimum value in the histogram.
- * @return Minimum float value in buffer (or 0.0f if empty).
- */
-float Histogram::getMinValueInWindow() const {
-    if (m_data_count == 0) return 0.0f;
-    return m_min_value;
-}
-
-/**
- * @brief Get the maximum value in the entire history.
- * @return Maximum float value ever recorded.
- */
-float Histogram::getMaxValueInHistory() const {
-    return m_hist_max_value;
-}
-
-/**
- * @brief Get the average value of all historical data.
- * @return Average float value across all recorded data or 0 if no data.
- */
-float Histogram::getAverageValueInHistory() const {
-    if (m_hist_count == 0) {
-        return 0.0f;
-    }
-    return m_hist_sum_value / m_hist_count;
-}
-
-/**
- * @brief Get the minimum value in the entire history.
- * @return Minimum float value ever recorded (or 0.0f if no data).
- */
-float Histogram::getMinValueInHistory() const {
-    if (m_hist_count == 0) return 0.0f;
-    if (m_hist_min_value == std::numeric_limits<float>::max()) return 0.0f;
-    return m_hist_min_value;
-}
-
-/**
- * @brief Clear all data in the histogram buffer and reset statistics.
- */
-void Histogram::clearData() {
-    if (m_data_buffer != nullptr) {
-        for (int i = 0; i < m_buffer_size; ++i) {
-            m_data_buffer[i] = 0.0f;
-        }
-    }
-    m_write_index = 0;
-    m_data_count = 0;
-    m_max_value = 0.0f;
-    m_sum_value = 0.0f;
-    m_min_value = std::numeric_limits<float>::max();
-    
-    // Reset history statistics
-    m_hist_max_value = 0.0f;
-    m_hist_min_value = std::numeric_limits<float>::max();
-    m_hist_sum_value = 0.0f;
-    m_hist_count = 0;
-    
-    // Reset visible cache
-    m_cached_visible_max = 0.0f;
-    m_cached_visible_min = 0.0f;
-    m_cached_visible_width = 0;
-    m_visible_cache_dirty = true;
 }
 
 /**
@@ -393,12 +220,15 @@ void Histogram::calculateExpandPosition(int32_t& target_x, int32_t& target_y) {
 /**
  * @brief Render the histogram widget on the screen.
  */
-void Histogram::draw() {
-    U8G2& u8g2 = m_ui.getU8G2();
+Canvas& Histogram::display() { return m_ui.getCanvas(); }
+
+/** @brief Histogram::drawSelf. */
+void Histogram::drawSelf(const WidgetRenderContext& context) {
+    Canvas& u8g2 = m_ui.getCanvas();
     
     // tl_x and tl_y are the animated top-left corner coordinates
-    int tl_x = pos_x_ + anim_x; 
-    int tl_y = pos_y_ + anim_y; 
+    int tl_x = context.originX + pos_x_ + anim_x;
+    int tl_y = context.originY + pos_y_ + anim_y;
     int current_w = anim_w;
     int current_h = anim_h;
 
@@ -433,9 +263,30 @@ void Histogram::draw() {
     // Draw histogram bars, passing top-left coordinates, current width, and height
     drawHistogramData(tl_x, tl_y, current_w, current_h, u8g2);
 
-    // Draw label (positioned relative to the top-right corner)
-    u8g2.setFont(u8g2_font_4x6_tr);
-    u8g2.drawStr(tl_x + current_w - 19, tl_y + 7, "Hist");
+    // Draw label if provided (positioned in the top-right area)
+    if (m_label != nullptr) {
+        u8g2.setFont(PIXELUI_FONT_CHART);
+        
+        // Define label area in top-right corner (matching original offset logic)
+        Rect label_area = {
+            static_cast<int16_t>(tl_x + current_w - 20 - 2),  // Right area
+            static_cast<int16_t>(tl_y + 2),               // Top margin
+            20,                                            // Width for label area
+            6                                              // Height matches font height
+        };
+        
+        // Calculate text position using TextAlignHelper
+        // Use Top alignment for Y to position near top, Right alignment for X
+        TextPos text_pos = TextAlignHelper::calcTextPos(
+            u8g2.rawDisplay().getU8g2(),
+            label_area,
+            m_label,
+            TextAlignX::Right,
+            TextAlignY::Top
+        );
+        
+        u8g2.drawStr(text_pos.x, text_pos.y, m_label);
+    }
 }
 
 /**
@@ -446,65 +297,54 @@ void Histogram::draw() {
  * @param height Current height of the widget.
  * @param u8g2 Reference to U8G2 for drawing.
  */
-void Histogram::drawHistogramData(int tl_x, int tl_y, int width, int height, U8G2& u8g2) {
-    if (m_data_buffer == nullptr || m_data_count == 0) {
-        return;
-    }
+void Histogram::drawHistogramData(int tl_x, int tl_y, int width, int height, Canvas& u8g2) {
+    if (m_series.empty()) return;
 
     // Determine number of points to draw based on current width
     // Subtract 3 to account for 2px borders (width - 3 = drawable columns from right border to left border inclusive)
-    int points_to_draw = std::min(width - 3, static_cast<int>(m_data_count));
+    const int points_to_draw =
+        etl::min(width - 3, static_cast<int>(m_series.size()));
     if (points_to_draw <= 0) return;
 
     // Calculate visible window min/max (with caching)
-    if (m_visible_cache_dirty || m_cached_visible_width != points_to_draw) {
-        m_cached_visible_max = -std::numeric_limits<float>::max();
-        m_cached_visible_min = std::numeric_limits<float>::max();
+    if (m_cached_series_revision != m_series.revision() ||
+        m_cached_visible_width != points_to_draw) {
+        m_cached_visible_max = etl::numeric_limits<ChartSample>::min();
         
         for (int i = 0; i < points_to_draw; ++i) {
-            int buffer_offset = i + 1;
-            int data_index = (m_write_index - buffer_offset + m_buffer_size) % m_buffer_size;
-            if (buffer_offset <= m_data_count) {
-                float value = m_data_buffer[data_index];
-                m_cached_visible_max = std::max(m_cached_visible_max, value);
-                m_cached_visible_min = std::min(m_cached_visible_min, value);
-            }
+            const ChartSample sample =
+                m_series.sampleFromNewest(static_cast<size_t>(i));
+            m_cached_visible_max = etl::max(m_cached_visible_max, sample);
         }
         
         m_cached_visible_width = points_to_draw;
-        m_visible_cache_dirty = false;
+        m_cached_series_revision = m_series.revision();
     }
 
-    // Use cached visible window max for scaling
-    float visible_max = m_cached_visible_max;
-    
-    // Use visible max for scaling, or fallback to buffer max
-    float scale_factor = (visible_max > 0.0f) 
-        ? static_cast<float>(height - 2) / visible_max
-        : static_cast<float>(height - 2) / m_max_value;
+    const ChartSample visible_max = m_cached_visible_max;
+    const ChartSample scale_max =
+        visible_max > 0 ? visible_max : m_series.maximum();
+    if (scale_max <= 0) return;
 
     // Draw bars from right (newest) to left (oldest)
     // Start from right edge minus 2px border
     for (int i = 0; i < points_to_draw; ++i) {
-        int buffer_offset = i + 1;
-        int data_index = (m_write_index - buffer_offset + m_buffer_size) % m_buffer_size;
+        const ChartSample sample =
+            m_series.sampleFromNewest(static_cast<size_t>(i));
+        int bar_height = static_cast<int>(
+            (static_cast<int64_t>(sample) * (height - 2)) / scale_max);
 
-        if (buffer_offset <= m_data_count) {
-            float value = m_data_buffer[data_index];
-            int bar_height = static_cast<int>(value * scale_factor);
+        // Clamp bar height to available vertical space
+        bar_height = etl::min(bar_height, height - 4);
+        bar_height = etl::max(bar_height, 0);
 
-            // Clamp bar height to available vertical space
-            bar_height = std::min(bar_height, height - 4);
-            bar_height = std::max(bar_height, 0);
+        // Calculate bar position: start from right border (tl_x + width - 2), move left
+        int bar_x = tl_x + width - 2 - i;
+        int bar_y = tl_y + height - bar_height;
 
-            // Calculate bar position: start from right border (tl_x + width - 2), move left
-            int bar_x = tl_x + width - 2 - i;
-            int bar_y = tl_y + height - bar_height;
-
-            // Draw vertical line for the bar
-            if (bar_height > 0) {
-                u8g2.drawVLine(bar_x, bar_y, bar_height);
-            }
+        // Draw vertical line for the bar
+        if (bar_height > 0) {
+            u8g2.drawVLine(bar_x, bar_y, bar_height);
         }
     }
 }

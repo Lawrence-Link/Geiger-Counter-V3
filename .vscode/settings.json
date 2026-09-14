@@ -2,9 +2,9 @@
   "C_Cpp.intelliSenseEngine": "default",
 
 
-  "C_Cpp.intelliSenseEngine": "disabled",
-  "C_Cpp.autocomplete": "disabled",
-  "C_Cpp.errorSquiggles": "disabled",
+  // "C_Cpp.intelliSenseEngine": "disabled",
+  // "C_Cpp.autocomplete": "disabled",
+  // "C_Cpp.errorSquiggles": "disabled",
 
   "idf.openOcdConfigs": [
     "board/esp32c6-builtin.cfg"

@@ -3,6 +3,7 @@
  */
 
 #include "core/app/IApplication.h"
+#include "PixelUI.h"
 #include "core/app/app_system.h"
 #include "core/coroutine/Coroutine.h"
 
@@ -134,7 +135,5 @@ AppItem charge_app{
     .title = nullptr,
     .bitmap = nullptr,
     
-    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<Charge>(ui, param); 
-    },
+    .factory = ApplicationFactory::make<Charge>(),
 };

@@ -16,6 +16,7 @@
  */
 
 #include "core/app/IApplication.h"
+#include "PixelUI.h"
 #include "core/app/app_system.h"
 #include <memory>
 #include <cstring>
@@ -395,7 +396,5 @@ AppItem racing_game_app{
     .title = "除我都逆行",
     .bitmap = image_racing_bits,
     
-    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<RacingGame>(ui, param); 
-    },
+    .factory = ApplicationFactory::make<RacingGame>(),
 };

@@ -1,88 +1,140 @@
 /*
  * Copyright (C) 2025 Lawrence Link
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "widgets/num_scroll/num_scroll.h"
-#include <cstdio>
+#include "PixelUI.h"
 #include "config.h"
-#include <etl/string.h>
 
 /**
  * @brief Constructor for NumScroll widget.
  * @param ui Reference to PixelUI instance for rendering and animation.
  */
 NumScroll::NumScroll(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h) : 
+    NumScroll(ui, x, y, w, h, NumericRange{}, NumericFormatter::integer()) {}
+
+NumScroll::NumScroll(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+                     const NumericRange& range, NumericFormatter formatter) :
     m_ui(ui),
     m_x(x),
     m_y(y),
     m_w(w),
-    m_h(h)
+    m_h(h),
+    range_(range),
+    formatter_(formatter.valid() ? formatter : NumericFormatter::integer())
  {
+    m_current_value = range_.clamp(m_current_value);
     setFocusable(true);
-    setFocusBox(FocusBox(m_x + 1, m_y + 1, m_w - 2, m_h - 2));
+    updateGeometry();
+ }
+
+NumScroll::~NumScroll() {
+    cancelOwnAnimations();
+}
+
+/** @brief NumScroll::updateGeometry. */
+void NumScroll::updateGeometry() {
+    if (presentation_ == Presentation::Bare) {
+        setFocusInsets({2, static_cast<int32_t>(m_h) - 2, 2, 0});
+    } else {
+        setFocusInsets({1, 1, 1, 1});
+    }
+    setWidgetBounds({m_x, m_y, m_w, m_h});
 }
 
 /**
  * @brief Initialize widget with animation.
  */
 void NumScroll::onLoad() {
+    onLoad(LoadTransition::Animated);
+}
+
+/** @brief NumScroll::onLoad. */
+void NumScroll::onLoad(LoadTransition transition) {
+    cancelOwnAnimations();
     m_anim_offset = 0;
     m_is_active = false;
 
     anim_w = 0;
     anim_h = 0;
 
-    // Set focus box slightly inside widget boundaries
-    setFocusBox(FocusBox(m_x + 1, m_y + 1, m_w - 2, m_h - 2));
+    updateGeometry();
 
-    // Animate size from 0 to margin size
-    m_ui.animate(anim_w, anim_h,
-                 m_w, m_h,
-                 200, EasingType::EASE_OUT_CUBIC,
-                 PROTECTION::PROTECTED);
+    if (transition == LoadTransition::Immediate) {
+        anim_w = m_w;
+        anim_h = m_h;
+        m_ui.markDirty();
+        return;
+    }
+
+    const int32_t targetWidth = m_w;
+    const int32_t targetHeight = m_h;
+    const bool sizeStarted = m_ui.animateCallback(
+        0, FIXED_POINT_ONE, 200, EasingType::EASE_OUT_CUBIC,
+        [this, targetWidth, targetHeight](int32_t progress) {
+            // Round both dimensions to nearest from one shared fixed-point phase.
+            anim_w = static_cast<int32_t>(
+                (static_cast<int64_t>(targetWidth) * progress +
+                 FIXED_POINT_ONE / 2) / FIXED_POINT_ONE);
+            anim_h = static_cast<int32_t>(
+                (static_cast<int64_t>(targetHeight) * progress +
+                 FIXED_POINT_ONE / 2) / FIXED_POINT_ONE);
+        },
+        PROTECTION::PROTECTED, &sizeAnimation_);
+    if (!sizeStarted) {
+        cancelOwnAnimations();
+        anim_w = m_w;
+        anim_h = m_h;
+        m_ui.markDirty();
+    }
 }
 
 /**
  * @brief Initialize widget without animation (immediate size).
  */
 void NumScroll::onLoadNoAnim() {
-    m_anim_offset = 0;
-    m_is_active = false;
-
-    anim_w = 0;
-    anim_h = 0;
-
-    FocusBox box;
-    box.x = m_x + 1;
-    box.y = m_y + 1;
-    box.w = m_w - 2;
-    box.h = m_h - 2;
-    setFocusBox(box);
-
-    // Set final size immediately
-    anim_w = m_w;
-    anim_h = m_h;
+    onLoad(LoadTransition::Immediate);
 }
 
 /**
  * @brief Clean up widget resources when offloaded.
  */
 void NumScroll::onOffload() {
-    m_ui.clearUnprotectedAnimations();
+    cancelOwnAnimations();
+    m_anim_offset = 0;
+    anim_w = m_w;
+    anim_h = m_h;
     m_is_active = false;
+}
+
+/** @brief NumScroll::cancelOwnAnimations. */
+void NumScroll::cancelOwnAnimations() {
+    m_ui.cancelAnimation(valueAnimation_);
+    m_ui.cancelAnimation(sizeAnimation_);
+    valueAnimation_ = INVALID_ANIMATION_HANDLE;
+    sizeAnimation_ = INVALID_ANIMATION_HANDLE;
 }
 
 /**
@@ -140,46 +192,73 @@ bool NumScroll::handleEvent(InputEvent event) {
 /**
  * @brief Render the scrollable number widget.
  */
-void NumScroll::draw() {
-    U8G2& u8g2 = m_ui.getU8G2();
+Canvas& NumScroll::display() { return m_ui.getCanvas(); }
+
+/** @brief NumScroll::drawSelf. */
+void NumScroll::drawSelf(const WidgetRenderContext& context) {
+    Canvas& u8g2 = m_ui.getCanvas();
+    if (anim_w <= 0 || anim_h <= 0) return;
 
     // Compute animated drawing area (centered)
-    int32_t draw_x = m_x + (m_w - anim_w) / 2;
-    int32_t draw_y = m_y + (m_h - anim_h) / 2;
+    int32_t draw_x = context.originX + m_x + (m_w - anim_w) / 2;
+    int32_t draw_y = context.originY + m_y + (m_h - anim_h) / 2;
     int center_x = draw_x + anim_w / 2;
     int center_y = draw_y + anim_h / 2;
 
     // Clear background
     u8g2.setDrawColor(0);
-    u8g2.drawBox(draw_x + 2, draw_y + 2, anim_w - 4, anim_h - 4);
+    if (presentation_ == Presentation::Bare) {
+        u8g2.drawBox(draw_x, draw_y, anim_w, anim_h);
+    } else {
+        u8g2.drawBox(draw_x + 2, draw_y + 2, anim_w - 4, anim_h - 4);
+    }
     u8g2.setDrawColor(1);
 
-    // Draw border, thicker if active
-    if (m_is_active) {
-        u8g2.drawFrame(draw_x, draw_y, anim_w, anim_h);
-        u8g2.drawFrame(draw_x + 1, draw_y + 1, anim_w - 2, anim_h - 2);
+    if (presentation_ == Presentation::Bare) {
+        if (m_is_active) {
+            u8g2.drawBox(draw_x + 2, draw_y + anim_h - 2, anim_w - 4, 2);
+        }
     } else {
-        u8g2.drawFrame(draw_x, draw_y, anim_w, anim_h);
+        // Draw border, thicker if active
+        if (m_is_active) {
+            u8g2.drawFrame(draw_x, draw_y, anim_w, anim_h);
+            u8g2.drawFrame(draw_x + 1, draw_y + 1, anim_w - 2, anim_h - 2);
+        } else {
+            u8g2.drawFrame(draw_x, draw_y, anim_w, anim_h);
+        }
     }
 
     // Clip drawing area inside the widget
-    u8g2.setClipWindow(draw_x + 3, draw_y + 3,
-                       draw_x + anim_w - 3,
-                       draw_y + anim_h - 3);
+    if (presentation_ == Presentation::Bare) {
+        setClipWindow(context, {
+            draw_x - context.originX,
+            draw_y - context.originY,
+            anim_w,
+            anim_h - 2
+        });
+    } else {
+        setClipWindow(context, {
+            draw_x + 3 - context.originX,
+            draw_y + 3 - context.originY,
+            anim_w - 6,
+            anim_h - 6
+        });
+    }
 
-    u8g2.setFont(u8g2_font_tenfatguys_tn);
+    u8g2.setFont(PIXELUI_FONT_NUMERIC);
 
     const int digit_height = 16;
-    char buffer[16];
+    char buffer[32];
 
     // Draw current value with one previous and one next value for scroll effect
     for (int i = -1; i <= 1; i++) {
-        int32_t value = m_current_value + i;
-        if (value < m_min_value) value = m_min_value;
-        if (value > m_max_value) value = m_max_value;
+        const int32_t value = i < 0
+            ? range_.decremented(m_current_value)
+            : i > 0
+                ? range_.incremented(m_current_value)
+                : m_current_value;
 
-        // Format value for fixed digits if applicable
-        formatValue(value, buffer, sizeof(buffer));
+        if (!formatValue(value, buffer, sizeof(buffer))) continue;
 
         int text_width = u8g2.getStrWidth(buffer);
         int y_pos = center_y + (i * digit_height) + m_anim_offset;
@@ -188,7 +267,7 @@ void NumScroll::draw() {
         u8g2.drawStr(center_x - text_width / 2, y_pos + 5, buffer);
     }
 
-    u8g2.setMaxClipWindow();
+    restoreClipWindow(context);
     u8g2.setDrawColor(1);
 }
 
@@ -197,20 +276,19 @@ void NumScroll::draw() {
  * @param min_val Minimum allowed value.
  * @param max_val Maximum allowed value.
  */
-void NumScroll::setRange(int32_t min_val, int32_t max_val) {
-    if (min_val <= max_val) {
-        m_min_value = min_val;
-        m_max_value = max_val;
+void NumScroll::setRange(const NumericRange& range) {
+    range_ = range;
+    m_current_value = range_.clamp(m_current_value);
+    m_anim_offset = 0;
+    m_ui.markDirty();
+}
 
-        if (m_current_value < m_min_value) {
-            m_current_value = m_min_value;
-        }
-        if (m_current_value > m_max_value) {
-            m_current_value = m_max_value;
-        }
-
-        m_ui.markDirty();
-    }
+/** @brief NumScroll::setRange. */
+bool NumScroll::setRange(int32_t minValue, int32_t maxValue, int32_t step) {
+    NumericRange range;
+    if (!NumericRange::tryCreate(minValue, maxValue, step, range)) return false;
+    setRange(range);
+    return true;
 }
 
 /**
@@ -218,20 +296,28 @@ void NumScroll::setRange(int32_t min_val, int32_t max_val) {
  * @param val New value to set.
  */
 void NumScroll::setValue(int32_t val) {
-    if (val < m_min_value) val = m_min_value;
-    if (val > m_max_value) val = m_max_value;
+    val = range_.clamp(val);
 
     if (val != m_current_value) {
         animateToValue(val);
     }
 }
 
+/** @brief NumScroll::setValueImmediate. */
+void NumScroll::setValueImmediate(int32_t val) {
+    m_ui.cancelAnimation(valueAnimation_);
+    valueAnimation_ = INVALID_ANIMATION_HANDLE;
+    m_current_value = range_.clamp(val);
+    m_anim_offset = 0;
+    m_ui.markDirty();
+}
+
 /**
  * @brief Increment the value by one step if not exceeding max.
  */
 void NumScroll::incrementValue() {
-    if (m_current_value < m_max_value) {
-        animateToValue(m_current_value + 1);
+    if (range_.canIncrement(m_current_value)) {
+        animateToValue(range_.incremented(m_current_value));
     }
 }
 
@@ -239,8 +325,8 @@ void NumScroll::incrementValue() {
  * @brief Decrement the value by one step if not below min.
  */
 void NumScroll::decrementValue() {
-    if (m_current_value > m_min_value) {
-        animateToValue(m_current_value - 1);
+    if (range_.canDecrement(m_current_value)) {
+        animateToValue(range_.decremented(m_current_value));
     }
 }
 
@@ -249,17 +335,25 @@ void NumScroll::decrementValue() {
  * @param new_value Target numeric value.
  */
 void NumScroll::animateToValue(int32_t new_value) {
-    int32_t diff = new_value - m_current_value;
-    if (diff == 0) return;
+    new_value = range_.clamp(new_value);
+    if (new_value == m_current_value) return;
 
+    const bool increasing = new_value > m_current_value;
+    m_ui.cancelAnimation(valueAnimation_);
+    valueAnimation_ = INVALID_ANIMATION_HANDLE;
     m_current_value = new_value;
 
     const int digit_height = 16;
-    int32_t start_offset = (diff > 0) ? digit_height : -digit_height;
+    const int32_t start_offset = increasing ? digit_height : -digit_height;
 
     // Start animation offset and animate to zero
     m_anim_offset = start_offset;
-    m_ui.animate(m_anim_offset, 0, 200, EasingType::EASE_OUT_QUAD);
+    if (!m_ui.animate(
+            m_anim_offset, 0, 200, EasingType::EASE_OUT_QUAD,
+            PROTECTION::NOT_PROTECTED, &valueAnimation_)) {
+        m_anim_offset = 0;
+        valueAnimation_ = INVALID_ANIMATION_HANDLE;
+    }
 
     m_ui.markDirty();
 }
@@ -270,12 +364,7 @@ void NumScroll::animateToValue(int32_t new_value) {
  * @param buffer Destination buffer.
  * @param buf_size Size of buffer.
  */
-void NumScroll::formatValue(int32_t value, char* buffer, size_t buf_size) const {
-    if (m_fixed_digits > 0) {
-        char fmt[8];
-        snprintf(fmt, sizeof(fmt), "%%0%dd", m_fixed_digits); // e.g. "%03d"
-        snprintf(buffer, buf_size, fmt, (int)value);
-    } else {
-        snprintf(buffer, buf_size, "%d", (int)value);
-    }
+bool NumScroll::formatValue(
+    int32_t value, char* buffer, size_t bufferSize) const {
+    return formatter_.format(value, buffer, bufferSize);
 }

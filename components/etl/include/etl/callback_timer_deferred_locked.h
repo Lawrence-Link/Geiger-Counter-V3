@@ -29,11 +29,12 @@ SOFTWARE.
 #ifndef ETL_CALLBACK_TIMER_DEFERRED_LOCKED_INCLUDED
 #define ETL_CALLBACK_TIMER_DEFERRED_LOCKED_INCLUDED
 
+#include "platform.h"
 #include "callback_timer_locked.h"
+#include "delegate.h"
 #include "etl/nullptr.h"
 #include "etl/optional.h"
 #include "priority_queue.h"
-#include "delegate.h"
 
 namespace etl
 {
@@ -54,22 +55,7 @@ namespace etl
 
   private:
 
-    class CallbackNode 
-    {
-    public:
-
-      CallbackNode(callback_type &callback_,uint_least8_t priority_) : callback(callback_), priority(priority_) 
-      {
-      }
-            
-      bool operator < (const CallbackNode& p) const
-      {
-        return this->priority > p.priority; // comparison was inverted here to easy the code design
-      }
-
-      callback_type callback;
-      uint_least8_t priority;
-    };
+    typedef icallback_timer_locked::callback_node callback_node;
 
   public:
 
@@ -93,7 +79,7 @@ namespace etl
     //*******************************************
     /// Handle the tick call
     //*******************************************
-    bool tick(uint32_t count) final
+    bool tick(uint32_t count) ETL_FINAL
     {
       if (enabled)
       {
@@ -111,12 +97,13 @@ namespace etl
               count -= timer.delta;
 
               active_list.remove(timer.id, true);
+              remove_callback.call_if(timer.id);
 
               if (timer.callback.is_valid())
               {
                 if (!handler_queue.full())
                 {
-                    handler_queue.push(CallbackNode(timer.callback, timer_priorities[timer.id]));
+                  handler_queue.push(callback_node(timer.callback, timer_priorities[timer.id]));
                 }
               }
 
@@ -125,6 +112,7 @@ namespace etl
                 // Reinsert the timer.
                 timer.delta = timer.period;
                 active_list.insert(timer.id);
+                insert_callback.call_if(timer.id);
               }
 
               has_active = !active_list.empty();
@@ -155,18 +143,17 @@ namespace etl
     {
       callback_type work_todo_callback;
 
-      do
-      {
+      do {
         lock();
-        
+
         if (handler_queue.empty())
         {
           work_todo_callback.clear();
         }
         else
         {
-          CallbackNode &work_todo_callback_node = handler_queue.top();
-          work_todo_callback = work_todo_callback_node.callback;
+          callback_node& work_todo_callback_node = handler_queue.top();
+          work_todo_callback                     = work_todo_callback_node.callback;
           handler_queue.pop();
         }
 
@@ -181,11 +168,9 @@ namespace etl
     //*******************************************
     /// Register a timer.
     //*******************************************
-    etl::timer::id::type register_timer(const callback_type& callback_,
-                                        uint32_t             period_,
-                                        bool                 repeating_)
+    etl::timer::id::type register_timer(const callback_type& callback_, uint32_t period_, bool repeating_)
     {
-        return register_timer(callback_, period_, repeating_, 0);
+      return register_timer(callback_, period_, repeating_, 0);
     }
 
     //*******************************************
@@ -194,27 +179,24 @@ namespace etl
     /// Suggestion: this could be used as amonth of work to do and
     /// less work will be done in first place.
     //*******************************************
-    etl::timer::id::type register_timer(const callback_type& callback_,
-                                        uint32_t             period_,
-                                        bool                 repeating_,
-                                        uint_least8_t        priority_)
+    etl::timer::id::type register_timer(const callback_type& callback_, uint32_t period_, bool repeating_, uint_least8_t priority_)
     {
-        etl::timer::id::type id = icallback_timer_locked::register_timer(callback_, period_, repeating_);
+      etl::timer::id::type id = icallback_timer_locked::register_timer(callback_, period_, repeating_);
 
-        if (id != etl::timer::id::NO_TIMER)
-        {
-            timer_priorities[id] = priority_;
-        }
+      if (id != etl::timer::id::NO_TIMER)
+      {
+        timer_priorities[id] = priority_;
+      }
 
-        return id;
+      return id;
     }
 
   private:
 
-    priority_queue<CallbackNode, Max_Handlers_> handler_queue;
-    uint_least8_t timer_priorities[Max_Timers_];
-    timer_data timer_array[Max_Timers_];
+    priority_queue<callback_node, Max_Handlers_> handler_queue;
+    uint_least8_t                                timer_priorities[Max_Timers_];
+    timer_data                                   timer_array[Max_Timers_];
   };
-}
+} // namespace etl
 
 #endif

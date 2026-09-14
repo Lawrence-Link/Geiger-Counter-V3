@@ -17,6 +17,7 @@
 
 
 #include "core/app/IApplication.h"
+#include "PixelUI.h"
 #include "core/app/app_system.h"
 #include "widgets/label/label.h"
 #include <memory>
@@ -41,13 +42,14 @@ public:
         exit_flag = true;
         CORO_END(ctx);
     }) {};
+
     void draw() override {
         m_ui.markDirty();
         U8G2& u8g2 = m_ui.getU8G2();
         product_name.draw();
         u8g2.drawHLine(14, 40, line_width);
         u8g2.setFont(u8g2_font_wqy12_t_gb2312);
-        // u8g2.drawUTF8(1, 63, "");
+        // u8g2.drawUTF8(1, 63, "test");
         if (exit_flag) { requestExit(); }   
     }
 
@@ -60,6 +62,8 @@ public:
         IApplication::onEnter(cb);
         m_ui.setContinousDraw(true);
         m_ui.markDirty(); 
+
+        product_name.onLoad();
 
         coroutine_anim.reset();
         coroutine_anim.start();
@@ -78,7 +82,5 @@ public:
 AppItem boot_app{
     .title = nullptr,
     .bitmap = nullptr,
-    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<App_Boot>(ui, param); 
-    },
+    .factory = ApplicationFactory::make<App_Boot>(),
 };

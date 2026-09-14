@@ -19,11 +19,13 @@
 #include <cmath>
 
 #include "esp_app_desc.h"
+#include "PixelUI.h"
+#include "U8g2lib.h"
 #include "core/app/IApplication.h"
 #include "core/app/app_system.h"
 #include "core/coroutine/Coroutine.h"
 #include "widgets/label/label.h"
-#include "blinker/Blinker.h"
+#include "blink/BlinkState.h"
 
 __attribute__((aligned(4)))
 static const unsigned char image_about_bits[] U8X8_PROGMEM = {0xf0,0xff,0x0f,0xfc,0xff,0x3f,0xfe,0xff,0x7f,0xfe,0xff,0x77,0xff,0xc3,0xef,0xff,0x81,0xff,0xff,0x1c,0xff,0xff,0x3e,0xff,0xff,0x3f,0xff,0xff,0x3f,0xff,0xff,0x1f,0xff,0xff,0x9f,0xff,0xff,0x8f,0xff,0xff,0xc7,0xff,0xff,0xe7,0xff,0xff,0xe7,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xef,0xe7,0xff,0xdf,0xe7,0xff,0xfe,0xff,0x7f,0xfe,0xff,0x7f,0xfc,0xff,0x3f,0xf0,0xff,0x0f};
@@ -31,7 +33,7 @@ static const unsigned char image_about_bits[] U8X8_PROGMEM = {0xf0,0xff,0x0f,0xf
 class About : public IApplication {
 private:
     PixelUI& m_ui;
-    Blinker bl;
+    BlinkState bl;
     int32_t anim_h_line = 44;
     int32_t anim_phrase_1_y = 75;
     int32_t anim_phrase_2_y = 75;
@@ -64,8 +66,6 @@ public:
         m_ui.markDirty();
         U8G2& u8g2 = m_ui.getU8G2();
 
-        bl.update();
-
         u8g2.setFont(u8g2_font_5x7_tr);
         
         u8g2.drawStr(5, anim_phrase_1_y, "DESIGNED BY");
@@ -75,7 +75,7 @@ public:
         
         char buf[20] = "fw: ";
 
-        if (bl.is_visible()) {u8g2.drawStr(12, 14, "THANKS FOR UR WORK");}
+        if (bl.isVisible()) {u8g2.drawStr(12, 14, "THANKS FOR UR WORK");}
         else { 
             strcat(buf, esp_app_get_description()->version);
             u8g2.drawStr(12, 14, buf);
@@ -105,7 +105,7 @@ public:
         IApplication::onEnter(cb);
         m_ui.setContinousDraw(true);
         m_ui.markDirty(); 
-        bl.set_interval(2000);
+        bl.setInterval(2000);
         bl.start();
         
         coroutine_anim.reset();
@@ -125,7 +125,5 @@ AppItem about_app{
     .title = "关于",
     .bitmap = image_about_bits,
     
-    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> { 
-        return std::make_unique<About>(ui, param); 
-    },
+    .factory = ApplicationFactory::make<About>(),
 };

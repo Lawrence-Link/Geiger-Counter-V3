@@ -16,6 +16,7 @@
  */
 
 #include "core/app/IApplication.h"
+#include "PixelUI.h"
 #include "core/app/app_system.h"
 #include "app_registry.h"
 #include <memory>
@@ -379,7 +380,5 @@ public:
 AppItem pixel_clock_app{
     .title = "像素钟",
     .bitmap = image_clock_bits,
-    .createApp = [](PixelUI& ui, void* param) -> std::unique_ptr<IApplication> {
-        return std::make_unique<APP_PIXEL_CLOCK>(ui, param);
-    },
+    .factory = ApplicationFactory::make<APP_PIXEL_CLOCK>(),
 };

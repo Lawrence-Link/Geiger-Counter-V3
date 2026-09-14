@@ -1,2 +1,12 @@
 CompileFlags:
-    Remove: [-f*, -m*]
+  CompilationDatabase: "build"
+  Compiler: riscv32-esp-elf-gcc
+
+  Remove: 
+    - "-fno-tree-switch-conversion"
+    - "-fstrict-volatile-bitfields"
+    - [-f*, -m*]
+Diagnostics:
+  UnusedIncludes: Strict
+  Suppress:
+    - "unknown_warning_option"

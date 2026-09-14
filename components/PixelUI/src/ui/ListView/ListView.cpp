@@ -1,24 +1,120 @@
 /*
  * Copyright (C) 2025 Lawrence Link
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "ui/ListView/ListView.h"
 #include "core/animation/animation.h"
-#include <cinttypes>
-#include <cstdio>
+
+ListView::ListView(PixelUI& ui, ListItem* itemList, int length)
+    : IApplication(true)
+    , m_ui(ui)
+    , m_itemList(itemList)
+    , m_itemLength(length - 1)
+#if PIXELUI_USE_LABEL_SCROLL
+    , selectedItemTitle_(ui, TITLE_X, 0, "", POS::BOTTOM,
+                         PIXELUI_FONT_TEXT)
+#endif
+{
+#if PIXELUI_USE_LABEL_SCROLL
+    selectedItemTitle_.setOverflow(Label::Overflow::AutoScroll);
+#endif
+}
+
+ListView::~ListView() {
+    cancelAllOwnedAnimations();
+}
+
+/** @brief ListView::cancelLoadAnimations. */
+void ListView::cancelLoadAnimations() {
+    for (AnimationHandle handle : loadAnimations_) m_ui.cancelAnimation(handle);
+    loadAnimations_.clear();
+}
+
+/** @brief ListView::cancelToggleAnimation. */
+void ListView::cancelToggleAnimation() {
+    m_ui.cancelAnimation(switchAnimState_.handle);
+    switchAnimState_ = {};
+}
+
+/** @brief ListView::toggleBoxXFor. */
+int32_t ListView::toggleBoxXFor(const ListItem& item) const {
+        const bool* toggle = item.accessory.toggleValue();
+    if (toggle == nullptr) return 0;
+    return switchAnimState_.item == &item
+        ? switchAnimState_.boxX
+        : (*toggle ? 7 : 0);
+}
+
+/** @brief ListView::clearNonInitialAnimations. */
+void ListView::clearNonInitialAnimations() {
+    for (AnimationHandle handle : viewAnimations_) m_ui.cancelAnimation(handle);
+    viewAnimations_.clear();
+}
+
+/** @brief ListView::cancelAllOwnedAnimations. */
+void ListView::cancelAllOwnedAnimations() {
+    clearNonInitialAnimations();
+    cancelLoadAnimations();
+    cancelToggleAnimation();
+}
+
+bool ListView::animateOwned(
+    int32_t& value, int32_t target, uint32_t duration,
+    EasingType easing, PROTECTION protection) {
+    if (viewAnimations_.full()) {
+        value = target;
+        return false;
+    }
+    AnimationHandle handle = INVALID_ANIMATION_HANDLE;
+    if (!m_ui.animate(
+            value, target, duration, easing, protection, &handle)) {
+        value = target;
+        return false;
+    }
+    viewAnimations_.push_back(handle);
+    return true;
+}
+
+bool ListView::animateOwnedCallback(
+    int32_t start, int32_t target, uint32_t duration,
+    EasingType easing, ValueCallback callback, PROTECTION protection) {
+    if (viewAnimations_.full()) {
+        if (callback) callback(target);
+        return false;
+    }
+    ValueCallback fallback = callback;
+    AnimationHandle handle = INVALID_ANIMATION_HANDLE;
+    if (!m_ui.animateCallback(
+            start, target, duration, easing, etl::move(callback),
+            protection, &handle)) {
+        if (fallback) fallback(target);
+        return false;
+    }
+    viewAnimations_.push_back(handle);
+    return true;
+}
 
 /**
  * @brief Called when the ListView is entered.
@@ -29,37 +125,33 @@
  */
 void ListView::onEnter(ExitCallback exitCallback){
     IApplication::onEnter(exitCallback);
-    m_ui.setContinousDraw(true);
+    cancelAllOwnedAnimations();
+#if PIXELUI_USE_LABEL_SCROLL
+    selectedItemTitle_.onOffload();
+#endif
 
-    U8G2& u8g2 = m_ui.getU8G2();
-    u8g2.setFont(u8g2_font_wqy12_t_gb2312b);
-    FontHeight = u8g2.getFontAscent() - u8g2.getFontDescent();
+    Canvas& canvas = m_ui.getCanvas();
+    canvas.setFont(PIXELUI_FONT_TEXT);
+    FontHeight = canvas.getFontAscent() - canvas.getFontDescent();
     
     topVisibleIndex_ = 0;
-    scrollOffset_ = 0;
+    m_ui.getCanvas().camera().setContentHeight(m_ui.getDisplayHeight());
+    m_ui.scrollCanvasTo(0);
     currentCursor = 0;
     isInitialLoad_ = true;
     
     onLoad(); // Initialize item data before calculating box states
 
     // Reset item load animation states
-    for (int i = 0; i < visibleItemCount_ + 1; i++) {
+    for (int i = 0; i < VISIBLE_ITEM_COUNT + 1; i++) {
         itemLoadAnimations_[i] = 0;
     }
-
-    // Initialize switch animations
-    for (int i = 0; i <= m_itemLength; i++) {
-        if (m_itemList[i].extra.switchValue) {
-            switchAnimStates_[i].boxX = *m_itemList[i].extra.switchValue ? 7 : 0;
-            switchAnimStates_[i].isAnimating = false;
-        }
-    }
-    
-    // Animate scrollbar
-    m_ui.animate(animation_pixel_dots, 32, 400, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
     
     startLoadAnimation();
     scrollToTarget();
+#if PIXELUI_USE_LABEL_SCROLL
+    selectedItemTitle_.onLoadImmediately();
+#endif
 }
 
 /**
@@ -69,8 +161,9 @@ void ListView::onEnter(ExitCallback exitCallback){
  * clears the PROTECTED marks and sets `isInitialLoad_` to false.
  */
 void ListView::startLoadAnimation() {
+    cancelLoadAnimations();
     isInitialLoad_ = true;
-    int maxVisible = std::min(visibleItemCount_ + 1, (int32_t)(m_itemLength + 1));
+    int maxVisible = etl::min(VISIBLE_ITEM_COUNT + 1, (int32_t)(m_itemLength + 1));
 
     for (int i = 0; i < maxVisible; i++) {
         int duration = 250 + i * 60;
@@ -79,24 +172,25 @@ void ListView::startLoadAnimation() {
             this->itemLoadAnimations_[i] = value;
             if (isLastAnimation && value >= FIXED_POINT_ONE) { 
                 this->isInitialLoad_ = false;
-                this->m_ui.getAnimationManPtr()->clearAllProtectionMarks();
             }
         };
 
-        auto animation = std::make_shared<CallbackAnimation>(
-            0, FIXED_POINT_ONE, duration, EasingType::EASE_IN_OUT_CUBIC, callback
-        );
-        
-        m_ui.getAnimationManPtr()->markProtected(animation);
-        m_ui.addAnimation(animation);
+        AnimationHandle handle = INVALID_ANIMATION_HANDLE;
+        const bool started = m_ui.animateCallback(
+            0,
+            FIXED_POINT_ONE,
+            duration,
+            EasingType::EASE_IN_OUT_CUBIC,
+            callback,
+            PROTECTION::NOT_PROTECTED,
+            &handle);
+        if (started && !loadAnimations_.full()) {
+            loadAnimations_.push_back(handle);
+        } else if (!started) {
+            itemLoadAnimations_[i] = FIXED_POINT_ONE;
+            if (isLastAnimation) isInitialLoad_ = false;
+        }
     }
-}
-
-/**
- * @brief Clears all unprotected animations.
- */
-void ListView::clearNonInitialAnimations() {
-    m_ui.getAnimationManPtr()->clearUnprotected();
 }
 
 /**
@@ -105,7 +199,8 @@ void ListView::clearNonInitialAnimations() {
  * @return True if scrolling is needed, false otherwise.
  */
 bool ListView::shouldScroll(int newCursor) {
-    return (newCursor < topVisibleIndex_ || newCursor >= topVisibleIndex_ + visibleItemCount_);
+    return newCursor < topVisibleIndex_ ||
+           newCursor >= topVisibleIndex_ + VISIBLE_ITEM_COUNT;
 }
 
 /**
@@ -117,19 +212,27 @@ bool ListView::shouldScroll(int newCursor) {
 void ListView::updateScrollPosition() {
     if (!shouldScroll(currentCursor)) return;
 
-    int newTopIndex = topVisibleIndex_;
-    if (currentCursor < topVisibleIndex_) newTopIndex = currentCursor;
-    else if (currentCursor >= topVisibleIndex_ + visibleItemCount_)
-        newTopIndex = currentCursor - visibleItemCount_ + 1;
-    
-    int maxTopIndex = std::max((int32_t)0, m_itemLength + 1 - visibleItemCount_);
-    newTopIndex = std::max(0, std::min(newTopIndex, maxTopIndex));
-    
-    if (newTopIndex != topVisibleIndex_) {
-        int32_t targetScrollOffset = -newTopIndex * (FontHeight + spacing_);
-        m_ui.animate(scrollOffset_, targetScrollOffset, 350, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
-        topVisibleIndex_ = newTopIndex;
+    const int32_t rowHeight = FontHeight + SPACING;
+    int32_t newTopIndex = topVisibleIndex_;
+    if (currentCursor < topVisibleIndex_) {
+        newTopIndex = currentCursor;
+    } else if (currentCursor >= topVisibleIndex_ + VISIBLE_ITEM_COUNT) {
+        newTopIndex = currentCursor - VISIBLE_ITEM_COUNT + 1;
     }
+
+    const int32_t maxTopIndex = etl::max(
+        (int32_t)0, m_itemLength + 1 - VISIBLE_ITEM_COUNT);
+    newTopIndex = etl::max((int32_t)0,
+                           etl::min(newTopIndex, maxTopIndex));
+    if (newTopIndex == topVisibleIndex_) return;
+
+    topVisibleIndex_ = newTopIndex;
+    const int32_t targetY = topVisibleIndex_ * rowHeight;
+    const int32_t startY = m_ui.getCanvas().camera().storedY();
+    animateOwnedCallback(
+        startY, targetY, 150, EasingType::EASE_OUT_CUBIC,
+        [this](int32_t value) { m_ui.getCanvas().camera().setY(value); },
+        PROTECTION::PROTECTED);
 }
 
 /**
@@ -138,9 +241,69 @@ void ListView::updateScrollPosition() {
  * @return Screen Y position of the item including scroll offset.
  */
 int32_t ListView::calculateItemY(int itemIndex) {
-    U8G2& u8g2 = m_ui.getU8G2();
-    int32_t baseY = topMargin_ + itemIndex * (FontHeight + spacing_) + u8g2.getFontAscent();
-    return baseY + scrollOffset_;
+    return TOP_MARGIN + itemIndex * (FontHeight + SPACING) +
+           m_ui.getCanvas().getFontAscent();
+}
+
+int32_t ListView::calculateTitleRight(
+    const ListItem& item, char* valueBuffer, size_t valueBufferSize) const {
+    Canvas& canvas = m_ui.getCanvas();
+    const int32_t displayWidth = m_ui.getDisplayWidth();
+    int32_t right = displayWidth - 15;
+
+    if (valueBuffer != nullptr && valueBufferSize != 0U) {
+        valueBuffer[0] = '\0';
+    }
+
+    switch (item.accessory.kind()) {
+        case ListItemAccessory::Kind::Toggle:
+            if (item.accessory.toggleValue() != nullptr) {
+                right = displayWidth - 42 - TITLE_ACCESSORY_GAP;
+            }
+            break;
+
+        case ListItemAccessory::Kind::Text: {
+            const char* text = item.accessory.textValue();
+            if (text != nullptr) {
+                right = displayWidth - canvas.getUTF8Width(text) - 4 -
+                        TITLE_ACCESSORY_GAP;
+            }
+            break;
+        }
+
+        case ListItemAccessory::Kind::Value:
+            if (item.accessory.formatValue(valueBuffer, valueBufferSize)) {
+                right = displayWidth - canvas.getUTF8Width(valueBuffer) - 8 -
+                        TITLE_ACCESSORY_GAP;
+            }
+            break;
+
+        case ListItemAccessory::Kind::None:
+            break;
+    }
+
+    return etl::max(TITLE_X + 1, right);
+}
+
+/** @brief ListView::updateSelectedItemTitle. */
+int32_t ListView::updateSelectedItemTitle() {
+    if (m_itemLength < 0 || currentCursor < 0 ||
+        currentCursor > m_itemLength) {
+#if PIXELUI_USE_LABEL_SCROLL
+        selectedItemTitle_.setText("");
+#endif
+        return TITLE_X + 1;
+    }
+
+    char valueBuffer[MAX_TEXT_LENGTH + 1]{};
+    const int32_t titleRight = calculateTitleRight(
+        m_itemList[currentCursor], valueBuffer, sizeof(valueBuffer));
+#if PIXELUI_USE_LABEL_SCROLL
+    selectedItemTitle_.setViewportWidth(
+        static_cast<uint16_t>(titleRight - TITLE_X));
+    selectedItemTitle_.setText(m_itemList[currentCursor].title);
+#endif
+    return titleRight;
 }
 
 /**
@@ -148,16 +311,36 @@ int32_t ListView::calculateItemY(int itemIndex) {
  * @param target Target item index.
  */
 void ListView::scrollToTarget(){
+    if (m_itemLength < 0 || currentCursor < 0 || currentCursor > m_itemLength) {
+        m_ui.scrollCanvasTo(0);
+        updateSelectedItemTitle();
+        return;
+    }
+
+    const int32_t contentHeight = TOP_MARGIN +
+        (m_itemLength + 1) * (FontHeight + SPACING);
+    m_ui.getCanvas().camera().setContentHeight(contentHeight);
     updateScrollPosition();
     
-    U8G2& u8g2 = m_ui.getU8G2();
-    int screenCursorIndex = currentCursor - topVisibleIndex_;
-    int32_t targetCursorY = topMargin_ + screenCursorIndex * (FontHeight + spacing_) - 1;
+    Canvas& canvas = m_ui.getCanvas();
+    const int32_t titleRight = updateSelectedItemTitle();
+    int32_t targetCursorY = TOP_MARGIN + currentCursor * (FontHeight + SPACING) - 1;
     
-    m_ui.animate(CursorY, targetCursorY, 150, EasingType::EASE_IN_OUT_CUBIC);
-    m_ui.animate(CursorWidth, u8g2.getUTF8Width(m_itemList[currentCursor].title) + 6, 500, EasingType::EASE_OUT_CUBIC);
-    m_ui.animate(progress_bar_top, ((int64_t)currentCursor * 64) / (m_itemLength + 1) + 1, 400, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
-    m_ui.animate(progress_bar_bottom, ((int64_t)1 * 64) / (m_itemLength + 1), 400, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
+    const int32_t displayHeight = m_ui.getDisplayHeight();
+    animateOwned(CursorY, targetCursorY, 150, EasingType::EASE_IN_OUT_CUBIC);
+    animateOwned(CursorWidth,
+                 etl::min(
+                     canvas.getUTF8Width(m_itemList[currentCursor].title) + 6,
+                     titleRight + 2 - CURSOR_X),
+                 500, EasingType::EASE_OUT_CUBIC);
+    animateOwned(progress_bar_top,
+                 static_cast<int32_t>(
+                     (static_cast<int64_t>(currentCursor) * displayHeight) /
+                     (m_itemLength + 1)) + 1,
+                 400, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
+    animateOwned(progress_bar_bottom,
+                 displayHeight / (m_itemLength + 1),
+                 400, EasingType::EASE_OUT_CUBIC, PROTECTION::PROTECTED);
 }
 
 /**
@@ -192,7 +375,7 @@ void ListView::selectCurrent(){
     if (currentCursor == 0) { returnToPreviousContext(); return; }
 
     if (m_itemList[currentCursor].nextList){  
-        m_ui.getAnimationManPtr()->clear();
+        cancelAllOwnedAnimations();
         m_history_stack.push_back(etl::make_pair(etl::make_pair(m_itemList, m_itemLength), currentCursor));
         // Guard against underflow if nextListLength is zero
         int32_t nextLen = m_itemList[currentCursor].nextListLength;
@@ -200,30 +383,40 @@ void ListView::selectCurrent(){
         m_itemLength = nextLen - 1;
         m_itemList = m_itemList[currentCursor].nextList;
         currentCursor = 0;
+        m_ui.scrollCanvasTo(0);
         m_ui.markFading();
         startLoadAnimation();
         scrollToTarget();
-        // return;
+        return;
     }
 
-    if (m_itemList[currentCursor].extra.switchValue) {
-        bool* switchValPtr = m_itemList[currentCursor].extra.switchValue;
+    if (bool* switchValPtr =
+            m_itemList[currentCursor].accessory.toggleValue()) {
         bool currentState = *switchValPtr;
         int32_t endX = currentState ? 0 : 7;
 
-        int32_t targetIndex = currentCursor;
-        switchAnimStates_[targetIndex].isAnimating = true;
-
-        auto callback = [this, targetIndex](int32_t value) { switchAnimStates_[targetIndex].boxX = value; };
-        auto animation = std::make_shared<CallbackAnimation>(
-            switchAnimStates_[targetIndex].boxX, endX, 200, EasingType::EASE_IN_OUT_CUBIC, callback
-        );
-
-        m_ui.getAnimationManPtr()->markProtected(animation);
-        m_ui.addAnimation(animation);
-
+        ListItem* const targetItem = &m_itemList[currentCursor];
+        cancelToggleAnimation();
+        switchAnimState_.item = targetItem;
+        switchAnimState_.boxX = currentState ? 7 : 0;
         *switchValPtr = !currentState;
-        // return;
+
+        auto callback = [this, targetItem, endX](int32_t value) {
+            if (switchAnimState_.item == targetItem) {
+                switchAnimState_.boxX = value;
+                if (value == endX) switchAnimState_ = {};
+            }
+        };
+        if (!m_ui.animateCallback(
+            switchAnimState_.boxX,
+            endX,
+            200,
+            EasingType::EASE_IN_OUT_CUBIC,
+            callback,
+            PROTECTION::PROTECTED,
+            &switchAnimState_.handle)) {
+            switchAnimState_ = {};
+        }
     }
 
     if (m_itemList[currentCursor].pFunc) { 
@@ -239,7 +432,7 @@ void ListView::selectCurrent(){
  */
 void ListView::returnToPreviousContext() {
     if (!m_history_stack.empty()){
-        m_ui.getAnimationManPtr()->clear();
+        cancelAllOwnedAnimations();
         auto parent_state = m_history_stack.back();
         m_history_stack.pop_back();
         m_itemList = parent_state.first.first;
@@ -247,6 +440,7 @@ void ListView::returnToPreviousContext() {
         currentCursor = parent_state.second;
 
         m_ui.markFading();
+        m_ui.scrollCanvasTo(0);
         startLoadAnimation();
         scrollToTarget();
         return;
@@ -294,7 +488,8 @@ bool ListView::handleInput(InputEvent event) {
         #ifdef LISTVIEW_NAVI_SELECT
         case LISTVIEW_NAVI_SELECT: selectCurrent(); return true;
         #endif
-        default: return false;
+        default:
+            return event == InputEvent::UP || event == InputEvent::DOWN;
     }
 }
 
@@ -302,29 +497,36 @@ bool ListView::handleInput(InputEvent event) {
  * @brief Draw the cursor rectangle and navigation hints.
  */
 void ListView::drawCursor() {
-    U8G2& u8g2 = m_ui.getU8G2();
-    u8g2.setDrawColor(2);
-    u8g2.drawRBox(CursorX, CursorY - 2, CursorWidth, FontHeight + 3, 0);
-    u8g2.setDrawColor(1);
+    Canvas& canvas = m_ui.getCanvas();
+    canvas.setDrawColor(2);
+    canvas.drawRBox(CURSOR_X, CursorY - 2, CursorWidth, FontHeight + 3, 0);
+    canvas.setDrawColor(1);
 
-    if (!currentCursor)
-        u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getUTF8Width("<") - 5, u8g2.getDisplayHeight(), "<");
-    else
-        u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getUTF8Width(">") - 5, u8g2.getDisplayHeight(), ">");
+    U8G2& overlay = canvas.rawDisplay();
+    const char* hint = currentCursor ? ">" : "<";
+    overlay.drawStr(m_ui.getDisplayWidth() - canvas.getUTF8Width(hint) - 5,
+                    m_ui.getDisplayHeight(), hint);
 }
 
 /**
  * @brief Called when resuming ListView.
  */
 void ListView::onResume() {
+    cancelLoadAnimations();
     isInitialLoad_ = false;
-    m_ui.getAnimationManPtr()->clearAllProtectionMarks();
+    updateSelectedItemTitle();
+#if PIXELUI_USE_LABEL_SCROLL
+    selectedItemTitle_.onLoadImmediately();
+#endif
 }
 
 /**
  * @brief Called when ListView is paused.
  */
 void ListView::onPause() {
+#if PIXELUI_USE_LABEL_SCROLL
+    selectedItemTitle_.onOffload();
+#endif
 }
 
 /**
@@ -333,71 +535,120 @@ void ListView::onPause() {
  * Saves state and clears animations.
  */
 void ListView::onExit() {
+#if PIXELUI_USE_LABEL_SCROLL
+    selectedItemTitle_.onOffload();
+#endif
+    cancelAllOwnedAnimations();
     onSave();
-    m_ui.setContinousDraw(false);
 }
 
 /**
  * @brief Draw all visible items and UI elements.
  */
 void ListView::draw() {
-    U8G2& u8g2 = m_ui.getU8G2();
-    u8g2.setFont(u8g2_font_wqy12_t_gb2312b); 
-    int startIndex = std::max((int32_t)0, topVisibleIndex_ - 2);
-    int endIndex = std::min(m_itemLength, topVisibleIndex_ + visibleItemCount_ + 2);
+    Canvas& canvas = m_ui.getCanvas();
+    canvas.setFont(PIXELUI_FONT_TEXT);
+    const int32_t rowHeight = FontHeight + SPACING;
+    const int32_t cameraY = canvas.camera().storedY();
+    int startIndex = etl::max((int32_t)0, topVisibleIndex_ - 2);
+    int endIndex = etl::min(m_itemLength, topVisibleIndex_ + VISIBLE_ITEM_COUNT + 2);
+    canvas.setContentHeight(TOP_MARGIN + (m_itemLength + 1) * rowHeight);
     
     for (int itemIndex = startIndex; itemIndex <= endIndex; itemIndex++) {
         int32_t itemY = calculateItemY(itemIndex);
         
-        if (itemY >= -FontHeight && itemY <= u8g2.getDisplayHeight() + FontHeight) {
-            int32_t drawX = 4;
+        const int32_t screenY = itemY - cameraY;
+        if (screenY >= -FontHeight && screenY <= m_ui.getDisplayHeight() + FontHeight) {
+            int32_t drawX = TITLE_X;
             if (isInitialLoad_) {
                 int animIndex = itemIndex - topVisibleIndex_;
-                if (animIndex >= 0 && animIndex < visibleItemCount_ + 1) {
+                if (animIndex >= 0 && animIndex < VISIBLE_ITEM_COUNT + 1) {
                     int32_t loadProgress = itemLoadAnimations_[animIndex];
-                    drawX = 4 + (FIXED_POINT_ONE - loadProgress) * 30 / FIXED_POINT_ONE;
+                    drawX = TITLE_X +
+                        (FIXED_POINT_ONE - loadProgress) * 30 / FIXED_POINT_ONE;
                 }
             }
-            u8g2.drawUTF8(drawX, itemY, m_itemList[itemIndex].title);
-            
-            // Draw switch box if present
-            if (m_itemList[itemIndex].extra.switchValue) {
-                u8g2.drawRFrame(u8g2.getDisplayWidth() - 42, itemY - 9, 14, 8, 1);
-                int32_t currentSwitchBoxX = switchAnimStates_.count(itemIndex) ? switchAnimStates_[itemIndex].boxX : (*m_itemList[itemIndex].extra.switchValue ? 7 : 0);
-                u8g2.drawRBox(u8g2.getDisplayWidth() - 42 + currentSwitchBoxX, itemY - 9, 7, 8, 2);
-                u8g2.drawUTF8(u8g2.getDisplayWidth() - 25, itemY - 1, *m_itemList[itemIndex].extra.switchValue ? "ON" : "OFF");
+
+            const ListItemAccessory& accessory =
+                m_itemList[itemIndex].accessory;
+            char valueBuffer[MAX_TEXT_LENGTH + 1]{};
+            const int32_t titleRight = calculateTitleRight(
+                m_itemList[itemIndex], valueBuffer, sizeof(valueBuffer));
+            if (drawX < titleRight) {
+#if PIXELUI_USE_LABEL_SCROLL
+                if (itemIndex == currentCursor) {
+                    const uint16_t viewportWidth = static_cast<uint16_t>(
+                        titleRight - drawX);
+                    if (selectedItemTitle_.getViewportWidth() != viewportWidth) {
+                        selectedItemTitle_.setViewportWidth(viewportWidth);
+                    }
+                    const WidgetRenderContext context{
+                        drawX - TITLE_X,
+                        itemY,
+                        {canvas.camera().x(), cameraY,
+                         m_ui.getDisplayWidth(), m_ui.getDisplayHeight()}
+                    };
+                    selectedItemTitle_.draw(context);
+                } else {
+#endif
+                    canvas.setClipWindow(
+                        drawX, itemY - FontHeight, titleRight, itemY + 1);
+                    canvas.drawUTF8(
+                        drawX, itemY, m_itemList[itemIndex].title);
+                    canvas.setMaxClipWindow();
+#if PIXELUI_USE_LABEL_SCROLL
+                }
+#endif
             }
 
-            if (m_itemList[itemIndex].extra.text) {
-                u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getUTF8Width(m_itemList[itemIndex].extra.text) - 4, itemY, m_itemList[itemIndex].extra.text);
-            }
-
-            // Draw integer value if present
-            if (m_itemList[itemIndex].extra.intValue) {
-                char buf[16] = {0};
-                snprintf(buf, sizeof(buf), "%" PRId32, *m_itemList[itemIndex].extra.intValue);
-                u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getUTF8Width(buf) - 8, itemY, buf);
-            }
-
-            // Draw float value if present
-            if (m_itemList[itemIndex].extra.float_dot1f_Value) {
-                char buf[16] = {0};
-                snprintf(buf, sizeof(buf), "%.1f", *m_itemList[itemIndex].extra.float_dot1f_Value);
-                u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getUTF8Width(buf) - 8, itemY, buf);
+            switch (accessory.kind()) {
+                case ListItemAccessory::Kind::Toggle: {
+                    bool* toggle = accessory.toggleValue();
+                    if (toggle == nullptr) break;
+                    canvas.drawRFrame(
+                        m_ui.getDisplayWidth() - 42, itemY - 9, 14, 8, 1);
+                    const int32_t currentSwitchBoxX =
+                        toggleBoxXFor(m_itemList[itemIndex]);
+                    canvas.drawRBox(
+                        m_ui.getDisplayWidth() - 42 + currentSwitchBoxX,
+                        itemY - 9,
+                        7,
+                        8,
+                        2);
+                    canvas.drawUTF8(
+                        m_ui.getDisplayWidth() - 25,
+                        itemY - 1,
+                        *toggle ? "ON" : "OFF");
+                    break;
+                }
+                case ListItemAccessory::Kind::Text: {
+                    const char* text = accessory.textValue();
+                    if (text != nullptr) {
+                        canvas.drawStr(
+                            m_ui.getDisplayWidth() - canvas.getUTF8Width(text) - 4,
+                            itemY,
+                            text);
+                    }
+                    break;
+                }
+                case ListItemAccessory::Kind::Value: {
+                    if (valueBuffer[0] != '\0') {
+                        canvas.drawStr(
+                            m_ui.getDisplayWidth() -
+                                canvas.getUTF8Width(valueBuffer) - 8,
+                            itemY,
+                            valueBuffer);
+                    }
+                    break;
+                }
+                case ListItemAccessory::Kind::None:
+                    break;
             }
         }
     }
 
     // Draw progress bar and cursor
-    u8g2.drawVLine(126, progress_bar_top, progress_bar_bottom);
+    canvas.rawDisplay().drawVLine(
+        m_ui.getDisplayWidth() - 2, progress_bar_top, progress_bar_bottom);
     drawCursor();
-}
-
-/**
- * @brief Get the visible item index on screen from screen coordinate.
- * @param screenIndex Index on screen.
- * @return Actual item index in the list.
- */
-int ListView::getVisibleItemIndex(int screenIndex) {
-    return topVisibleIndex_ + screenIndex;
 }
