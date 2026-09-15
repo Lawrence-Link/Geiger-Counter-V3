@@ -8,7 +8,6 @@ idf_component_register(
     "app_environment.cpp"
     "app_registry.cpp"
     "app_ui_utils/app_charging_animation.cpp"
-    "app_cube.cpp"
     "app_ui_utils/app_silly_cat.cpp"
     "racing_game.cpp"
     "app_game_pong.cpp"
@@ -19,13 +18,3 @@ idf_component_register(
 
     INCLUDE_DIRS "." "./app_counter"
     REQUIRES "PixelUI" "voltage_pid" "main" "time_module" "counter_task" "system_nvs_varibles" "led" "bme280" idf::app_update "esp_wifi" "esp_event" "esp_netif")
-
-# 防止静态注册被优化
-# target_compile_options(${COMPONENT_LIB} PRIVATE 
-#     -fno-function-sections 
-#     -fno-data-sections
-# )
-
-# target_link_options(${COMPONENT_LIB} PRIVATE 
-#     "LINKER:--no-gc-sections"
-# )

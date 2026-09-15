@@ -2,9 +2,12 @@
 
 #include "esp_event.h"
 #include "esp_netif.h"
+#include "esp_timer.h"
 
 #include <cstring>
 #include <etl/atomic.h>
+
+bool mutable_char_writer(char* src, const char* dst);
 
 namespace {
 
@@ -12,6 +15,7 @@ constexpr size_t kWifiListFirstSlot = 2U;
 constexpr size_t kWifiListSlotCount = 8U;
 constexpr size_t kSsidCapacity = 33U;
 constexpr size_t kPasswordCapacity = MAX_TEXT_LENGTH + 1U;
+constexpr int64_t kScanRetryDelayUs = 500000;
 bool wifi_initialized = false;
 bool wifi_infrastructure_initialized = false;
 bool wifi_started = false;
@@ -22,6 +26,12 @@ size_t selected_slot = kWifiListSlotCount;
 etl::atomic_bool connection_state_changed{false};
 etl::atomic_bool reconnect_requested{false};
 etl::atomic_bool suppress_next_reconnect{false};
+etl::atomic_bool scan_requested{false};
+etl::atomic_bool scan_in_progress{false};
+etl::atomic_bool scan_completed{false};
+ListItem* scan_target = nullptr;
+size_t scan_target_length = 0U;
+int64_t next_scan_attempt_us = 0;
 
 void clear_connected_slots() {
     for (bool& connected : connected_slots) {
@@ -54,6 +64,9 @@ void wifi_event_handler(void*, esp_event_base_t, int32_t event_id, void* event_d
             reconnect_requested.store(true, etl::memory_order_release);
         }
         connection_state_changed.store(true, etl::memory_order_release);
+    } else if (event_id == WIFI_EVENT_SCAN_DONE &&
+               scan_in_progress.exchange(false, etl::memory_order_acq_rel)) {
+        scan_completed.store(true, etl::memory_order_release);
     }
 }
 
@@ -171,6 +184,95 @@ void clear_wifi_list(ListItem* wifi_lists, size_t wifi_lists_length) {
     clear_connected_slots();
 }
 
+void apply_connected_accessories() {
+    if (scan_target == nullptr || scan_target_length <= kWifiListFirstSlot) {
+        return;
+    }
+
+    const size_t available_slots = scan_target_length - kWifiListFirstSlot;
+    const size_t slot_count = available_slots < kWifiListSlotCount
+        ? available_slots
+        : kWifiListSlotCount;
+    for (size_t i = 0; i < slot_count && scanned_ssids[i][0] != '\0'; ++i) {
+        scan_target[kWifiListFirstSlot + i].accessory =
+            ListItemAccessory::check(connected_slots[i]);
+    }
+}
+
+void populate_scan_results() {
+    if (scan_target == nullptr || scan_target_length <= kWifiListFirstSlot) {
+        esp_wifi_clear_ap_list();
+        return;
+    }
+
+    clear_wifi_list(scan_target, scan_target_length);
+
+    uint16_t ap_count = 0;
+    if (esp_wifi_scan_get_ap_num(&ap_count) != ESP_OK || ap_count == 0U) {
+        return;
+    }
+
+    const size_t available_slots = scan_target_length - kWifiListFirstSlot;
+    const size_t slot_count = available_slots < kWifiListSlotCount
+        ? available_slots
+        : kWifiListSlotCount;
+    const uint16_t record_capacity = ap_count < slot_count
+        ? ap_count
+        : static_cast<uint16_t>(slot_count);
+    wifi_ap_record_t records[kWifiListSlotCount]{};
+    uint16_t record_count = record_capacity;
+    if (esp_wifi_scan_get_ap_records(&record_count, records) != ESP_OK) {
+        ESP_LOGE("WiFi", "Failed to retrieve access points");
+        esp_wifi_clear_ap_list();
+        return;
+    }
+
+    size_t slot = 0;
+    for (uint16_t i = 0; i < record_count && slot < slot_count; ++i) {
+        if (records[i].ssid[0] == '\0') {
+            continue;
+        }
+        mutable_char_writer(
+            scan_target[kWifiListFirstSlot + slot].title,
+            reinterpret_cast<const char*>(records[i].ssid));
+        std::memcpy(scanned_ssids[slot], records[i].ssid, kSsidCapacity);
+        scanned_ssids[slot][kSsidCapacity - 1U] = '\0';
+        ++slot;
+    }
+
+    wifi_ap_record_t connected_ap{};
+    if (esp_wifi_sta_get_ap_info(&connected_ap) == ESP_OK) {
+        update_connected_slot(connected_ap.ssid,
+                              std::strlen(reinterpret_cast<const char*>(connected_ap.ssid)));
+    }
+
+    apply_connected_accessories();
+}
+
+void start_pending_scan() {
+    if (!scan_requested.load(etl::memory_order_acquire) ||
+        scan_in_progress.load(etl::memory_order_acquire) ||
+        esp_timer_get_time() < next_scan_attempt_us) {
+        return;
+    }
+
+    scan_requested.store(false, etl::memory_order_release);
+    scan_in_progress.store(true, etl::memory_order_release);
+    const esp_err_t error = esp_wifi_scan_start(nullptr, false);
+    if (error == ESP_OK) {
+        return;
+    }
+
+    scan_in_progress.store(false, etl::memory_order_release);
+    if (error == ESP_ERR_WIFI_STATE) {
+        next_scan_attempt_us = esp_timer_get_time() + kScanRetryDelayUs;
+        scan_requested.store(true, etl::memory_order_release);
+    } else {
+        ESP_LOGE("WiFi", "Failed to start access-point scan: %s",
+                 esp_err_to_name(error));
+    }
+}
+
 } // namespace
 
 bool wifi_assists_start_saved_network() {
@@ -198,24 +300,35 @@ bool wifi_assists_is_started() {
 }
 
 void wifi_assists_process(PixelUI& ui) {
+    start_pending_scan();
+
+    bool ui_dirty = false;
+    if (scan_completed.exchange(false, etl::memory_order_acq_rel)) {
+        populate_scan_results();
+        ui_dirty = true;
+    }
+
     if (reconnect_requested.exchange(false, etl::memory_order_acq_rel) &&
         wifi_started) {
         esp_wifi_connect();
     }
 
-    if (!connection_state_changed.exchange(false, etl::memory_order_acq_rel)) {
-        return;
+    if (connection_state_changed.exchange(false, etl::memory_order_acq_rel)) {
+        wifi_ap_record_t connected_ap{};
+        if (wifi_started && esp_wifi_sta_get_ap_info(&connected_ap) == ESP_OK) {
+            update_connected_slot(
+                connected_ap.ssid,
+                std::strlen(reinterpret_cast<const char*>(connected_ap.ssid)));
+        } else {
+            clear_connected_slots();
+        }
+        apply_connected_accessories();
+        ui_dirty = true;
     }
 
-    wifi_ap_record_t connected_ap{};
-    if (wifi_started && esp_wifi_sta_get_ap_info(&connected_ap) == ESP_OK) {
-        update_connected_slot(
-            connected_ap.ssid,
-            std::strlen(reinterpret_cast<const char*>(connected_ap.ssid)));
-    } else {
-        clear_connected_slots();
+    if (ui_dirty) {
+        ui.markDirty();
     }
-    ui.markDirty();
 }
 
 bool mutable_char_writer(char* src, const char* dst) {
@@ -241,9 +354,16 @@ void wifi_assists_update_status(bool wifi_enabled,
         return;
     }
 
-    clear_wifi_list(wifi_lists, wifi_lists_length);
+    scan_target = wifi_lists;
+    scan_target_length = wifi_lists_length;
 
     if (!wifi_enabled) {
+        clear_wifi_list(wifi_lists, wifi_lists_length);
+        scan_requested.store(false, etl::memory_order_release);
+        scan_in_progress.store(false, etl::memory_order_release);
+        scan_completed.store(false, etl::memory_order_release);
+        scan_target = nullptr;
+        scan_target_length = 0U;
         if (wifi_started) {
             wifi_started = false;
             reconnect_requested.store(false, etl::memory_order_release);
@@ -256,53 +376,8 @@ void wifi_assists_update_status(bool wifi_enabled,
         return;
     }
 
-    if (esp_wifi_scan_start(nullptr, true) != ESP_OK) {
-        ESP_LOGE("WiFi", "Failed to scan for access points");
-        return;
-    }
-
-    uint16_t ap_count = 0;
-    if (esp_wifi_scan_get_ap_num(&ap_count) != ESP_OK || ap_count == 0U) {
-        return;
-    }
-
-    const size_t slot_count = wifi_lists_length - kWifiListFirstSlot < kWifiListSlotCount
-        ? wifi_lists_length - kWifiListFirstSlot
-        : kWifiListSlotCount;
-    const uint16_t record_capacity = ap_count < slot_count
-        ? ap_count
-        : static_cast<uint16_t>(slot_count);
-    wifi_ap_record_t records[kWifiListSlotCount]{};
-    uint16_t record_count = record_capacity;
-    if (esp_wifi_scan_get_ap_records(&record_count, records) != ESP_OK) {
-        ESP_LOGE("WiFi", "Failed to retrieve access points");
-        esp_wifi_clear_ap_list();
-        return;
-    }
-
-    size_t slot = 0;
-    for (uint16_t i = 0; i < record_count && slot < slot_count; ++i) {
-        if (records[i].ssid[0] == '\0') {
-            continue;
-        }
-        mutable_char_writer(
-            wifi_lists[kWifiListFirstSlot + slot].title,
-            reinterpret_cast<const char*>(records[i].ssid));
-        std::memcpy(scanned_ssids[slot], records[i].ssid, kSsidCapacity);
-        scanned_ssids[slot][kSsidCapacity - 1U] = '\0';
-        ++slot;
-    }
-
-    wifi_ap_record_t connected_ap{};
-    if (esp_wifi_sta_get_ap_info(&connected_ap) == ESP_OK) {
-        update_connected_slot(connected_ap.ssid,
-                              std::strlen(reinterpret_cast<const char*>(connected_ap.ssid)));
-    }
-
-    for (size_t i = 0; i < slot; ++i) {
-        wifi_lists[kWifiListFirstSlot + i].accessory =
-            ListItemAccessory::check(connected_slots[i]);
-    }
+    next_scan_attempt_us = 0;
+    scan_requested.store(true, etl::memory_order_release);
 }
 
 void wifi_assists_select_network(PixelUI& ui, ListItem wifi_lists[],

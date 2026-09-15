@@ -68,12 +68,12 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     std::error_code ec;
     espp::Nvs nvs_driver;
     nvs_driver.init(ec);
-    if (!ec) {
-        wifi_assists_start_saved_network();
-    }
     // load setup from nvs
     auto& syscfg = SystemConf::getInstance();
     syscfg.load_conf_from_nvs();
+    if (!ec && syscfg.read_conf_enable_wifi()) {
+        wifi_assists_start_saved_network();
+    }
     u8g2.setContrast(syscfg.read_conf_brightness() * 51);
 
     bme280_start_reading();
@@ -81,7 +81,7 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     Tune& tune = Tune::getInstance();
 
     Tune::Melody startup = {
-        // {Notes::B5, 80},
+        {Notes::B5, 40},
         {Notes::REST, 80},
         // {Notes::B5, 80},
     };

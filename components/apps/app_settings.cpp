@@ -186,12 +186,10 @@ public:
     void onLoad() override {
         auto& syscfg = SystemConf::getInstance();
 
-        WiFi_enabled = wifi_assists_is_started();
-        if (WiFi_enabled) {
-            wifi_assists_update_status(true, sub_radio_wifi_cfg, 10);
-        }
-
         syscfg.load_conf_from_nvs();
+
+        WiFi_enabled = syscfg.read_conf_enable_wifi();
+        wifi_assists_update_status(WiFi_enabled, sub_radio_wifi_cfg, 10);
 
         brightness = syscfg.read_conf_brightness();
 
@@ -224,6 +222,7 @@ public:
         syscfg.set_conf_enable_geiger_click(en_sound_click);
         syscfg.set_conf_enable_navi_tone(en_sound_navigate);
         syscfg.set_conf_enable_interaction_tone(en_interaction_tone);
+        syscfg.set_conf_enable_wifi(WiFi_enabled);
 
         syscfg.set_conf_warn_threshold(cpm_warn_threshold);
         syscfg.set_conf_dngr_threshold(cpm_dngr_threshold);
@@ -244,6 +243,6 @@ AppItem settings_app{
 
     .factory = ApplicationFactory::makeCustom<APP_SETTINGS>(
         [](void* storage, PixelUI& ui, void*) -> IApplication* {
-            return ::new (storage) APP_SETTINGS(ui, itemList, 10);
+            return ::new (storage) APP_SETTINGS(ui, itemList, 11);
         }),
 };
