@@ -11,6 +11,12 @@
 #include "counter_task.h"
 #include "led.h"
 #include "system_nvs_varibles.h"
+#include "data_storage.h"
+#include "data_storage_core.h"
+#include "time_module.h"
+#include "i2c.h"
+#include <algorithm>
+#include <cmath>
 
 static const char *TAG = "counter_task";
 
@@ -39,11 +45,13 @@ static void counter_task(void *pvParameters)
     float smoothed_cpm = 0.0f;
     int last_raw_count = 0;
     int64_t last_sample_time = esp_timer_get_time(); 
+    int64_t last_storage_time = last_sample_time;
     
     uint32_t loop_count = 0;
     uint32_t accum_pulses_500ms = 0;
 
     ESP_LOGI(TAG, "Counter task started with precision timing.");
+    if (syscfg.read_conf_enable_storage()) data_storage_start_recording();
 
     while (true)
     {
@@ -98,6 +106,21 @@ static void counter_task(void *pvParameters)
             accum_pulses_500ms = 0;
             loop_count = 0;
             last_sample_time = now; 
+
+            if (syscfg.read_conf_enable_storage() && now - last_storage_time >= 1000000) {
+                last_storage_time = now;
+                struct tm rtc_time{};
+                bool rtc_valid = false;
+                if (pcf8563_get_time(pcf8563_dev, &rtc_time, &rtc_valid) == ESP_OK && rtc_valid) {
+                    const float raw_dose = smoothed_cpm *
+                        syscfg.read_conf_tube_convertion_coefficient();
+                    const float dose = std::isfinite(raw_dose)
+                        ? std::clamp(raw_dose, 0.0f, 10000.0f)
+                        : 0.0f;
+                    data_storage_enqueue(rtc_time, static_cast<int32_t>(std::lround(
+                        dose * DataStorageCore::kDoseScale)));
+                }
+            }
         }
     }
 }
@@ -158,6 +181,7 @@ bool start_counter_task(const counter_task_config_t* config)
 
 bool stop_counter_task(void) 
 {
+    data_storage_stop_recording();
     if (s_counter_task_handle) 
     {
         vTaskDelete(s_counter_task_handle);

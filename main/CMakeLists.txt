@@ -21,4 +21,5 @@ idf_component_register(
                     "system_nvs_varibles"
                     "nvs"
                     "tune"
+                    "data_storage"
                     )

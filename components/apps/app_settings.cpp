@@ -29,6 +29,7 @@
 #include <cstdio>
 #include <new>
 #include "app_settings_utils/wifi_assists/wifi_assists.h"
+#include "data_storage.h"
 
 static bool en_sound_click; // geiger click
 static bool en_sound_navigate; // sound navigate
@@ -37,6 +38,20 @@ static bool en_led = true;     // led
 static bool en_interaction_tone;
 
 static bool use_cpm;
+static bool storage_enabled;
+static char storage_capacity[24] = "--KB/--KB";
+
+static void refresh_storage_capacity() {
+    StorageStats stats;
+    if (!data_storage_get_stats(stats) || stats.totalBytes < stats.usedBytes) {
+        std::snprintf(storage_capacity, sizeof(storage_capacity), "--KB/--KB");
+        return;
+    }
+    const size_t freeKb = (stats.totalBytes - stats.usedBytes) / 1024U;
+    const size_t totalKb = stats.totalBytes / 1024U;
+    std::snprintf(storage_capacity, sizeof(storage_capacity), "%uKB/%uKB",
+                  static_cast<unsigned>(freeKb), static_cast<unsigned>(totalKb));
+}
 
 static float convertion_coefficient = 0.0f;
 static int32_t brightness = 0;
@@ -129,7 +144,25 @@ ListItem sub_radio_cfg[3] = {
     ListItem{.title = "- Bluetooth", .nextList = sub_radio_ble_cfg, .nextListLength = 10}
 };
 
-ListItem itemList[11] = {
+ListItem sub_storage_cfg[3] = {
+    ListItem(">>>>> 存储 <<<<<"),
+    ListItem{
+        .title = "- 启用存储",
+        .pFunc = []() {
+            if (storage_enabled && !data_storage_ready()) {
+                storage_enabled = false;
+                ui.showPopupInfo("存储初始化失败", "存储", 104, 32, 0);
+            } else if (!storage_enabled) {
+                data_storage_stop_recording();
+            }
+            refresh_storage_capacity();
+        },
+        .accessory = ListItemAccessory::toggle(storage_enabled),
+    },
+    ListItem{.title = "- 剩余/总计", .accessory = ListItemAccessory::text(storage_capacity)},
+};
+
+ListItem itemList[12] = {
     ListItem(">>>> 设置 <<<<"),
     ListItem{
         .title = "- 屏幕亮度",
@@ -174,6 +207,11 @@ ListItem itemList[11] = {
         .use_fade = true
     },
     ListItem{
+        .title = "- 存储",
+        .nextList = sub_storage_cfg,
+        .nextListLength = 3
+    },
+    ListItem{
         .title = "- LED指示",
         .accessory = ListItemAccessory::toggle(en_led)
     }
@@ -211,6 +249,8 @@ public:
         vkd = syscfg.read_conf_volt_pid_kd();
 
         use_cpm = syscfg.read_conf_use_cpm();
+        storage_enabled = syscfg.read_conf_enable_storage();
+        refresh_storage_capacity();
 
         sprintf(str_coeff, "%.6f", convertion_coefficient);
     }
@@ -223,6 +263,7 @@ public:
         syscfg.set_conf_enable_navi_tone(en_sound_navigate);
         syscfg.set_conf_enable_interaction_tone(en_interaction_tone);
         syscfg.set_conf_enable_wifi(WiFi_enabled);
+        syscfg.set_conf_enable_storage(storage_enabled);
 
         syscfg.set_conf_warn_threshold(cpm_warn_threshold);
         syscfg.set_conf_dngr_threshold(cpm_dngr_threshold);
@@ -243,6 +284,6 @@ AppItem settings_app{
 
     .factory = ApplicationFactory::makeCustom<APP_SETTINGS>(
         [](void* storage, PixelUI& ui, void*) -> IApplication* {
-            return ::new (storage) APP_SETTINGS(ui, itemList, 11);
+            return ::new (storage) APP_SETTINGS(ui, itemList, 12);
         }),
 };

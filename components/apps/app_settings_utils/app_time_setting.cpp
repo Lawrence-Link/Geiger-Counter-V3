@@ -1,127 +1,115 @@
 /*
  * Copyright (C) 2025 Lawrence Link
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include "core/app/IApplication.h"
 #include "PixelUI.h"
 #include "core/app/app_system.h"
-#include "core/coroutine/Coroutine.h"
-
-#include "focus/focus.h"
-
 #include "widgets/num_scroll/num_scroll.h"
-#include "widgets/analog_clock/analog_clock.h"
 #include "widgets/text_button/text_button.h"
 #include "widgets/label/label.h"
-
+#include "data_storage_core.h"
 #include "time_module.h"
 #include "i2c.h"
 
+#include <cstring>
+
 namespace {
-// NumericFormatter keeps a non-owning pointer to its format description.
 constexpr IntegerFormat kTwoDigitFormat{2U, nullptr};
+constexpr IntegerFormat kFourDigitFormat{4U, nullptr};
+
+int32_t weekdayForDate(int32_t year, int32_t month, int32_t day) {
+    static constexpr int32_t offsets[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+    if (month < 3) --year;
+    return (year + year / 4 - year / 100 + year / 400 +
+            offsets[month - 1] + day) % 7;
+}
 }
 
 class TimeSetting : public IApplication {
 private:
-    PixelUI& m_ui;
-    NumScroll num_h, num_m, num_s;
-    Clock clock;
-    TextButton button_sync;
-    Label title;
+    class FocusGroup : public IWidget {
+    public:
+        explicit FocusGroup(PixelUI& ui) : ui_(ui) { setFocusable(false); }
+        void onLoad() override {}
+        void onOffload() override {}
+    private:
+        PixelUI& ui_;
+        void drawSelf(const WidgetRenderContext&) override {}
+        Canvas& display() override { return ui_.getCanvas(); }
+    } focusGroup_;
+    PixelUI& ui_;
+    NumScroll year_;
+    NumScroll month_;
+    NumScroll day_;
+    NumScroll hour_;
+    NumScroll minute_;
+    NumScroll second_;
+    TextButton writeButton_;
+    Label title_;
+    tm adjusted_{};
+    bool rtcValid_ = false;
+    bool written_ = false;
+    int32_t dayMaximum_ = 0;
 
-    int32_t anim_title_bar = 0;
-    int32_t anim_title_x = -50;
-    int32_t anim_analog_clock_x = 103;
+    void updateDayRange() {
+        const int32_t maximum = DataStorageCore::daysInMonth(year_.getValue(), month_.getValue());
+        if (maximum == dayMaximum_) return;
+        dayMaximum_ = maximum;
+        day_.setRange(1, maximum);
+        if (day_.getValue() > maximum) day_.setValue(maximum);
+    }
 
-    struct tm timeinfo_adjust;
-    struct tm timeinfo_realtime;
-    bool tm_valid;
-
-    uint32_t timestamp_prev;
-    uint32_t timestamp_now;
-
-    enum {ADJUSTING, SET} state = ADJUSTING;
-
-    Coroutine coroutine_anim;
+    void writeRtc() {
+        updateDayRange();
+        adjusted_.tm_year = year_.getValue() - 1900;
+        adjusted_.tm_mon = month_.getValue() - 1;
+        adjusted_.tm_mday = day_.getValue();
+        adjusted_.tm_wday = weekdayForDate(year_.getValue(), month_.getValue(), day_.getValue());
+        adjusted_.tm_hour = hour_.getValue();
+        adjusted_.tm_min = minute_.getValue();
+        adjusted_.tm_sec = second_.getValue();
+        if (pcf8563_set_time(pcf8563_dev, &adjusted_) == ESP_OK) {
+            written_ = true;
+            writeButton_.setText("成功/返回");
+        } else {
+            ui_.showPopupInfo("RTC写入失败", "RTC", 82, 30, 2500);
+        }
+    }
 
 public:
-    TimeSetting(PixelUI& ui, void* param): m_ui(ui), 
-    num_h(ui, 1, 25, 24, 16), 
-    num_m(ui, 27, 25, 24, 16), 
-    num_s(ui, 53, 25, 24, 16), 
-    clock(ui, 103, 32, 20),
-    button_sync(ui, 1, 44, 76, 17),
-    title(ui, 3, 14, "RTC时间", POS::LEFT),
-    coroutine_anim(
-        [this] (CoroutineContext& ctx) {
-            CORO_BEGIN(ctx);
-                
-            CORO_DELAY(ctx,m_ui, 100, 1); // wait for renderer loading
-                clock.onLoad();
-                num_h.onLoad();
-            CORO_DELAY(ctx,m_ui, 100, 12);
-                title.onLoad();
-                num_m.onLoad();
-                m_ui.animate(anim_title_bar, 78, 700, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
-                m_ui.animate(anim_title_x, 3, 300, EasingType::EASE_IN_OUT_CUBIC, PROTECTION::PROTECTED);
-            CORO_DELAY(ctx, m_ui, 100, 123);
-                num_s.onLoad();
-            CORO_DELAY(ctx, m_ui, 100, 11);
-                button_sync.onLoad();
-            CORO_END(ctx);
-            }
-    ){};
+    TimeSetting(PixelUI& ui, void*)
+        : IApplication(false), focusGroup_(ui), ui_(ui),
+          year_(ui, 1, 20, 38, 15), month_(ui, 42, 20, 18, 15),
+          day_(ui, 63, 20, 18, 15), hour_(ui, 1, 38, 24, 15),
+          minute_(ui, 28, 38, 24, 15), second_(ui, 55, 38, 24, 15),
+          writeButton_(ui, 84, 38, 42, 15, "写入", PIXELUI_FONT_TEXT, 0, -1),
+          title_(ui, 3, 12, "RTC 日期和时间", POS::LEFT) {
+        focusGroup_.addChild(year_);
+        focusGroup_.addChild(month_);
+        focusGroup_.addChild(day_);
+        focusGroup_.addChild(hour_);
+        focusGroup_.addChild(minute_);
+        focusGroup_.addChild(second_);
+        focusGroup_.addChild(writeButton_);
+    }
 
     void draw() override {
-        U8G2& u8g2 = m_ui.getU8G2();
-        
-        timestamp_now = m_ui.getCurrentTime();
-        if (timestamp_now - timestamp_prev > 1000) {
-            timestamp_prev = timestamp_now;
-            pcf8563_get_time(pcf8563_dev, &timeinfo_realtime, &tm_valid);
-        }
-
-        u8g2.drawHLine(0, 19, anim_title_bar);
-        
-        u8g2.setFont(u8g2_font_5x7_tr);
-        char buf[10];
-        snprintf(buf, 10, "%02d:%02d:%02d", timeinfo_realtime.tm_hour, timeinfo_realtime.tm_min, timeinfo_realtime.tm_sec);
-        u8g2.drawStr(84, 62, buf);
-
-        switch (state) {        
-            case ADJUSTING:
-            clock.setHour(num_h.getValue());
-            clock.setMinute(num_m.getValue());
-            clock.setSecond(num_s.getValue());
-            break;
-            case SET:
-            clock.setHour(timeinfo_realtime.tm_hour);
-            clock.setMinute(timeinfo_realtime.tm_min);
-            clock.setSecond(timeinfo_realtime.tm_sec);
-            break;
-        }
-
-        num_h.draw();
-        num_m.draw();
-        num_s.draw();
-        clock.draw();
-        button_sync.draw();
-        title.draw();
-        
+        updateDayRange();
+        Canvas& canvas = ui_.getCanvas();
+        canvas.setFont(PIXELUI_FONT_TINY);
+        canvas.drawStr(84, 25, "Y-M-D");
+        canvas.drawStr(84, 33, "H:M:S");
+        canvas.drawHLine(0, 15, 128);
+        year_.draw();
+        month_.draw();
+        day_.draw();
+        hour_.draw();
+        minute_.draw();
+        second_.draw();
+        writeButton_.draw();
+        title_.draw();
     }
 
     bool handleInput(InputEvent event) override {
@@ -129,77 +117,71 @@ public:
             requestExit();
             return true;
         }
-        return true;
+        return false;
     }
-    
-    void onEnter(ExitCallback cb) override {
-        IApplication::onEnter(cb);
-        m_ui.setContinousDraw(true);
-        m_ui.markDirty(); 
 
-        num_h.setRange(0,23);
-        num_h.setValue(0);
-        num_h.setFormatter(NumericFormatter::integer(kTwoDigitFormat));
+    void onEnter(ExitCallback callback) override {
+        IApplication::onEnter(callback);
+        ui_.setContinousDraw(true);
+        written_ = false;
+        dayMaximum_ = 0;
+        writeButton_.setText("写入");
 
-        num_m.setRange(0,59);
-        num_m.setValue(0);
-        num_m.setFormatter(NumericFormatter::integer(kTwoDigitFormat));
+        year_.setRange(2000, 2099);
+        month_.setRange(1, 12);
+        day_.setRange(1, 31);
+        hour_.setRange(0, 23);
+        minute_.setRange(0, 59);
+        second_.setRange(0, 59);
+        year_.setFormatter(NumericFormatter::integer(kFourDigitFormat));
+        month_.setFormatter(NumericFormatter::integer(kTwoDigitFormat));
+        day_.setFormatter(NumericFormatter::integer(kTwoDigitFormat));
+        hour_.setFormatter(NumericFormatter::integer(kTwoDigitFormat));
+        minute_.setFormatter(NumericFormatter::integer(kTwoDigitFormat));
+        second_.setFormatter(NumericFormatter::integer(kTwoDigitFormat));
 
-        num_s.setRange(0,59);
-        num_s.setValue(0);
-        num_s.setFormatter(NumericFormatter::integer(kTwoDigitFormat));
+        std::memset(&adjusted_, 0, sizeof(adjusted_));
+        if (pcf8563_get_time(pcf8563_dev, &adjusted_, &rtcValid_) != ESP_OK || !rtcValid_) {
+            adjusted_.tm_year = 126;
+            adjusted_.tm_mon = 0;
+            adjusted_.tm_mday = 1;
+        }
+        year_.setValue(adjusted_.tm_year + 1900);
+        month_.setValue(adjusted_.tm_mon + 1);
+        day_.setValue(adjusted_.tm_mday);
+        hour_.setValue(adjusted_.tm_hour);
+        minute_.setValue(adjusted_.tm_min);
+        second_.setValue(adjusted_.tm_sec);
 
-        pcf8563_get_time(pcf8563_dev, &timeinfo_adjust, &tm_valid);
-        pcf8563_get_time(pcf8563_dev, &timeinfo_realtime, &tm_valid);
-
-        num_h.setValue(timeinfo_realtime.tm_hour);
-        num_m.setValue(timeinfo_realtime.tm_min);
-        num_s.setValue(timeinfo_realtime.tm_sec);
-
-        button_sync.setText("写入");
-        button_sync.setCallback([this](){
-            if (state == ADJUSTING) {
-                timeinfo_adjust.tm_hour = num_h.getValue();
-                timeinfo_adjust.tm_min = num_m.getValue();
-                timeinfo_adjust.tm_sec = num_s.getValue();
-                if (pcf8563_set_time(pcf8563_dev, &timeinfo_adjust) == ESP_OK) {
-                    button_sync.setText("成功");
-                    state = SET;
-                }
-            } else {
-                requestExit();
-            }
+        writeButton_.setCallback([this]() {
+            if (written_) requestExit();
+            else writeRtc();
         });
 
-        coroutine_anim.reset();
-        coroutine_anim.start();
+        title_.onLoad();
+        year_.onLoad();
+        month_.onLoad();
+        day_.onLoad();
+        hour_.onLoad();
+        minute_.onLoad();
+        second_.onLoad();
+        writeButton_.onLoad();
 
-        m_ui.addCoroutine(&coroutine_anim);
-
-        m_ui.addWidgetToFocusManager(&num_h);
-        m_ui.addWidgetToFocusManager(&num_m);
-        m_ui.addWidgetToFocusManager(&num_s);
-        m_ui.addWidgetToFocusManager(&button_sync);
-
-        timestamp_prev = timestamp_now = m_ui.getCurrentTime();
+        ui_.addWidgetToFocusManager(&focusGroup_);
+        ui_.markDirty();
     }
 
-    void onResume() override {
-        m_ui.setContinousDraw(true);
-    }
+    void onResume() override { ui_.setContinousDraw(true); }
 
     void onExit() override {
-        // cleanup the coroutine
-        m_ui.removeCoroutine(&coroutine_anim);
-        m_ui.clearAllAnimations();
-        m_ui.setContinousDraw(false);
-        m_ui.markFading();
+        ui_.clearAllAnimations();
+        ui_.setContinousDraw(false);
+        ui_.markFading();
     }
 };
 
 AppItem time_setting_app{
     .title = nullptr,
     .bitmap = nullptr,
-    
     .factory = ApplicationFactory::make<TimeSetting>(),
 };

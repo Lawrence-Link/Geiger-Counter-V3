@@ -16,9 +16,9 @@ void registerApps() {
     app_man.registerApp(counter_app);
     app_man.registerApp(settings_app);
     app_man.registerApp(app_environment);
+    app_man.registerApp(storyboard_app);
     app_man.registerApp(racing_game_app);
     app_man.registerApp(game_pong_app);
     app_man.registerApp(pixel_clock_app);
     app_man.registerApp(about_app);
-    app_man.registerApp(storyboard_app);
 }

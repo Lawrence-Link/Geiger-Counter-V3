@@ -35,6 +35,7 @@ void SystemConf::load_conf_from_nvs() {
     LOAD_OR_SET("navi_tone", navi_tone_status);
     LOAD_OR_SET("intr_tone", en_interaction_tone);
     LOAD_OR_SET("wifi", wifi_status);
+    LOAD_OR_SET("storage", storage_status);
     LOAD_OR_SET("hs_car_", highscore_car_dodge);
     LOAD_OR_SET("use_cpm", use_cpm);
     LOAD_OR_SET("bright", brightness);
@@ -66,6 +67,7 @@ void SystemConf::save_conf_to_nvs() {
     storage.set("navi_tone", navi_tone_status, ec);
     storage.set("intr_tone", en_interaction_tone, ec);
     storage.set("wifi", wifi_status, ec);
+    storage.set("storage", storage_status, ec);
     storage.set("hs_car_", highscore_car_dodge, ec);
     storage.set("use_cpm", use_cpm, ec);
     storage.set("bright", brightness, ec);

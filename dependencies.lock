@@ -123,6 +123,16 @@ dependencies:
     source:
       type: idf
     version: 6.1.0
+  joltwallet/littlefs:
+    component_hash: 3af20a3d75c49db9dc2286fd50862c34055c9f578419ad1f2bf7ed3ed01391fe
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.22.3
   supcik/buzzer:
     component_hash: 8fc191ab2efe6526905b597c30aa3bf21e2de54152044197fd00b2dcbf54e4a4
     dependencies:
@@ -139,7 +149,8 @@ direct_dependencies:
 - espp/adc
 - espp/nvs
 - idf
+- joltwallet/littlefs
 - supcik/buzzer
-manifest_hash: 21e4ae8f33adb9aa6815b1ace5fb8de105c06c001121c9a2d92263047742b662
+manifest_hash: 35ce291969e9a9ebd447b94826fe57d6ed3981709f2aae5841f356ccc26083a1
 target: esp32c6
 version: 3.0.0

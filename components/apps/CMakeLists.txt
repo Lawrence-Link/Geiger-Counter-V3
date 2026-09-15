@@ -18,4 +18,6 @@ idf_component_register(
     "app_storyboard.cpp"
 
     INCLUDE_DIRS "." "./app_counter"
-    REQUIRES "PixelUI" "voltage_pid" "main" "time_module" "counter_task" "system_nvs_varibles" "led" "bme280" idf::app_update "esp_wifi" "esp_event" "esp_netif")
+    REQUIRES "PixelUI" "voltage_pid" "main" "time_module" "counter_task"
+             "system_nvs_varibles" "data_storage" "led" "bme280"
+             idf::app_update "esp_wifi" "esp_event" "esp_netif")

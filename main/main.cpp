@@ -27,6 +27,7 @@
 #include "tune.h"
 #include "boot_bmp.h"
 #include "app_settings_utils/wifi_assists/wifi_assists.h"
+#include "data_storage.h"
 
 // Global variables
 U8G2 u8g2;
@@ -71,6 +72,12 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
     // load setup from nvs
     auto& syscfg = SystemConf::getInstance();
     syscfg.load_conf_from_nvs();
+    data_storage_init();
+    if (!syscfg.read_conf_enable_storage()) {
+        // Initialization is attempted eagerly so Settings can show capacity.
+        // A disabled feature should remain quiet if its partition is absent.
+        (void)data_storage_take_event();
+    }
     if (!ec && syscfg.read_conf_enable_wifi()) {
         wifi_assists_start_saved_network();
     }
@@ -252,6 +259,17 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
         }
 
         wifi_assists_process(ui);
+        const StorageEvent storageEvent = data_storage_take_event();
+        if (storageEvent != StorageEvent::None) {
+            data_storage_stop_recording();
+            syscfg.set_conf_enable_storage(false);
+            syscfg.save_conf_to_nvs();
+            if (storageEvent == StorageEvent::Full) {
+                ui.showPopupInfo("存储空间已满，记录已停止", "存储", 104, 32, 0);
+            } else {
+                ui.showPopupInfo("写入失败，记录已停止", "存储", 104, 32, 0);
+            }
+        }
         ui.renderer();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
