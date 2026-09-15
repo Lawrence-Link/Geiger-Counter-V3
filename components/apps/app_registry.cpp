@@ -9,6 +9,7 @@ extern AppItem game_pong_app;
 extern AppItem about_app;
 extern AppItem pixel_clock_app;
 extern AppItem keyboard_test_app;
+extern AppItem storyboard_app;
 
 void registerApps() {
     auto& app_man = AppManager::getInstance();
@@ -19,4 +20,5 @@ void registerApps() {
     app_man.registerApp(game_pong_app);
     app_man.registerApp(pixel_clock_app);
     app_man.registerApp(about_app);
+    app_man.registerApp(storyboard_app);
 }

@@ -39,6 +39,7 @@ private:
 
     const char* src = nullptr;                 // Button text
     const uint8_t* m_font = PIXELUI_FONT_TEXT;
+    int16_t m_textOffsetX = 0, m_textOffsetY = 0;
     // Animation values
     int32_t anim_w = 0, anim_h = 0;           // Animated width/height
     int32_t anim_x = 0, anim_y = 0;           // Animated position
@@ -50,14 +51,17 @@ private:
 
 public:
 /** @brief TextButton. */
-    TextButton(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h, char const* text = "")
-        : TextButton(ui, x, y, w, h, text, PIXELUI_FONT_TEXT)
+    TextButton(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+               char const* text = "", int16_t textOffsetX = 0, int16_t textOffsetY = 0)
+        : TextButton(ui, x, y, w, h, text, PIXELUI_FONT_TEXT, textOffsetX, textOffsetY)
     {
     }
 /** @brief TextButton. */
     TextButton(PixelUI& ui, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
-               char const* text, const uint8_t* font)
-        : m_ui(ui), m_x(x), m_y(y), m_w(w), m_h(h), src(text), m_font(font)
+               char const* text, const uint8_t* font,
+               int16_t textOffsetX = 0, int16_t textOffsetY = 0)
+        : m_ui(ui), m_x(x), m_y(y), m_w(w), m_h(h), src(text), m_font(font),
+          m_textOffsetX(textOffsetX), m_textOffsetY(textOffsetY)
     {
         setFocusable(true);
         setFocusInsets({1, 1, 1, 1});
@@ -94,4 +98,10 @@ public:
     }
 /** @brief setText. */
     void setText(const char* text) { src = text; }
+/** @brief setText. */
+    void setText(const char* text, int16_t textOffsetX, int16_t textOffsetY) {
+        src = text;
+        m_textOffsetX = textOffsetX;
+        m_textOffsetY = textOffsetY;
+    }
 };

@@ -109,7 +109,9 @@ void TextButton::drawSelf(const WidgetRenderContext& context) {
     int32_t text_y = draw_y + (anim_h - font_height) / 2 + font_ascent;
 
     // Draw the button text
-    u8g2.drawUTF8(text_x, text_y + 2, (const char*)src);
+    u8g2.drawUTF8(text_x + m_textOffsetX,
+                  text_y + 2 + m_textOffsetY,
+                  (const char*)src);
 
     // Reset clip window
     restoreClipWindow(context);

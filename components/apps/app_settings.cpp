@@ -69,14 +69,14 @@ ListItem sub_Alarm[5] = {
     ListItem(">>> 剂量警告 <<<"),
     ListItem{.title = "- 启用", .accessory = ListItemAccessory::toggle(en_sos)},
     ListItem{.title = "- 警告阈值(CPM)",
-            .pFunc = [](){ ui.showPopupValueDigits(cpm_warn_threshold, 4, "警告CPM", 100, 40, 3000); },
+            .pFunc = [](){ ui.showPopupValueDigits(cpm_warn_threshold, 4, "警告CPM", 100, 56, 3000); },
             .accessory = ListItemAccessory::value(PixelUIValue::Binding::integer(cpm_warn_threshold))},
     ListItem{
         .title = "- 危险阈值(CPM)",
-        .pFunc = [](){ ui.showPopupValueDigits(cpm_dngr_threshold, 4, "危险CPM", 100, 40, 3000); },
+        .pFunc = [](){ ui.showPopupValueDigits(cpm_dngr_threshold, 4, "危险CPM", 100, 56, 3000); },
         .accessory = ListItemAccessory::value(PixelUIValue::Binding::integer(cpm_dngr_threshold))},
     ListItem{.title = "- 灾难阈值(CPM)",
-        .pFunc = [](){ ui.showPopupValueDigits(cpm_hzdr_threshold, 4, "灾难CPM", 100, 40, 3000); },
+        .pFunc = [](){ ui.showPopupValueDigits(cpm_hzdr_threshold, 4, "灾难CPM", 100, 56, 3000); },
         .accessory = ListItemAccessory::value(PixelUIValue::Binding::integer(cpm_hzdr_threshold))}
 };
 

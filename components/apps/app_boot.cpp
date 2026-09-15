@@ -63,8 +63,6 @@ public:
         m_ui.setContinousDraw(true);
         m_ui.markDirty(); 
 
-        product_name.onLoad();
-
         coroutine_anim.reset();
         coroutine_anim.start();
         // register coroutine

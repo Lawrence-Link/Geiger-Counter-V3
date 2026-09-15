@@ -26,7 +26,7 @@
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32c6"
   },
-  "clangd.path": "/home/lawrence/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
+  "clangd.path": "/opt/homebrew/opt/llvm/bin/clangd",
   "clangd.arguments": [
     "--background-index",
     "--query-driver=/home/lawrence/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32-elf-gcc",

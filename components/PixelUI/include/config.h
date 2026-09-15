@@ -61,7 +61,7 @@
 /* Fixed-capacity storage. All memory is reserved statically. */
 #define PIXELUI_MAX_ANIMATION_COUNT             35
 #define PIXELUI_MAX_TEXT_LENGTH                 30
-#define PIXELUI_MAX_APP_NUM                     11
+#define PIXELUI_MAX_APP_NUM                     12
 #define PIXELUI_MAX_VIEW_DEPTH                   8
 #define PIXELUI_APPLICATION_ARENA_SIZE        4096
 #define PIXELUI_APPLICATION_ARENA_MAX_ALIGNMENT 64
