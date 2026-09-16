@@ -24,6 +24,7 @@
 #include "time_module.h"
 #include "i2c.h"
 #include "system_nvs_varibles.h"
+#include <cstdio>
 
 // External variable from battery_task
 extern int battery_percentage;
@@ -79,8 +80,8 @@ private:
     bool isInitialized = false;
     
     // Time data from RTC
-    struct tm timeinfo;
-    bool tm_valid;
+    struct tm timeinfo{};
+    bool tm_valid = false;
     
     // Animation parameters
     static constexpr uint32_t DIGIT_ANIM_DURATION = 200; // milliseconds
@@ -90,7 +91,77 @@ private:
     // Battery icon state
     uint32_t last_battery_update = 0;
     const unsigned char* current_battery_icon = image_BAT_FULL_bits;
-    char print_buffer[16];
+    char print_buffer[32];
+
+    static constexpr int16_t HEADER_BASELINE_Y = 8;
+    static constexpr int16_t HEADER_DIVIDER_Y = 11;
+    static constexpr int16_t TIME_BASELINE_Y = 52;
+    static constexpr int16_t SECONDS_BASELINE_Y = 49;
+    static constexpr int16_t PROGRESS_X = 2;
+    static constexpr int16_t PROGRESS_Y = 59;
+    static constexpr int16_t PROGRESS_WIDTH = 124;
+
+    static const char* weekdayName(int weekday) {
+        static constexpr const char* WEEKDAYS[] = {
+            "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"
+        };
+        return weekday >= 0 && weekday < 7 ? WEEKDAYS[weekday] : "---";
+    }
+
+    void updateBatteryIcon() {
+        // Pick the icon whose nominal charge level is nearest to the reading.
+        if (battery_percentage >= 88) {
+            current_battery_icon = image_BAT_FULL_bits;
+        } else if (battery_percentage >= 63) {
+            current_battery_icon = image_BAT_75_bits;
+        } else if (battery_percentage >= 38) {
+            current_battery_icon = image_BAT_50_bits;
+        } else if (battery_percentage >= 13) {
+            current_battery_icon = image_BAT_25_bits;
+        } else {
+            current_battery_icon = image_BAT_empty_bits;
+        }
+    }
+
+    void drawHeader(U8G2& u8g2) {
+        u8g2.setFont(u8g2_font_5x7_mf);
+
+        if (tm_valid) {
+            std::snprintf(print_buffer, sizeof(print_buffer), "%s %02d/%02d",
+                          weekdayName(timeinfo.tm_wday),
+                          timeinfo.tm_mon + 1,
+                          timeinfo.tm_mday);
+        } else {
+            std::snprintf(print_buffer, sizeof(print_buffer), "RTC --/--");
+        }
+        u8g2.drawStr(2, HEADER_BASELINE_Y, print_buffer);
+
+        int battery = battery_percentage;
+        if (battery < 0) battery = 0;
+        if (battery > 100) battery = 100;
+        std::snprintf(print_buffer, sizeof(print_buffer), "%d%%", battery);
+        const int16_t textWidth = u8g2.getStrWidth(print_buffer);
+        const int16_t textX = u8g2.getDisplayWidth() - 2 - textWidth;
+        u8g2.drawXBM(textX - 12, 2, 10, 6, current_battery_icon);
+        u8g2.drawStr(textX, HEADER_BASELINE_Y, print_buffer);
+
+        u8g2.drawHLine(2, HEADER_DIVIDER_Y, u8g2.getDisplayWidth() - 4);
+    }
+
+    void drawSecondProgress(U8G2& u8g2) {
+        const int second = tm_valid
+            ? secondTens.currentValue * 10 + secondOnes.currentValue
+            : 0;
+        const int16_t innerWidth = PROGRESS_WIDTH - 4;
+        const int16_t filledWidth = tm_valid
+            ? static_cast<int16_t>((innerWidth * (second + 1)) / 60)
+            : 0;
+
+        u8g2.drawFrame(PROGRESS_X, PROGRESS_Y, PROGRESS_WIDTH, 4);
+        if (filledWidth > 0) {
+            u8g2.drawBox(PROGRESS_X + 2, PROGRESS_Y + 1, filledWidth, 2);
+        }
+    }
 public:
     APP_PIXEL_CLOCK(PixelUI& ui, void* param) : m_ui(ui) {
         resetDigitState(hourTens);
@@ -146,7 +217,11 @@ public:
      */
     void syncWithRTCTime() {
         // Read time from PCF8563 RTC
-        pcf8563_get_time(pcf8563_dev, &timeinfo, &tm_valid);
+        tm_valid = false;
+        const esp_err_t result = pcf8563_get_time(pcf8563_dev, &timeinfo, &tm_valid);
+        if (result != ESP_OK) {
+            tm_valid = false;
+        }
         
         if (tm_valid) {
             int hour = timeinfo.tm_hour;
@@ -162,6 +237,8 @@ public:
             secondOnes.currentValue = second % 10;
             
             isInitialized = true;
+        } else {
+            isInitialized = false;
         }
     }
     
@@ -289,51 +366,28 @@ public:
     void draw() override {
         U8G2& u8g2 = m_ui.getU8G2();
         
-        if (isInitialized) {
-            timestamp_now = m_ui.getCurrentTime();
-            
-            // Sync with RTC every 60 seconds to prevent drift
-            if (timestamp_now - lastSyncTime >= SYNC_INTERVAL) {
-                syncWithRTCTime();
-                lastSyncTime = timestamp_now;
-                timestamp_prev = timestamp_now; // Reset tick timer after sync
-            }
-            // Tick every second (event-driven)
-            else if (timestamp_now - timestamp_prev >= TICK_INTERVAL) {
-                incrementSecond();
-                timestamp_prev = timestamp_now;
-            }
-            
-            // Update battery icon every second
-            if (timestamp_now - last_battery_update >= 1000) {
-                last_battery_update = timestamp_now;
-                if (battery_percentage >= 75) {
-                    current_battery_icon = image_BAT_FULL_bits;
-                } else if (battery_percentage >= 50) {
-                    current_battery_icon = image_BAT_75_bits;
-                } else if (battery_percentage >= 25) {
-                    current_battery_icon = image_BAT_50_bits;
-                } else if (battery_percentage > 0) {
-                    current_battery_icon = image_BAT_25_bits;
-                } else {
-                    current_battery_icon = image_BAT_empty_bits;
-                }
-            }
+        timestamp_now = m_ui.getCurrentTime();
+
+        // Retry an invalid RTC as well as periodically correcting normal drift.
+        if (timestamp_now - lastSyncTime >= SYNC_INTERVAL) {
+            syncWithRTCTime();
+            lastSyncTime = timestamp_now;
+            timestamp_prev = timestamp_now;
+        } else if (isInitialized && timestamp_now - timestamp_prev >= TICK_INTERVAL) {
+            incrementSecond();
+            timestamp_prev = timestamp_now;
         }
-        
-        // Position: bottom-right area
-        // Screen is 128x64
-        // Large font: ~20 pixels wide, ~26 pixels tall
-        // Small font: ~10 pixels wide, ~12 pixels tall
-        
-        int16_t baseY = u8g2.getDisplayHeight() - 4; // Near bottom
-        int16_t secondBaseY = baseY;
-        
-        // Calculate positions from right to left
-        // Seconds are at the rightmost position
-        int16_t secondX = u8g2.getDisplayWidth() - 22; // Leave some margin from right edge
-        int16_t minuteX = secondX - 42; // Before seconds
-        int16_t hourX = minuteX - 42;   // Before minutes
+
+        if (timestamp_now - last_battery_update >= 1000) {
+            last_battery_update = timestamp_now;
+            updateBatteryIcon();
+        }
+
+        drawHeader(u8g2);
+
+        constexpr int16_t hourX = 6;
+        constexpr int16_t minuteX = 58;
+        constexpr int16_t secondX = 107;
         
         // Font dimensions for clipping
         int16_t largeDigitWidth = 20;
@@ -341,27 +395,33 @@ public:
         int16_t smallDigitWidth = 10;
         int16_t smallDigitHeight = 12;
         
-        // Draw battery icon in top-left corner
-        u8g2.drawXBM(2, 2, 10, 6, current_battery_icon);
-        u8g2.setFont(u8g2_font_5x7_mf);
-        sprintf(print_buffer, "%d%%", battery_percentage);
-        u8g2.drawStr(14, 8, print_buffer);
-        
-        // Draw hours (large font)
-        drawScrollingDigit(hourX, baseY, hourTens, true, largeDigitWidth, largeDigitHeight);
-        drawScrollingDigit(hourX + 20, baseY, hourOnes, true, largeDigitWidth, largeDigitHeight);
-        
-        // Draw colon separator between hours and minutes
-        u8g2.setFont(u8g2_font_freedoomr25_tn);
-        u8g2.drawStr(hourX + 40, baseY, ":");
-        
-        // Draw minutes (large font)
-        drawScrollingDigit(minuteX, baseY, minuteTens, true, largeDigitWidth, largeDigitHeight);
-        drawScrollingDigit(minuteX + 20, baseY, minuteOnes, true, largeDigitWidth, largeDigitHeight);
-        
-        // Draw seconds (small font)
-        drawScrollingDigit(secondX, secondBaseY, secondTens, false, smallDigitWidth, smallDigitHeight);
-        drawScrollingDigit(secondX + 10, secondBaseY, secondOnes, false, smallDigitWidth, smallDigitHeight);
+        if (isInitialized) {
+            // Draw hours and minutes as the dominant information layer.
+            drawScrollingDigit(hourX, TIME_BASELINE_Y, hourTens, true, largeDigitWidth, largeDigitHeight);
+            drawScrollingDigit(hourX + 20, TIME_BASELINE_Y, hourOnes, true, largeDigitWidth, largeDigitHeight);
+
+            // The separator pulses once per second like a quiet clock heartbeat.
+            if ((secondOnes.currentValue & 1) == 0) {
+                u8g2.setFont(u8g2_font_freedoomr25_tn);
+                u8g2.drawStr(43, TIME_BASELINE_Y, ":");
+            }
+
+            drawScrollingDigit(minuteX, TIME_BASELINE_Y, minuteTens, true, largeDigitWidth, largeDigitHeight);
+            drawScrollingDigit(minuteX + 20, TIME_BASELINE_Y, minuteOnes, true, largeDigitWidth, largeDigitHeight);
+
+            // Seconds remain readable, but no longer compete with HH:MM.
+            drawScrollingDigit(secondX, SECONDS_BASELINE_Y, secondTens, false, smallDigitWidth, smallDigitHeight);
+            drawScrollingDigit(secondX + 10, SECONDS_BASELINE_Y, secondOnes, false, smallDigitWidth, smallDigitHeight);
+        } else {
+            u8g2.setFont(u8g2_font_maniac_tf);
+            u8g2.drawStr(17, TIME_BASELINE_Y, "--");
+            u8g2.setFont(u8g2_font_freedoomr25_tn);
+            u8g2.drawStr(48, TIME_BASELINE_Y, ":");
+            u8g2.setFont(u8g2_font_maniac_tf);
+            u8g2.drawStr(65, TIME_BASELINE_Y, "--");
+        }
+
+        drawSecondProgress(u8g2);
     }
     
     bool handleInput(InputEvent event) override {
