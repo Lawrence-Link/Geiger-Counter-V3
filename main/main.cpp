@@ -87,6 +87,17 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
 
     Tune& tune = Tune::getInstance();
 
+    Tune::Melody first_boot = {
+        {Notes::C5, 40},
+        {Notes::REST, 80},
+        {Notes::D5, 40},
+        {Notes::REST, 80},
+        {Notes::F5, 40},
+        {Notes::REST, 80},
+        {Notes::A5, 80},
+        {Notes::REST, 80},
+    };
+
     Tune::Melody startup = {
         {Notes::B5, 40},
         {Notes::REST, 80},
@@ -187,7 +198,9 @@ extern "C" void app_main(void) // mainly reserved for ui rendering
         {Notes::B5, 52}        // 8b5
     };
 
-    if (syscfg.read_conf_enable_interaction_tone()) tune.playMelody(startup);
+    if (SystemConf::getInstance().read_conf_first_boot()) {
+        tune.playMelody(first_boot);
+    } else if (syscfg.read_conf_enable_interaction_tone()) tune.playMelody(startup);
 
     startBatteryTask();
     

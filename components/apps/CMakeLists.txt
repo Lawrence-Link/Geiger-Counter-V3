@@ -2,6 +2,8 @@ idf_component_register(
     SRCS
     "app_pixel_clock.cpp"
     "app_about.cpp"
+    "app_first_boot.cpp"
+    "app_ui_utils/hello_animation.cpp"
     "app_boot.cpp"
     "app_settings_utils/app_time_setting.cpp"
     "app_settings.cpp"

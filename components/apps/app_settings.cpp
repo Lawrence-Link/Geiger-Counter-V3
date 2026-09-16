@@ -23,6 +23,8 @@
 #include "ui/ListView/ListView.h"
 #include "system_nvs_varibles.h"
 #include "esp_log.h"
+#include "esp_system.h"
+#include "nvs_flash.h"
 #include "voltage_pid.hpp"
 #include "esp_wifi.h"
 #include "core/ValueBinding.h"
@@ -162,7 +164,23 @@ ListItem sub_storage_cfg[3] = {
     ListItem{.title = "- 剩余/总计", .accessory = ListItemAccessory::text(storage_capacity)},
 };
 
-ListItem itemList[12] = {
+static void factory_reset() {
+    const esp_err_t result = nvs_flash_erase();
+    if (result != ESP_OK) {
+        ESP_LOGE("Settings", "Factory reset failed: %s", esp_err_to_name(result));
+        ui.showPopupInfo("重置失败", "重置", 82, 30, 2500);
+        return;
+    }
+
+    esp_restart();
+}
+
+ListItem sub_reset_cfg[2] = {
+    ListItem(">>> 确认重置 <<<"),
+    ListItem{.title = "- 确认并重启", .pFunc = factory_reset},
+};
+
+ListItem itemList[13] = {
     ListItem(">>>> 设置 <<<<"),
     ListItem{
         .title = "- 屏幕亮度",
@@ -214,6 +232,11 @@ ListItem itemList[12] = {
     ListItem{
         .title = "- LED指示",
         .accessory = ListItemAccessory::toggle(en_led)
+    },
+    ListItem{
+        .title = "- 恢复出厂设置",
+        .nextList = sub_reset_cfg,
+        .nextListLength = 2
     }
 };
 
@@ -284,6 +307,6 @@ AppItem settings_app{
 
     .factory = ApplicationFactory::makeCustom<APP_SETTINGS>(
         [](void* storage, PixelUI& ui, void*) -> IApplication* {
-            return ::new (storage) APP_SETTINGS(ui, itemList, 12);
+            return ::new (storage) APP_SETTINGS(ui, itemList, 13);
         }),
 };

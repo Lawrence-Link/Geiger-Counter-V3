@@ -42,6 +42,7 @@ public:
     bool read_conf_enable_interaction_tone() const { return en_interaction_tone; }
     bool read_conf_enable_wifi() const { return wifi_status; }
     bool read_conf_enable_storage() const { return storage_status; }
+    bool read_conf_first_boot() const { return first_boot; }
     bool read_conf_use_cpm() const { return use_cpm; }
     uint8_t read_conf_brightness() const { return brightness; }
     int32_t read_conf_warn_threshold() const { return cpm_warn_threshold; }
@@ -63,6 +64,7 @@ public:
     void set_conf_enable_interaction_tone(bool value) { en_interaction_tone = value; }
     void set_conf_enable_wifi(bool value) { wifi_status = value; }
     void set_conf_enable_storage(bool value) { storage_status = value; }
+    void set_conf_first_boot(bool value) { first_boot = value; }
     void set_conf_use_cpm(bool value) { use_cpm = value; }
     void set_conf_brightness(uint8_t value) { brightness = value; }
     void set_conf_warn_threshold(uint16_t value) { cpm_warn_threshold = value; }
@@ -80,6 +82,7 @@ private:
     bool en_interaction_tone = true;
     bool wifi_status = false;
     bool storage_status = false;
+    bool first_boot = true;
     bool use_cpm = false;
     uint8_t brightness = 5;
     float tube_convertion_coefficient = 0.00662f;

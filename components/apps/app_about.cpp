@@ -41,7 +41,7 @@ static const uint8_t pixelui_logo_bits[] U8X8_PROGMEM = {
 };
 
 namespace {
-constexpr uint32_t kNetworkRefreshMs = 1000U;
+constexpr uint32_t kNetworkRefreshMs = 10000U;
 }
 
 class About : public IApplication {
