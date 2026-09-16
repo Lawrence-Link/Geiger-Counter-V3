@@ -1,96 +1,98 @@
 /*
  * Copyright (C) 2025 Lawrence Link
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <memory>
-#include <cmath>
-
-#include "esp_app_desc.h"
 #include "PixelUI.h"
-#include "U8g2lib.h"
 #include "core/app/IApplication.h"
 #include "core/app/app_system.h"
-#include "core/coroutine/Coroutine.h"
-#include "widgets/label/label.h"
-#include "blink/BlinkState.h"
+
+#include "esp_app_desc.h"
+#include "esp_netif.h"
+#include "esp_wifi.h"
+
+#include <cstdio>
 
 __attribute__((aligned(4)))
-static const unsigned char image_about_bits[] U8X8_PROGMEM = {0xf0,0xff,0x0f,0xfc,0xff,0x3f,0xfe,0xff,0x7f,0xfe,0xff,0x77,0xff,0xc3,0xef,0xff,0x81,0xff,0xff,0x1c,0xff,0xff,0x3e,0xff,0xff,0x3f,0xff,0xff,0x3f,0xff,0xff,0x1f,0xff,0xff,0x9f,0xff,0xff,0x8f,0xff,0xff,0xc7,0xff,0xff,0xe7,0xff,0xff,0xe7,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xef,0xe7,0xff,0xdf,0xe7,0xff,0xfe,0xff,0x7f,0xfe,0xff,0x7f,0xfc,0xff,0x3f,0xf0,0xff,0x0f};
+static const unsigned char image_about_bits[] U8X8_PROGMEM = {
+    0xf0,0xff,0x0f,0xfc,0xff,0x3f,0xfe,0xff,0x7f,0xfe,0xff,0x77,
+    0xff,0xc3,0xef,0xff,0x81,0xff,0xff,0x1c,0xff,0xff,0x3e,0xff,
+    0xff,0x3f,0xff,0xff,0x3f,0xff,0xff,0x1f,0xff,0xff,0x9f,0xff,
+    0xff,0x8f,0xff,0xff,0xc7,0xff,0xff,0xe7,0xff,0xff,0xe7,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xef,0xe7,0xff,0xdf,0xe7,0xff,
+    0xfe,0xff,0x7f,0xfe,0xff,0x7f,0xfc,0xff,0x3f,0xf0,0xff,0x0f
+};
+
+__attribute__((aligned(4)))
+static const uint8_t pixelui_logo_bits[] U8X8_PROGMEM = {
+    0xfc,0xff,0xff,0x03,0xfe,0xff,0xff,0x07,0xff,0xff,0xff,0x0f,
+    0xff,0xff,0xff,0x0f,0xff,0xff,0xff,0x0f,0xff,0x00,0xf0,0x0f,
+    0x7f,0x00,0xe0,0x0f,0x7f,0x00,0xe7,0x0f,0x7f,0x00,0xe7,0x0f,
+    0x7f,0x00,0xe7,0x0f,0x7f,0x00,0xe0,0x0f,0x7f,0x00,0xe0,0x0f,
+    0xff,0x00,0xf0,0x0f,0x7f,0xe0,0xff,0x0f,0x7f,0xe0,0xff,0x0f,
+    0x7f,0xe0,0xff,0x0f,0x7f,0xe0,0xff,0x0f,0x7f,0xe0,0xff,0x0f,
+    0x7f,0xe0,0xff,0x0f,0x7f,0xe0,0xff,0x0f,0x7f,0xe0,0xff,0x0f,
+    0x7f,0xe0,0xff,0x0f,0x7f,0xe0,0xff,0x0f,0xff,0xff,0xff,0x0f,
+    0xff,0xff,0xff,0x0f,0xff,0xff,0xff,0x0f,0xfe,0xff,0xff,0x07,
+    0xfc,0xff,0xff,0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0xf8,0xff,0xff,0x01,0xf8,0xff,0xff,0x01,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0xf8,0xff,0x03,0x00,0xf8,0xff,0x03,0x00
+};
+
+namespace {
+constexpr uint32_t kNetworkRefreshMs = 1000U;
+}
 
 class About : public IApplication {
 private:
-    PixelUI& m_ui;
-    BlinkState bl;
-    int32_t anim_h_line = 44;
-    int32_t anim_phrase_1_y = 75;
-    int32_t anim_phrase_2_y = 75;
-    int32_t anim_phrase_3_y = 75;
-    int32_t anim_phrase_4_y = 75;
-    bool once_flag = false;
+    PixelUI& ui_;
+    char version_[24] = "FW --";
+    char footer_[24] = "GPL-3 / LINKATOMS";
+    uint32_t lastNetworkRefresh_ = 0U;
 
-    Coroutine coroutine_anim;
+    void refreshNetworkInfo() {
+        std::snprintf(footer_, sizeof(footer_), "GPL-3 / LINKATOMS");
+
+        wifi_ap_record_t accessPoint{};
+        if (esp_wifi_sta_get_ap_info(&accessPoint) != ESP_OK) return;
+
+        esp_netif_t* station = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+        esp_netif_ip_info_t ipInfo{};
+        if (station == nullptr || esp_netif_get_ip_info(station, &ipInfo) != ESP_OK ||
+            ipInfo.ip.addr == 0U) {
+            return;
+        }
+
+        std::snprintf(footer_, sizeof(footer_), "IP " IPSTR, IP2STR(&ipInfo.ip));
+    }
 
 public:
-    About(PixelUI& ui, void* param):m_ui(ui), bl(ui),
-    coroutine_anim([this](CoroutineContext& ctx) {
-        CORO_BEGIN(ctx);
-        CORO_DELAY(ctx, m_ui, 160, 100);
-        m_ui.animate(anim_phrase_1_y, 51, 300, EasingType::EASE_OUT_QUAD);
-        CORO_DELAY(ctx, m_ui, 200, 200);
-        m_ui.animate(anim_phrase_2_y, 60, 300, EasingType::EASE_OUT_QUAD);
-        CORO_DELAY(ctx, m_ui, 200, 300);
-        m_ui.animate(anim_phrase_3_y, 52, 300, EasingType::EASE_OUT_QUAD);
-        CORO_DELAY(ctx, m_ui, 200, 400);
-        m_ui.animate(anim_phrase_4_y, 61, 300, EasingType::EASE_OUT_QUAD);
-        CORO_END(ctx);
-    }) {};
+    About(PixelUI& ui, void*) : ui_(ui) {
+        setEnterTransitionEnabled(true);
+    }
+
     void draw() override {
-
-        if (!once_flag) {
-            once_flag = true;
-            m_ui.animate(anim_h_line, 61, 500, EasingType::EASE_OUT_CUBIC);
+        const uint32_t now = ui_.getCurrentTime();
+        if (now - lastNetworkRefresh_ >= kNetworkRefreshMs) {
+            lastNetworkRefresh_ = now;
+            refreshNetworkInfo();
         }
-        m_ui.markDirty();
-        U8G2& u8g2 = m_ui.getU8G2();
 
-        u8g2.setFont(u8g2_font_5x7_tr);
-        
-        u8g2.drawStr(5, anim_phrase_1_y, "DESIGNED BY");
-        u8g2.drawStr(5, anim_phrase_2_y, "LINKATOMS");
+        Canvas& display = ui_.getCanvas();
+        display.setFontDirection(0);
+        display.setDrawColor(1);
+        display.drawXBMP(5, 7, 28, 38, pixelui_logo_bits);
 
-        u8g2.setFont(u8g2_font_6x10_tr);
-        
-        char buf[20] = "fw: ";
+        display.setFont(u8g2_font_ncenB14_tr);
+        display.drawStr(42, 20, "Geiger");
 
-        if (bl.isVisible()) {u8g2.drawStr(12, 14, "THANKS FOR UR WORK");}
-        else { 
-            strcat(buf, esp_app_get_description()->version);
-            u8g2.drawStr(12, 14, buf);
-        }
-        u8g2.drawStr(95, anim_phrase_3_y, "UNDER");
-
-        u8g2.drawStr(84, anim_phrase_4_y, "PixelUI");
-
-        u8g2.drawFrame(6, 1, 117, 18);
-
-        u8g2.drawFrame(8, 3, 117, 18);
-
-        u8g2.drawLine(63, 44, 63, anim_h_line);
-
-        u8g2.drawStr(6, 36, "General");
+        display.setFont(PIXELUI_FONT_SMALL);
+        display.drawStr(43, 33, "COUNTER N1");
+        display.drawHLine(42, 37, 80);
+        display.setFont(PIXELUI_FONT_TINY);
+        display.drawStr(43, 50, version_);
+        display.drawStr(43, 61, footer_);
     }
 
     bool handleInput(InputEvent event) override {
@@ -100,30 +102,27 @@ public:
         }
         return false;
     }
-    
-    void onEnter(ExitCallback cb) override {
-        IApplication::onEnter(cb);
-        m_ui.setContinousDraw(true);
-        m_ui.markDirty(); 
-        bl.setInterval(2000);
-        bl.start();
-        
-        coroutine_anim.reset();
-        coroutine_anim.start();
 
-        m_ui.addCoroutine(&coroutine_anim);
+    void onEnter(ExitCallback callback) override {
+        IApplication::onEnter(callback);
+        const esp_app_desc_t* description = esp_app_get_description();
+        std::snprintf(version_, sizeof(version_), "FW %.16s",
+                      description != nullptr ? description->version : "--");
+        refreshNetworkInfo();
+        lastNetworkRefresh_ = ui_.getCurrentTime();
+        ui_.setContinousDraw(true);
+        ui_.markDirty();
     }
 
-    void onExit() {
-        m_ui.removeCoroutine(&coroutine_anim);
-        m_ui.setContinousDraw(false);
-        m_ui.markFading();
+    void onExit() override {
+        ui_.clearAllAnimations();
+        ui_.setContinousDraw(false);
+        ui_.markFading();
     }
 };
 
 AppItem about_app{
     .title = "关于",
     .bitmap = image_about_bits,
-    
     .factory = ApplicationFactory::make<About>(),
 };
