@@ -143,7 +143,8 @@ ListItem sub_radio_ble_cfg[10] = {
 ListItem sub_radio_cfg[3] = {
     ListItem(">>> 无线 <<<"),
     ListItem{.title = "- Wi-Fi", .nextList = sub_radio_wifi_cfg, .nextListLength = 10},
-    ListItem{.title = "- 蓝色牙齿", .nextList = sub_radio_ble_cfg, .nextListLength = 10}
+    // ListItem{.title = "- 蓝色牙齿", .nextList = sub_radio_ble_cfg, .nextListLength = 10}
+    ListItem{.title = "- 蓝色牙齿", .pFunc = []() { ui.showPopupInfo("尚未智齿", "Bluetooth LE", 120, 60, 2000); }}
 };
 
 ListItem sub_storage_cfg[3] = {

@@ -10,7 +10,7 @@
 #include "system_nvs_varibles.h"
 
 namespace {
-constexpr uint32_t kPostHelloDelayMs = 600U;
+constexpr uint32_t kPostHelloDelayMs = 100U;
 constexpr uint32_t kDeviceEnterMs = 700U;
 constexpr uint32_t kPromptEnterMs = 450U;
 constexpr uint32_t kPromptNudgeMs = 320U;

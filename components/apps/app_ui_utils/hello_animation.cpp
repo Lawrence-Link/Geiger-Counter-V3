@@ -11,7 +11,7 @@
 
 namespace {
 constexpr uint32_t kHelloFirstStrokeMs = 400U;
-constexpr uint32_t kHelloSecondStrokeDelayMs = 500U;
+constexpr uint32_t kHelloSecondStrokeDelayMs = 300U;
 constexpr uint32_t kHelloSecondStrokeMs = 1600U;
 constexpr uint32_t kHelloDurationMs =
     kHelloSecondStrokeDelayMs + kHelloSecondStrokeMs;
